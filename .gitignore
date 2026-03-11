@@ -1,6 +1,7 @@
 # Environment files
+.env
 .env.local
-convert.js
+.env.*.local
 
 # OS files
 .DS_Store
@@ -15,6 +16,24 @@ Thumbs.db
 # Dependencies
 node_modules/
 
-# Build outputs
-.next/
-.wrangler/
+# React Native (Expo)
+app/ios/Pods/
+app/ios/build/
+app/android/.gradle/
+app/android/app/build/
+app/android/build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+*.hprof
+
+# Next.js
+web/.next/
+web/out/
+
+# Misc
+*.tsbuildinfo
+.expo/

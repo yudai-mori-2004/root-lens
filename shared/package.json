@@ -1,7 +1,0 @@
-{
-  "name": "@rootlens/shared",
-  "version": "4.0.0",
-  "private": true,
-  "main": "./types/index.ts",
-  "types": "./types/index.ts"
-}
