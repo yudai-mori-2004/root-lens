@@ -15,6 +15,8 @@ export interface PageMeta {
   thumbnailUrl: string;
   /** OGP用バナー付き画像URL */
   ogpImageUrl: string;
+  /** cNFT Asset ID (Solana mint address)。検索の高速パスに使用 */
+  assetId?: string;
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

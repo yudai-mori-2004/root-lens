@@ -1,57 +1,141 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, PublishResult } from '../navigation/types';
+import { config } from '../config';
 
-// 仕様書 §3.7 公開ページプレビュー
-// 将来: Title Protocol登録 → ローディング → iframe(rootlens.io)
-// 現時点: モックローディング → 仮ページ表示
+// 仕様書 §2.4 公開パイプライン実行
+// §6.1 Title Protocol登録 + §6.2 R2保存 + §6.4 ページ生成
+// サーバーの POST /api/v1/publish に委譲
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Publishing'>;
 
+type Phase = 'uploading' | 'registering' | 'done' | 'error';
+
 export default function PublishingScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const [phase, setPhase] = useState<'loading' | 'done'>('loading');
+  const { signedUris } = route.params;
 
-  // モックの登録処理（2秒待機）
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  const [phase, setPhase] = useState<Phase>('uploading');
+  const [result, setResult] = useState<PublishResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const publishingRef = useRef(false);
+
+  const publish = async () => {
+    if (publishingRef.current) return;
+    publishingRef.current = true;
+    setPhase('uploading');
+    setErrorMessage('');
+
+    try {
+      // C2PA署名済みファイルを読み取り
+      const uri = signedUris[0];
+      const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+
+      setPhase('uploading');
+
+      // multipart/form-data でサーバーに送信
+      const response = await FileSystem.uploadAsync(config.publishUrl, fileUri, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'content',
+        mimeType: 'image/jpeg',
+      });
+
+      setPhase('registering');
+
+      if (response.status !== 200) {
+        const body = JSON.parse(response.body);
+        throw new Error(body.error || `Server error: ${response.status}`);
+      }
+
+      const data: PublishResult = JSON.parse(response.body);
+      setResult(data);
       setPhase('done');
-    }, 2000);
-    return () => clearTimeout(timer);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      setErrorMessage(msg);
+      setPhase('error');
+    } finally {
+      publishingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    publish();
   }, []);
 
   const handleDone = () => {
-    // ホームに戻る
     navigation.popToTop();
   };
 
-  if (phase === 'loading') {
+  const handleCopyLink = async () => {
+    if (!result) return;
+    await Clipboard.setStringAsync(result.pageUrl);
+    Alert.alert('コピーしました', result.pageUrl);
+  };
+
+  const handleShare = async () => {
+    if (!result) return;
+    try {
+      await Share.share({ message: result.pageUrl });
+    } catch (_) {}
+  };
+
+  // --- ローディング ---
+  if (phase === 'uploading' || phase === 'registering') {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1a1a1a" />
-        <Text style={styles.loadingTitle}>本物証明を登録中...</Text>
+        <Text style={styles.loadingTitle}>
+          {phase === 'uploading' ? 'アップロード中...' : '本物証明を登録中...'}
+        </Text>
         <Text style={styles.loadingSubtitle}>
-          コンテンツの真正性を記録しています
+          {phase === 'uploading'
+            ? 'コンテンツをサーバーに送信しています'
+            : 'Title Protocolに記録しています'}
         </Text>
       </SafeAreaView>
     );
   }
 
-  // 完了: WebViewで仮ページ表示
+  // --- エラー ---
+  if (phase === 'error') {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color="#d32f2f" />
+        <Text style={styles.loadingTitle}>登録に失敗しました</Text>
+        <Text style={styles.errorText}>{errorMessage}</Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity style={styles.retryButton} onPress={publish}>
+            <Text style={styles.retryButtonText}>リトライ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelButton} onPress={handleDone}>
+            <Text style={styles.cancelButtonText}>戻る</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // --- 完了: WebViewで公開ページ表示 ---
   return (
     <SafeAreaView style={styles.container}>
       {/* ヘッダー */}
@@ -64,109 +148,26 @@ export default function PublishingScreen() {
 
       {/* 共有バー */}
       <View style={styles.shareBar}>
-        <TouchableOpacity style={styles.shareButton}>
+        <TouchableOpacity style={styles.shareButton} onPress={handleCopyLink}>
           <Ionicons name="link-outline" size={20} color="#1a1a1a" />
           <Text style={styles.shareButtonText}>リンクをコピー</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton}>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <Ionicons name="share-outline" size={20} color="#1a1a1a" />
           <Text style={styles.shareButtonText}>共有</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 仮の公開ページ（WebView） */}
+      {/* 公開ページ WebView */}
       <WebView
-        source={{
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                  background: #fafafa;
-                  color: #1a1a1a;
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                  padding: 24px 16px;
-                }
-                .badge {
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 6px;
-                  background: #1a1a1a;
-                  color: #fff;
-                  padding: 8px 16px;
-                  border-radius: 24px;
-                  font-size: 13px;
-                  font-weight: 600;
-                  margin-bottom: 24px;
-                }
-                .badge .dot {
-                  width: 8px; height: 8px;
-                  border-radius: 4px;
-                  background: #4caf50;
-                }
-                .card {
-                  background: #fff;
-                  border-radius: 16px;
-                  padding: 24px;
-                  width: 100%;
-                  max-width: 400px;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                }
-                .card h2 { font-size: 16px; margin-bottom: 16px; }
-                .row {
-                  display: flex; justify-content: space-between;
-                  padding: 10px 0;
-                  border-bottom: 1px solid #f0f0f0;
-                  font-size: 14px;
-                }
-                .row:last-child { border-bottom: none; }
-                .label { color: #999; }
-                .value { font-weight: 500; }
-                .verified { color: #4caf50; }
-                .footer {
-                  margin-top: 24px;
-                  font-size: 12px;
-                  color: #999;
-                  text-align: center;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="badge"><span class="dot"></span> Shot on RootLens</div>
-              <div class="card">
-                <h2>本物証明</h2>
-                <div class="row">
-                  <span class="label">ステータス</span>
-                  <span class="value verified">検証済み</span>
-                </div>
-                <div class="row">
-                  <span class="label">撮影元</span>
-                  <span class="value">RootLens</span>
-                </div>
-                <div class="row">
-                  <span class="label">登録日時</span>
-                  <span class="value">${new Date().toLocaleDateString('ja-JP')}</span>
-                </div>
-                <div class="row">
-                  <span class="label">ブラウザ検証</span>
-                  <span class="value verified">完了</span>
-                </div>
-              </div>
-              <p class="footer">
-                このページはRootLensの仮プレビューです。<br>
-                実際の公開ページはrootlens.ioでホストされます。
-              </p>
-            </body>
-            </html>
-          `,
-        }}
+        source={{ uri: result!.pageUrl }}
         style={styles.webview}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={styles.webviewLoading}>
+            <ActivityIndicator size="small" color="#999" />
+          </View>
+        )}
       />
     </SafeAreaView>
   );
@@ -184,6 +185,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
+    paddingHorizontal: 24,
   },
   loadingTitle: {
     fontSize: 18,
@@ -193,6 +195,41 @@ const styles = StyleSheet.create({
   loadingSubtitle: {
     fontSize: 14,
     color: '#999',
+  },
+  // エラー
+  errorText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  retryButton: {
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 15,
+    fontWeight: '500',
   },
   // ヘッダー
   header: {
@@ -247,5 +284,14 @@ const styles = StyleSheet.create({
   // WebView
   webview: {
     flex: 1,
+  },
+  webviewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -7,7 +7,7 @@
  */
 
 import type { Metadata } from "next";
-import { resolvePageMeta } from "@/lib/mock";
+import { resolvePageMeta } from "@/lib/data";
 import ContentPage from "@/components/ContentPage";
 
 interface Props {

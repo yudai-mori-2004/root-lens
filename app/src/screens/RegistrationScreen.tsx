@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -34,17 +33,8 @@ export default function RegistrationScreen() {
   const { signedUris } = route.params;
 
   const handleRegister = () => {
-    // プレースホルダー: Title Protocolへの登録は次タスク
-    Alert.alert(
-      '登録準備完了',
-      `${signedUris.length}枚の署名済みコンテンツが準備されました。\nプロトコルへの登録は次のアップデートで実装されます。`,
-      [
-        {
-          text: 'ホームに戻る',
-          onPress: () => navigation.popToTop(),
-        },
-      ],
-    );
+    // 仕様書 §2.4: 公開パイプライン実行
+    navigation.navigate('Publishing', { signedUris });
   };
 
   const handleBack = () => {

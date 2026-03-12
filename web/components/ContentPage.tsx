@@ -15,7 +15,7 @@ import type {
   VerificationResult,
   VerifyStepStatus,
 } from "@/lib/types";
-import { fetchContentRecord, verifyContent } from "@/lib/mock";
+import { fetchContentRecord, verifyContent } from "@/lib/data";
 import styles from "./ContentPage.module.css";
 
 interface Props {
@@ -34,12 +34,15 @@ export default function ContentPage({ page }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    // Title Protocol からコンテンツ記録を取得
-    fetchContentRecord(page.contentHash).then(setRecord);
-
-    // クライアントサイド検証を実行
-    verifyContent(page.contentHash, page.thumbnailUrl).then(setVerification);
-  }, [page.contentHash, page.thumbnailUrl]);
+    // Title Protocol からコンテンツ記録を取得 → 取得結果で検証を実行
+    fetchContentRecord(page.contentHash, page.assetId).then(({ record: r, resolved }) => {
+      setRecord(r);
+      // クライアントサイド検証を実行 (§7.4: サーバー関与なし)
+      verifyContent(page.contentHash, page.thumbnailUrl, resolved).then(
+        setVerification
+      );
+    });
+  }, [page.contentHash, page.thumbnailUrl, page.assetId]);
 
   const capturedDate = record
     ? formatDate(record.capturedAt)

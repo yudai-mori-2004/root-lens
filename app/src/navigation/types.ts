@@ -5,12 +5,21 @@ export interface MediaItem {
   type: 'image' | 'video';
 }
 
+/** POST /api/v1/publish のレスポンス */
+export interface PublishResult {
+  shortId: string;
+  pageUrl: string;
+  contentHash: string;
+  assetId: string;
+  txSignature: string;
+}
+
 export type RootStackParamList = {
   Main: undefined;
   Camera: undefined;
   CameraGallery: undefined;
   Edit: { mediaItems: MediaItem[] };
-  Publishing: { mediaItems: MediaItem[] };
+  Publishing: { signedUris: string[] };
   Preview: { contentIds: string[] };
   Registration: { signedUris: string[] };
 };

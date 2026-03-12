@@ -14,6 +14,8 @@ const SERVER_URL = __DEV__
 
 export const config = {
   serverUrl: SERVER_URL,
+  /** 公開API — 仕様書 §6.1, §6.2, §6.4 */
+  publishUrl: `${SERVER_URL}/api/v1/publish`,
   /** 証明書発行API */
   deviceCertificateUrl: `${SERVER_URL}/api/v1/device-certificate`,
   /** 証明書更新API */
