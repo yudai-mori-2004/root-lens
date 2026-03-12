@@ -42,6 +42,7 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
         private const val TAG = "C2paBridge"
         init {
             System.loadLibrary("c2pa_bridge")
+            System.loadLibrary("c2pa_jni")
         }
     }
 

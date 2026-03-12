@@ -16,6 +16,9 @@ import { uploadPublic, contentKey, ogpKey } from "@/lib/server/r2";
 import { registerContent } from "@/lib/server/title-protocol";
 import { createPage } from "@/lib/server/page-store";
 
+// Vercel function timeout (Proプラン: 最大60秒)
+export const maxDuration = 60;
+
 /** 表示用画像の最大幅 */
 const DISPLAY_MAX_WIDTH = 1600;
 /** OGP画像の幅 */

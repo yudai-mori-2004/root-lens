@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // c2pa-bridge FFI (レガシー)
 extern int c2pa_sign_image(

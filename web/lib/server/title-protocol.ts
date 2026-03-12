@@ -82,6 +82,35 @@ async function uploadToIrys(
 }
 
 // ---------------------------------------------------------------------------
+// ポーリングベースのトランザクション確認（WebSocket不要）
+// ---------------------------------------------------------------------------
+
+async function pollTransactionConfirmation(
+  connection: Connection,
+  signature: string,
+  maxRetries = 30,
+  intervalMs = 1000,
+): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    const { value } = await connection.getSignatureStatuses([signature]);
+    const status = value?.[0];
+    if (status) {
+      if (status.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+      }
+      if (
+        status.confirmationStatus === "confirmed" ||
+        status.confirmationStatus === "finalized"
+      ) {
+        return;
+      }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(`Transaction confirmation timeout: ${signature}`);
+}
+
+// ---------------------------------------------------------------------------
 // 登録結果
 // ---------------------------------------------------------------------------
 
@@ -129,6 +158,8 @@ export async function registerContent(
   const contentHash = result.contents[0]?.contentHash || "";
 
   // 4. Co-sign + broadcast
+  // Vercelサーバーレス環境ではWebSocketが使えないため、
+  // confirmTransaction の代わりにポーリングで確認する
   let txSignature = "";
   if (result.partialTxs && result.partialTxs.length > 0) {
     for (const txBase64 of result.partialTxs) {
@@ -138,7 +169,8 @@ export async function registerContent(
         skipPreflight: false,
         preflightCommitment: "confirmed",
       });
-      await connection.confirmTransaction(sig, "confirmed");
+      // ポーリングで確認（WebSocket不要）
+      await pollTransactionConfirmation(connection, sig);
       txSignature = sig;
     }
   }
@@ -146,6 +178,8 @@ export async function registerContent(
   // 5. Asset ID をトランザクションログから取得
   let assetId = "";
   if (txSignature) {
+    // confirmTransaction直後はgetTransactionがnullを返すことがあるため少し待つ
+    await new Promise((r) => setTimeout(r, 1000));
     const txInfo = await connection.getTransaction(txSignature, {
       maxSupportedTransactionVersion: 0,
     });
