@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { findByShortId } from "@/lib/server/page-store";
+import { findByShortId, updatePageContent } from "@/lib/server/page-store";
 
 export async function GET(
   _req: NextRequest,
@@ -24,4 +24,30 @@ export async function GET(
     thumbnailUrl: record.thumbnailUrl,
     ogpImageUrl: record.ogpImageUrl,
   });
+}
+
+/**
+ * PATCH /api/v1/pages/:shortId
+ *
+ * Title Protocol登録完了後、アプリからcontentHash/assetIdを更新
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ shortId: string }> }
+) {
+  try {
+    const { shortId } = await params;
+    const { contentHash, assetId } = await req.json();
+
+    if (!contentHash) {
+      return NextResponse.json({ error: "contentHash is required" }, { status: 400 });
+    }
+
+    await updatePageContent(shortId, contentHash, assetId || "");
+
+    return NextResponse.json({ ok: true });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }

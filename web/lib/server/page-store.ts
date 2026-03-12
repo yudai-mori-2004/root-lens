@@ -132,6 +132,32 @@ export async function findByShortId(
   };
 }
 
+export async function updatePageContent(
+  shortId: string,
+  contentHash: string,
+  assetId: string,
+): Promise<void> {
+  // pages テーブルからpage_idを取得
+  const { data: page, error: pageError } = await supabase
+    .from("pages")
+    .select("id")
+    .eq("short_id", shortId)
+    .single();
+
+  if (pageError || !page) throw new Error(`Page not found: ${shortId}`);
+
+  // contents テーブルを更新
+  const { error } = await supabase
+    .from("contents")
+    .update({
+      content_hash: contentHash,
+      title_protocol_asset_id: assetId,
+    })
+    .eq("page_id", page.id);
+
+  if (error) throw new Error(`contents update failed: ${error.message}`);
+}
+
 export async function findByContentHash(
   contentHash: string
 ): Promise<PageRecord | null> {

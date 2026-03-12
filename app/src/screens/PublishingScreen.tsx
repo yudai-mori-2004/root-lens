@@ -18,10 +18,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
 import { config } from '../config';
+import { registerOnTitleProtocol } from '../services/titleProtocol';
 
 // 仕様書 §2.4 公開パイプライン実行
-// §6.1 Title Protocol登録 + §6.2 R2保存 + §6.4 ページ生成
-// サーバーの POST /api/v1/publish に委譲
+// §6.1 パイプラインA: Title Protocol登録（クライアント側）
+// §6.2 パイプラインB: R2保存 + ページ生成（サーバー側）
+// 両パイプラインを並列実行
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Publishing'>;
@@ -45,28 +47,63 @@ export default function PublishingScreen() {
     setErrorMessage('');
 
     try {
-      // C2PA署名済みファイルを読み取り
       const uri = signedUris[0];
       const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
 
-      setPhase('uploading');
-
-      // multipart/form-data でサーバーに送信
-      const response = await FileSystem.uploadAsync(config.publishUrl, fileUri, {
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-        fieldName: 'content',
-        mimeType: 'image/jpeg',
-      });
+      // ファイルをバイナリとして読み取り（Title Protocol SDK用）
+      const fileBase64 = await FileSystem.readAsStringAsync(
+        fileUri,
+        { encoding: FileSystem.EncodingType.Base64 },
+      );
+      const binaryStr = atob(fileBase64);
+      const content = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        content[i] = binaryStr.charCodeAt(i);
+      }
 
       setPhase('registering');
 
-      if (response.status !== 200) {
-        const body = JSON.parse(response.body);
-        throw new Error(body.error || `Server error: ${response.status}`);
+      // §6: パイプラインA + B を並列実行
+      const [tpResult, uploadResponse] = await Promise.all([
+        // パイプラインA: Title Protocol登録（クライアント側 SDK）
+        registerOnTitleProtocol(content),
+
+        // パイプラインB: 画像保存 + ページ作成（サーバー側）
+        FileSystem.uploadAsync(config.publishUrl, fileUri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'content',
+          mimeType: 'image/jpeg',
+        }),
+      ]);
+
+      // パイプラインBのレスポンス確認
+      if (uploadResponse.status !== 200) {
+        const body = JSON.parse(uploadResponse.body);
+        throw new Error(body.error || `Server error: ${uploadResponse.status}`);
       }
 
-      const data: PublishResult = JSON.parse(response.body);
+      const serverData = JSON.parse(uploadResponse.body);
+
+      // 両パイプラインの結果を統合
+      const data: PublishResult = {
+        shortId: serverData.shortId,
+        pageUrl: serverData.pageUrl,
+        contentHash: tpResult.contentHash,
+        assetId: tpResult.assetId,
+        txSignature: tpResult.txSignature,
+      };
+
+      // サーバーにTP登録結果を送信してページレコードを更新
+      await fetch(`${config.serverUrl}/api/v1/pages/${serverData.shortId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentHash: tpResult.contentHash,
+          assetId: tpResult.assetId,
+        }),
+      });
+
       setResult(data);
       setPhase('done');
     } catch (e: unknown) {

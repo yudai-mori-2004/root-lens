@@ -12,8 +12,10 @@ const SERVER_URL = 'https://www.rootlens.io';
 
 export const config = {
   serverUrl: SERVER_URL,
-  /** 公開API — 仕様書 §6.1, §6.2, §6.4 */
+  /** パイプラインB: 画像保存 + ページ作成 — 仕様書 §6.2, §6.4 */
   publishUrl: `${SERVER_URL}/api/v1/publish`,
+  /** signed_json 保存 — storeSignedJsonコールバック用 */
+  storeJsonUrl: `${SERVER_URL}/api/v1/store-json`,
   /** 証明書発行API */
   deviceCertificateUrl: `${SERVER_URL}/api/v1/device-certificate`,
   /** 証明書更新API */
