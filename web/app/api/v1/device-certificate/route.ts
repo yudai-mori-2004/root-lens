@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyCSR, issueDeviceCertificate } from "@/lib/ca";
+import { verifyCSR, issueDeviceCertificate } from "@/lib/server/ca";
 
 const DEV_MODE = process.env.DEV_MODE !== "false"; // デフォルトtrue
 

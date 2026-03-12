@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getRevokedSerials } from "@/lib/crl";
+import { getRevokedSerials } from "@/lib/server/crl";
 
 export async function GET() {
   const revoked = getRevokedSerials();

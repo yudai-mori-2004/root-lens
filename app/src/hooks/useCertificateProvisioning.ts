@@ -101,7 +101,12 @@ export function useCertificateProvisioning(): CertState & { retry: () => void } 
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[CertProvisioning] Provisioning failed:', msg);
-      safeSetState({ status: 'error', error: msg });
+      if (__DEV__) {
+        console.warn('[CertProvisioning] DEV mode: continuing without certificate');
+        safeSetState({ status: 'ready', error: null });
+      } else {
+        safeSetState({ status: 'error', error: msg });
+      }
     } finally {
       provisioningRef.current = false;
     }

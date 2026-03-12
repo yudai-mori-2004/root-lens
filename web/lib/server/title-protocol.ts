@@ -12,7 +12,6 @@ if (!globalThis.crypto?.subtle) {
   (globalThis as any).crypto = webcrypto;
 }
 
-import * as fs from "node:fs";
 import { Connection, Keypair, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import bs58 from "bs58";
 import { fetchGlobalConfig, TitleClient } from "@title-protocol/sdk";
@@ -21,8 +20,6 @@ import { fetchGlobalConfig, TitleClient } from "@title-protocol/sdk";
 // 設定
 // ---------------------------------------------------------------------------
 
-const WALLET_PATH = process.env.OPERATOR_WALLET_PATH
-  || "/Users/forest/WebCreations/title-protocol/keys/operator.json";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 // ---------------------------------------------------------------------------
@@ -33,8 +30,19 @@ let _keypair: Keypair | null = null;
 
 function getKeypair(): Keypair {
   if (!_keypair) {
-    const raw = JSON.parse(fs.readFileSync(WALLET_PATH, "utf-8"));
-    _keypair = Keypair.fromSecretKey(Uint8Array.from(raw));
+    // 環境変数 OPERATOR_WALLET_JSON: JSON配列文字列 e.g. "[1,2,3,...]"
+    // フォールバック: ファイルパスから読み込み（ローカル開発用）
+    const walletJson = process.env.OPERATOR_WALLET_JSON;
+    if (walletJson) {
+      const raw = JSON.parse(walletJson);
+      _keypair = Keypair.fromSecretKey(Uint8Array.from(raw));
+    } else {
+      const fs = require("node:fs");
+      const walletPath = process.env.OPERATOR_WALLET_PATH
+        || "/Users/forest/WebCreations/title-protocol/keys/operator.json";
+      const raw = JSON.parse(fs.readFileSync(walletPath, "utf-8"));
+      _keypair = Keypair.fromSecretKey(Uint8Array.from(raw));
+    }
   }
   return _keypair;
 }

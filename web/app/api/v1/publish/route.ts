@@ -12,9 +12,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
-import { uploadPublic, contentKey, ogpKey } from "@/lib/r2";
-import { registerContent } from "@/lib/title-protocol";
-import { createPage } from "@/lib/page-store";
+import { uploadPublic, contentKey, ogpKey } from "@/lib/server/r2";
+import { registerContent } from "@/lib/server/title-protocol";
+import { createPage } from "@/lib/server/page-store";
 
 /** 表示用画像の最大幅 */
 const DISPLAY_MAX_WIDTH = 1600;

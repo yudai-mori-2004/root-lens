@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createPage } from "@/lib/page-store";
+import { createPage } from "@/lib/server/page-store";
 
 export async function POST(req: NextRequest) {
   try {

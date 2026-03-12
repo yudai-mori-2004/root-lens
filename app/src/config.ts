@@ -7,10 +7,10 @@ import { Platform } from 'react-native';
 // iOS シミュレータは localhost でOK
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 
-// TODO: 本番URL設定
+// web/ に統合されたため、本番もrootlens.ioを使用
 const SERVER_URL = __DEV__
   ? `http://${DEV_HOST}:3000`
-  : 'https://api.rootlens.io';
+  : 'https://www.rootlens.io';
 
 export const config = {
   serverUrl: SERVER_URL,

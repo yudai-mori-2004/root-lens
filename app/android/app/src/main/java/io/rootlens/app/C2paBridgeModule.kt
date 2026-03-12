@@ -130,11 +130,24 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val privateKey = entry.privateKey
 
             // PKCS#10 CSR作成（§4.4.1: Subject CN = "RootLens Device"）
+            // AndroidKeyStoreはBouncyCastleのJcaContentSignerBuilderと互換性がないため、
+            // 標準JCA Signatureを使ったカスタムContentSignerでCSRに署名する
             val subject = X500Name("CN=RootLens Device")
             val csrBuilder = JcaPKCS10CertificationRequestBuilder(subject, publicKey)
-            val signer = JcaContentSignerBuilder("SHA256withECDSA")
-                .setProvider("AndroidKeyStore")
-                .build(privateKey)
+            val signer = object : org.bouncycastle.operator.ContentSigner {
+                private val stream = java.io.ByteArrayOutputStream()
+                override fun getAlgorithmIdentifier() =
+                    org.bouncycastle.asn1.x509.AlgorithmIdentifier(
+                        org.bouncycastle.asn1.x9.X9ObjectIdentifiers.ecdsa_with_SHA256
+                    )
+                override fun getOutputStream(): java.io.OutputStream = stream
+                override fun getSignature(): ByteArray {
+                    val sig = Signature.getInstance("SHA256withECDSA")
+                    sig.initSign(privateKey)
+                    sig.update(stream.toByteArray())
+                    return sig.sign()
+                }
+            }
             val csr = csrBuilder.build(signer)
             val csrDer = csr.encoded
             val csrBase64 = Base64.encodeToString(csrDer, Base64.NO_WRAP)

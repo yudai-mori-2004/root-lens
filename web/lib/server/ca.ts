@@ -2,13 +2,11 @@
  * Root CA 鍵管理 + Device Certificate 発行
  * 仕様書 §4.3, §4.4
  *
- * Dev環境: ファイルシステムからPEMを読み込み
- * Prod環境: AWS KMS Sign API（将来実装）
+ * 環境変数 ROOT_CA_CERT_PEM / ROOT_CA_KEY_PEM から PEM を読み込む。
+ * ローカル開発時はファイルからフォールバック。
  */
 
 import * as x509 from "@peculiar/x509";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import crypto from "crypto";
 
 // @peculiar/x509 が使う Crypto プロバイダを設定（Node.js環境）
@@ -16,19 +14,25 @@ x509.cryptoProvider.set(crypto.webcrypto as Crypto);
 
 // --- Root CA 読み込み ---
 
-const DEV_CERTS_DIR = resolve(process.cwd(), "..", "certs", "dev");
-
 let rootCaCert: x509.X509Certificate | null = null;
 let rootCaKey: CryptoKey | null = null;
+
+function loadPem(envVar: string, fallbackPath?: string): string {
+  const envValue = process.env[envVar];
+  if (envValue) return envValue;
+  if (fallbackPath) {
+    const fs = require("fs");
+    const path = require("path");
+    return fs.readFileSync(path.resolve(process.cwd(), fallbackPath), "utf-8");
+  }
+  throw new Error(`${envVar} is not set`);
+}
 
 async function loadRootCa() {
   if (rootCaCert && rootCaKey) return { cert: rootCaCert, key: rootCaKey };
 
-  const certPem = readFileSync(resolve(DEV_CERTS_DIR, "root-ca.pem"), "utf-8");
-  const keyPem = readFileSync(
-    resolve(DEV_CERTS_DIR, "root-ca-key.pem"),
-    "utf-8"
-  );
+  const certPem = loadPem("ROOT_CA_CERT_PEM", "../certs/dev/root-ca.pem");
+  const keyPem = loadPem("ROOT_CA_KEY_PEM", "../certs/dev/root-ca-key.pem");
 
   rootCaCert = new x509.X509Certificate(certPem);
 

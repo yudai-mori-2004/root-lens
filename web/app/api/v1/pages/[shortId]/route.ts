@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { findByShortId } from "@/lib/page-store";
+import { findByShortId } from "@/lib/server/page-store";
 
 export async function GET(
   _req: NextRequest,
