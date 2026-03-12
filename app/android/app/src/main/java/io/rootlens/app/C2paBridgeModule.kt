@@ -8,6 +8,9 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import androidx.media3.common.MediaItem
@@ -15,10 +18,16 @@ import androidx.media3.effect.Crop
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.*
 import com.facebook.react.bridge.*
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
+import java.security.*
+import java.security.cert.X509Certificate
+import java.security.spec.ECGenParameterSpec
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -38,7 +47,10 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
 
     override fun getName(): String = "C2paBridge"
 
-    // JNI宣言
+    // TEE鍵のKeyStoreエイリアス
+    private val TEE_KEY_ALIAS = "rootlens_c2pa_signing_key"
+
+    // JNI宣言 (レガシー)
     private external fun nativeSignImage(
         inputPath: String,
         outputPath: String,
@@ -46,26 +58,215 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
         privateKeyPem: String
     ): Int
 
+    // JNI宣言 (TEEコールバック)
+    private external fun nativeSignImageTee(
+        inputPath: String,
+        outputPath: String,
+        certsDer: ByteArray,
+        certSizes: IntArray,
+        certCount: Int,
+        tsaUrl: String?
+    ): Int
+
     private external fun nativeReadManifest(inputPath: String): String
 
     private external fun nativeGetVersion(): String
+
+    // --- TEE鍵管理 (§4.4, §4.6) ---
+
+    /**
+     * TEE内でEC P-256鍵を生成し、CSRとPlatform Attestationを返す
+     * 仕様書 §4.4.1 フロー詳細
+     */
+    @ReactMethod
+    fun generateDeviceCredentials(promise: Promise) {
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+
+            // 既存の鍵があれば再利用
+            if (!keyStore.containsAlias(TEE_KEY_ALIAS)) {
+                // §4.2: ES256 (ECDSA P-256)
+                // §4.4.1: setIsStrongBoxBacked(true) → StrongBox対応端末で設定
+                val paramBuilder = KeyGenParameterSpec.Builder(
+                    TEE_KEY_ALIAS,
+                    KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+                )
+                    .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                    .setDigests(KeyProperties.DIGEST_SHA256)
+
+                // StrongBoxを試み、非対応ならTEEにフォールバック
+                try {
+                    paramBuilder.setIsStrongBoxBacked(true)
+                    val kpg = KeyPairGenerator.getInstance(
+                        KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
+                    )
+                    kpg.initialize(paramBuilder.build())
+                    kpg.generateKeyPair()
+                    Log.d(TAG, "TEE key generated (StrongBox)")
+                } catch (e: Exception) {
+                    Log.w(TAG, "StrongBox not available, falling back to TEE", e)
+                    val fallbackBuilder = KeyGenParameterSpec.Builder(
+                        TEE_KEY_ALIAS,
+                        KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+                    )
+                        .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                        .setDigests(KeyProperties.DIGEST_SHA256)
+                    val kpg = KeyPairGenerator.getInstance(
+                        KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
+                    )
+                    kpg.initialize(fallbackBuilder.build())
+                    kpg.generateKeyPair()
+                    Log.d(TAG, "TEE key generated (TEE fallback)")
+                }
+            } else {
+                Log.d(TAG, "TEE key already exists")
+            }
+
+            // 公開鍵を取得
+            keyStore.load(null)
+            val entry = keyStore.getEntry(TEE_KEY_ALIAS, null) as KeyStore.PrivateKeyEntry
+            val publicKey = entry.certificate.publicKey
+            val privateKey = entry.privateKey
+
+            // PKCS#10 CSR作成（§4.4.1: Subject CN = "RootLens Device"）
+            val subject = X500Name("CN=RootLens Device")
+            val csrBuilder = JcaPKCS10CertificationRequestBuilder(subject, publicKey)
+            val signer = JcaContentSignerBuilder("SHA256withECDSA")
+                .setProvider("AndroidKeyStore")
+                .build(privateKey)
+            val csr = csrBuilder.build(signer)
+            val csrDer = csr.encoded
+            val csrBase64 = Base64.encodeToString(csrDer, Base64.NO_WRAP)
+
+            // TODO: Platform Attestation (Key Attestation + Play Integrity)
+            // 現時点ではDev Modeのため省略
+
+            val result = Arguments.createMap().apply {
+                putString("csr", csrBase64)
+                putString("platform", "android")
+            }
+
+            Log.d(TAG, "generateDeviceCredentials: CSR created (${csrDer.size} bytes)")
+            promise.resolve(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "generateDeviceCredentials failed", e)
+            promise.reject("TEE_ERROR", e.message, e)
+        }
+    }
+
+    /**
+     * サーバーから返却されたDevice Certificate + Root CA Certificateを保存
+     * 仕様書 §4.4.1 ステップ7
+     */
+    @ReactMethod
+    fun storeDeviceCertificate(deviceCertBase64: String, rootCaCertBase64: String, promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val prefs = context.getSharedPreferences("rootlens_certs", 0)
+            prefs.edit()
+                .putString("device_cert_der", deviceCertBase64)
+                .putString("root_ca_cert_der", rootCaCertBase64)
+                .apply()
+            Log.d(TAG, "Device certificate stored")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "storeDeviceCertificate failed", e)
+            promise.reject("STORE_ERROR", e.message, e)
+        }
+    }
+
+    /**
+     * Device Certificateが存在するか確認
+     */
+    @ReactMethod
+    fun hasDeviceCertificate(promise: Promise) {
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            val hasKey = keyStore.containsAlias(TEE_KEY_ALIAS)
+
+            val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
+            val hasCert = prefs.getString("device_cert_der", null) != null
+
+            promise.resolve(hasKey && hasCert)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * Device Certificateの有効期限を返す（ISO 8601文字列）
+     * 証明書更新判定用
+     */
+    @ReactMethod
+    fun getDeviceCertificateExpiry(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
+            val certBase64 = prefs.getString("device_cert_der", null)
+            if (certBase64 == null) {
+                promise.resolve(null)
+                return
+            }
+            val certDer = Base64.decode(certBase64, Base64.NO_WRAP)
+            val cf = java.security.cert.CertificateFactory.getInstance("X.509")
+            val cert = cf.generateCertificate(certDer.inputStream()) as X509Certificate
+            promise.resolve(cert.notAfter.toInstant().toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "getDeviceCertificateExpiry failed", e)
+            promise.resolve(null)
+        }
+    }
+
+    /**
+     * TEE署名コールバック — JNI C層から呼び出される
+     * Android KeyStoreの秘密鍵でECDSA P-256署名を実行
+     */
+    fun nativeSignCallback(data: ByteArray): ByteArray {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val entry = keyStore.getEntry(TEE_KEY_ALIAS, null) as KeyStore.PrivateKeyEntry
+        val signature = Signature.getInstance("SHA256withECDSA")
+        signature.initSign(entry.privateKey)
+        signature.update(data)
+        return signature.sign()
+    }
+
+    /**
+     * 保存済みDER証明書を取得し、TEEコールバック経由で署名する内部メソッド
+     */
+    private fun signWithTee(inputFile: File, outputFile: File): Int {
+        val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
+        val deviceCertBase64 = prefs.getString("device_cert_der", null)
+            ?: throw IllegalStateException("Device certificate not found")
+        val rootCaBase64 = prefs.getString("root_ca_cert_der", null)
+            ?: throw IllegalStateException("Root CA certificate not found")
+
+        val deviceCertDer = Base64.decode(deviceCertBase64, Base64.NO_WRAP)
+        val rootCaDer = Base64.decode(rootCaBase64, Base64.NO_WRAP)
+
+        // DER証明書を連結
+        val certsDer = deviceCertDer + rootCaDer
+        val certSizes = intArrayOf(deviceCertDer.size, rootCaDer.size)
+
+        // 仕様書 §4.5.3: RFC 3161 TSAタイムスタンプ（短期証明書には必須）
+        val tsaUrl = "http://timestamp.digicert.com"
+
+        return nativeSignImageTee(
+            inputFile.absolutePath,
+            outputFile.absolutePath,
+            certsDer,
+            certSizes,
+            2,
+            tsaUrl
+        )
+    }
 
     @ReactMethod
     fun signContent(imagePath: String, promise: Promise) {
         try {
             val context = reactApplicationContext
             Log.d(TAG, "signContent called with: $imagePath")
-
-            // 開発用証明書を読み込む
-            val certChain = loadAssetAsString("dev-certs/dev-chain.pem")
-            val privateKey = loadAssetAsString("dev-certs/dev-device-key.pem")
-
-            if (certChain == null || privateKey == null) {
-                Log.e(TAG, "Dev certs not found")
-                promise.reject("CERT_ERROR", "開発用証明書が見つかりません")
-                return
-            }
-            Log.d(TAG, "Certs loaded: chain=${certChain.length} chars, key=${privateKey.length} chars")
 
             // 入力ファイルを実パスに変換（content:// URI対応）
             val inputFile = resolveToFile(imagePath)
@@ -80,14 +281,29 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val ext = inputFile.extension.ifEmpty { "jpg" }
             val outputFile = File(context.cacheDir, "c2pa_signed_${System.currentTimeMillis()}.$ext")
 
-            val result = nativeSignImage(
-                inputFile.absolutePath,
-                outputFile.absolutePath,
-                certChain,
-                privateKey
-            )
+            // TEE証明書があればTEEコールバック署名
+            // レガシーPEM署名はDEBUGビルドでのみ許可（§4.6）
+            val prefs = context.getSharedPreferences("rootlens_certs", 0)
+            val hasTeeCert = prefs.getString("device_cert_der", null) != null
 
-            Log.d(TAG, "nativeSignImage result: $result")
+            val result = if (hasTeeCert) {
+                Log.d(TAG, "Using TEE callback signing")
+                signWithTee(inputFile, outputFile)
+            } else if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Using legacy PEM signing (dev certs) — DEBUG only")
+                val certChain = loadAssetAsString("dev-certs/dev-chain.pem")
+                val privateKey = loadAssetAsString("dev-certs/dev-device-key.pem")
+                if (certChain == null || privateKey == null) {
+                    promise.reject("CERT_ERROR", "証明書が見つかりません")
+                    return
+                }
+                nativeSignImage(inputFile.absolutePath, outputFile.absolutePath, certChain, privateKey)
+            } else {
+                promise.reject("CERT_ERROR", "Device Certificateが未取得です。ネットワーク接続を確認してください")
+                return
+            }
+
+            Log.d(TAG, "signContent result: $result")
 
             when (result) {
                 0 -> {

@@ -47,7 +47,229 @@ fn mime_from_path(path: &str) -> &'static str {
     }
 }
 
-/// C2PA署名を実行する
+// --- TEEコールバック署名 (§4.6) ---
+
+/// 署名コールバック関数の型
+/// data: 署名対象データ
+/// data_len: dataの長さ
+/// sig_out: 署名出力バッファ（呼び出し側が確保）
+/// sig_out_len: 入力=バッファサイズ、出力=実際の署名サイズ
+/// context: 不透明コンテキストポインタ
+/// 戻り値: 0=成功, その他=エラー
+pub type CSignFn = extern "C" fn(
+    data: *const u8,
+    data_len: u32,
+    sig_out: *mut u8,
+    sig_out_len: *mut u32,
+    context: *mut std::ffi::c_void,
+) -> i32;
+
+/// TEEコールバックを使用したC2PA署名
+///
+/// 秘密鍵をRust側に渡さず、コールバック関数経由でTEE内で署名する。
+/// 仕様書 §4.6: Signerトレイトのカスタム実装 → TEE API
+///
+/// # Arguments
+/// * `input_path` - 入力メディアファイルのパス
+/// * `output_path` - 出力先パス
+/// * `certs_der` - DER証明書の連結バイト列 (Device Cert + Root CA)
+/// * `cert_sizes` - 各証明書のサイズ配列
+/// * `cert_count` - 証明書の数
+/// * `sign_fn` - TEE署名コールバック
+/// * `sign_ctx` - コールバック用コンテキスト
+/// * `tsa_url` - RFC 3161 TSAのURL（NULLの場合タイムスタンプなし）
+///
+/// # Returns
+/// * 0: 成功, -1: 引数エラー, -2: 署名エラー, -3: その他
+#[no_mangle]
+pub extern "C" fn c2pa_sign_image_tee(
+    input_path: *const c_char,
+    output_path: *const c_char,
+    certs_der: *const u8,
+    cert_sizes: *const u32,
+    cert_count: u32,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: *const c_char,
+) -> i32 {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        sign_image_tee_inner(
+            input_path, output_path, certs_der, cert_sizes, cert_count, sign_fn, sign_ctx, tsa_url,
+        )
+    }));
+    match result {
+        Ok(r) => r,
+        Err(_) => -3,
+    }
+}
+
+fn sign_image_tee_inner(
+    input_path: *const c_char,
+    output_path: *const c_char,
+    certs_der: *const u8,
+    cert_sizes: *const u32,
+    cert_count: u32,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: *const c_char,
+) -> i32 {
+    let input = match unsafe_cstr_to_str(input_path) {
+        Some(s) => s,
+        None => return -1,
+    };
+    let output = match unsafe_cstr_to_str(output_path) {
+        Some(s) => s,
+        None => return -1,
+    };
+
+    if certs_der.is_null() || cert_sizes.is_null() || cert_count == 0 {
+        return -1;
+    }
+
+    // DER証明書を分割
+    let mut certs: Vec<Vec<u8>> = Vec::new();
+    let sizes = unsafe { std::slice::from_raw_parts(cert_sizes, cert_count as usize) };
+    let mut offset: usize = 0;
+    for &size in sizes {
+        let s = size as usize;
+        let cert_data =
+            unsafe { std::slice::from_raw_parts(certs_der.add(offset), s) };
+        certs.push(cert_data.to_vec());
+        offset += s;
+    }
+
+    let tsa = unsafe_cstr_to_str(tsa_url);
+
+    match do_sign_tee(&input, &output, certs, sign_fn, sign_ctx, tsa) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("c2pa_sign_image_tee error: {e}");
+            -2
+        }
+    }
+}
+
+/// TEEコールバックSignerの実装
+struct CallbackSigner {
+    certs: Vec<Vec<u8>>,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: Option<String>,
+}
+
+// sign_ctxは単一スレッドからのみ使用される（c2pa-rsのBuilder::signは同期的）
+unsafe impl Send for CallbackSigner {}
+unsafe impl Sync for CallbackSigner {}
+
+impl c2pa::Signer for CallbackSigner {
+    fn sign(&self, data: &[u8]) -> c2pa::Result<Vec<u8>> {
+        // ES256署名は最大72バイト（DER形式）
+        let mut sig_buf = vec![0u8; 128];
+        let mut sig_len: u32 = sig_buf.len() as u32;
+
+        let ret = (self.sign_fn)(
+            data.as_ptr(),
+            data.len() as u32,
+            sig_buf.as_mut_ptr(),
+            &mut sig_len,
+            self.sign_ctx,
+        );
+
+        if ret != 0 {
+            return Err(c2pa::Error::OtherError(
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("TEE sign callback failed with code {ret}"),
+                ))
+            ));
+        }
+
+        sig_buf.truncate(sig_len as usize);
+        Ok(sig_buf)
+    }
+
+    fn alg(&self) -> c2pa::SigningAlg {
+        c2pa::SigningAlg::Es256
+    }
+
+    fn certs(&self) -> c2pa::Result<Vec<Vec<u8>>> {
+        Ok(self.certs.clone())
+    }
+
+    fn reserve_size(&self) -> usize {
+        // C2PAマニフェスト内の署名予約サイズ
+        // 証明書チェーン + COSE構造 + タイムスタンプ用の余裕
+        10240
+    }
+
+    /// 仕様書 §4.5.3 RFC 3161タイムスタンプ
+    fn time_authority_url(&self) -> Option<String> {
+        self.tsa_url.clone()
+    }
+}
+
+fn do_sign_tee(
+    input_path: &str,
+    output_path: &str,
+    certs: Vec<Vec<u8>>,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use c2pa::Builder;
+
+    // 仕様書 §4.5 C2PAマニフェスト
+    let manifest_json = r#"{
+        "claim_generator_info": [
+            {
+                "name": "RootLens",
+                "version": "0.1.0"
+            }
+        ],
+        "assertions": [
+            {
+                "label": "c2pa.actions",
+                "data": {
+                    "actions": [
+                        {
+                            "action": "c2pa.created",
+                            "softwareAgent": {
+                                "name": "RootLens",
+                                "version": "0.1.0"
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }"#;
+
+    let mut builder = Builder::from_json(manifest_json)?;
+
+    let signer = CallbackSigner {
+        certs,
+        sign_fn,
+        sign_ctx,
+        tsa_url,
+    };
+
+    let mut source = fs::File::open(input_path)?;
+    let mut dest = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(output_path)?;
+
+    let mime = mime_from_path(input_path);
+    builder.sign(&signer, mime, &mut source, &mut dest)?;
+
+    Ok(())
+}
+
+// --- レガシー署名（PEMベース、dev/テスト用） ---
+
+/// C2PA署名を実行する（レガシー: PEMベースのソフトウェア署名）
 ///
 /// # Arguments
 /// * `input_path` - 入力メディアファイルのパス (null-terminated UTF-8)

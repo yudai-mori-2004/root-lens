@@ -1,18 +1,39 @@
 #ifndef C2PA_BRIDGE_H
 #define C2PA_BRIDGE_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * C2PA署名を実行する
- *
- * @param input_path   入力JPEG/PNGのパス (null-terminated UTF-8)
- * @param output_path  出力先パス (null-terminated UTF-8)
- * @param cert_chain_pem 証明書チェーン PEM (Device Cert + Root CA)
- * @param private_key_pem 秘密鍵 PEM (PKCS#8)
- * @return 0: 成功, -1: 引数エラー, -2: 署名エラー, -3: その他
+ * TEE署名コールバック関数の型
+ */
+typedef int32_t (*c2pa_sign_fn)(
+    const uint8_t *data,
+    uint32_t data_len,
+    uint8_t *sig_out,
+    uint32_t *sig_out_len,
+    void *context
+);
+
+/**
+ * TEEコールバックを使用したC2PA署名（§4.6）
+ */
+int32_t c2pa_sign_image_tee(
+    const char *input_path,
+    const char *output_path,
+    const uint8_t *certs_der,
+    const uint32_t *cert_sizes,
+    uint32_t cert_count,
+    c2pa_sign_fn sign_fn,
+    void *sign_ctx,
+    const char *tsa_url
+);
+
+/**
+ * C2PA署名を実行する（レガシー: PEMベースのソフトウェア署名）
  */
 int c2pa_sign_image(
     const char *input_path,
@@ -23,9 +44,6 @@ int c2pa_sign_image(
 
 /**
  * C2PAマニフェストを読み取る
- *
- * @param input_path 入力画像のパス (null-terminated UTF-8)
- * @return JSON文字列 (c2pa_free_stringで解放すること)。NULLの場合は致命的エラー。
  */
 char *c2pa_read_manifest(const char *input_path);
 

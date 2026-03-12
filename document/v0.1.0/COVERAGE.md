@@ -17,9 +17,9 @@
 |---------|------|
 | モバイルアプリ (React Native) | 着手中 |
 | ネイティブモジュール (c2pa-rs FFI) | 実装済み（署名 + 読み取り） |
-| ネイティブモジュール (TEE) | 未着手 |
-| サーバー (Next.js API Routes) | 未着手 |
-| 公開ページ (rootlens.io) | 未着手 |
+| ネイティブモジュール (TEE) | 実装済み（鍵生成 + CSR + TEE署名コールバック。Android/iOS両対応） |
+| サーバー (Next.js API Routes) | 着手中（CA + 証明書発行 + CRL） |
+| 公開ページ (rootlens.io) | 着手中（UI + モックデータ。Title Protocol接続は後続） |
 | データベース (Supabase) | 未着手 |
 | ストレージ (R2) | 未着手 |
 
@@ -37,7 +37,7 @@
 
 | 仕様の要素 | 対応コンポーネント | 状態 |
 |-----------|------------------|------|
-| §2.1 初回起動 (TEE鍵生成 + Attestation) | App / Native Module | 未着手 |
+| §2.1 初回起動 (TEE鍵生成 + Attestation) | App / Native Module | 実装済み（起動時証明書プロビジョニング + 14日前自動更新 + リトライUI） |
 | §2.2 撮影・選択 | App / Native Module | 実装済み（写真・動画ともC2PA署名 + C2PAフィルタ付きギャラリー選択 + 複数選択） |
 | §2.3 編集 | App | 実装済み（クロップ・マスク・リサイズ・トリム + undo/redo + ドラフト永続化 + 動画動的プレビュー + ネイティブマスク描画 + ネイティブ動画書き出し） |
 | §2.4 公開 | App / Server | スタブ（登録準備画面まで。サーバー連携なし） |
@@ -65,12 +65,12 @@
 | 仕様の要素 | 対応コンポーネント | 状態 |
 |-----------|------------------|------|
 | §4.1 信頼モデル | — | 未着手 |
-| §4.2 暗号アルゴリズム (ES256) | Native Module | 未着手 |
-| §4.3 PKI構造 (Root CA + Device Cert) | Server / Native Module | 未着手 |
-| §4.4 証明書発行フロー | Server / Native Module | 未着手 |
-| §4.5 C2PAマニフェスト | Native Module | 実装済み（読み取り + 検証。署名生成は自己署名証明書） |
-| §4.6 C2PA SDK統合 (c2pa-rs FFI) | Native Module | 実装済み（フォーマット非依存署名 + マニフェスト読み取り + マスク描画 + 動画処理。JPEG/PNG/WebP/HEIC/MP4/MOV等対応。Android/iOS両対応） |
-| §4.7 鍵ライフサイクル管理 | Server (KMS) / Native Module | 未着手 |
+| §4.2 暗号アルゴリズム (ES256) | Native Module | 実装済み（c2pa-rs ES256 + TEE ECDSA P-256） |
+| §4.3 PKI構造 (Root CA + Device Cert) | Server / Native Module | 実装済み（Dev Root CA生成スクリプト + Device Certificate発行 + 90日有効期限 + CRL） |
+| §4.4 証明書発行フロー | Server / Native Module | 実装済み（CSR生成 + サーバーCA + Dev mode attestation skip。Prod attestation検証はスタブ） |
+| §4.5 C2PAマニフェスト | Native Module | 実装済み（読み取り + 検証。署名生成はTEE対応。RFC 3161 TSA対応済み） |
+| §4.6 C2PA SDK統合 (c2pa-rs FFI) | Native Module | 実装済み（フォーマット非依存署名 + TEE署名コールバック + マニフェスト読み取り + マスク描画 + 動画処理。Android/iOS両対応） |
+| §4.7 鍵ライフサイクル管理 | Server (KMS) / Native Module | 実装済み（90日有効期限 + 更新API + CRL。Prod KMS統合は未着手） |
 | §4.8 C2PA Trust List | — | 未着手 |
 
 ---
@@ -101,10 +101,10 @@
 
 | 仕様の要素 | 対応コンポーネント | 状態 |
 |-----------|------------------|------|
-| §7.1 URL構造 | Server / Public Page | 未着手 |
-| §7.2 コンテンツページの表示内容 | Public Page | 未着手 |
-| §7.3 OGP | App / Server / Public Page | 未着手 |
-| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 未着手 |
+| §7.1 URL構造 | Public Page | 実装済み（/p/[shortId] ルーティング） |
+| §7.2 コンテンツページの表示内容 | Public Page | 実装済み（デバイス情報・検証カード・技術詳細。モックデータで動作） |
+| §7.3 OGP | Public Page | 実装済み（generateMetadata でOGタグ + Twitterカード設定） |
+| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 型のみ（検証IF定義済み。Title Protocol接続は後続タスク） |
 | §7.5 データの削除・非公開 | App / Server | 未着手 |
 
 ---

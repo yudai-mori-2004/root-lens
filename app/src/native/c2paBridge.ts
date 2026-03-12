@@ -40,12 +40,23 @@ export interface VideoProcessOptions {
   endMs?: number;
 }
 
+// 仕様書 §4.4 証明書発行フロー — デバイス認証情報
+export interface DeviceCredentials {
+  csr: string; // Base64 DER
+  platform: 'android' | 'ios';
+}
+
 interface C2paBridgeInterface {
   signContent(imagePath: string): Promise<string>;
   readManifest(imagePath: string): Promise<string>;
   applyMasks(imagePath: string, masks: MaskRect[]): Promise<string>;
   processVideo(inputPath: string, optionsJson: string): Promise<string>;
   getVersion(): Promise<string>;
+  // §4.4 TEE鍵管理
+  generateDeviceCredentials(): Promise<DeviceCredentials>;
+  storeDeviceCertificate(deviceCertBase64: string, rootCaCertBase64: string): Promise<boolean>;
+  hasDeviceCertificate(): Promise<boolean>;
+  getDeviceCertificateExpiry(): Promise<string | null>;
 }
 
 // Expo Modules API (iOS) or legacy NativeModules (Android)
@@ -123,4 +134,52 @@ export async function getVersion(): Promise<string> {
     return 'not available';
   }
   return C2paBridge.getVersion();
+}
+
+// --- TEE鍵管理 (§4.4, §4.6) ---
+
+/**
+ * TEE内でEC P-256鍵を生成し、CSR + Platform Attestationを返す
+ * 仕様書 §4.4.1 証明書発行フロー
+ */
+export async function generateDeviceCredentials(): Promise<DeviceCredentials> {
+  if (!C2paBridge) {
+    throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
+  }
+  return C2paBridge.generateDeviceCredentials();
+}
+
+/**
+ * サーバーから返却されたDevice Certificate + Root CA Certificateを保存
+ * 仕様書 §4.4.1 ステップ7
+ */
+export async function storeDeviceCertificate(
+  deviceCertBase64: string,
+  rootCaCertBase64: string,
+): Promise<boolean> {
+  if (!C2paBridge) {
+    throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
+  }
+  return C2paBridge.storeDeviceCertificate(deviceCertBase64, rootCaCertBase64);
+}
+
+/**
+ * Device Certificateが存在するか確認
+ */
+export async function hasDeviceCertificate(): Promise<boolean> {
+  if (!C2paBridge) {
+    return false;
+  }
+  return C2paBridge.hasDeviceCertificate();
+}
+
+/**
+ * Device Certificateの有効期限を返す（ISO 8601文字列 or null）
+ * 証明書更新判定用
+ */
+export async function getDeviceCertificateExpiry(): Promise<string | null> {
+  if (!C2paBridge) {
+    return null;
+  }
+  return C2paBridge.getDeviceCertificateExpiry();
 }
