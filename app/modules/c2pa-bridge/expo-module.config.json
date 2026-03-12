@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["C2paBridgeModule"]
+  },
+  "android": {
+    "modules": ["io.rootlens.c2pa.C2paBridgeModule"]
+  }
+}

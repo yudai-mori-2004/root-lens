@@ -50,6 +50,14 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>カメラで写真を撮影するために使用します</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>動画撮影で音声を録音するために使用します</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>撮影した写真を保存するために使用します</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>端末の写真にアクセスするために使用します</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

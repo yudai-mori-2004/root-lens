@@ -25,7 +25,22 @@
     },
     "plugins": [
       "expo-dev-client",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "カメラで写真を撮影するために使用します",
+          "microphonePermission": "動画撮影で音声を録音するために使用します"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "端末の写真にアクセスするために使用します",
+          "savePhotosPermission": "撮影した写真を保存するために使用します"
+        }
+      ],
+      "expo-font"
     ]
   }
 }
