@@ -5,12 +5,13 @@ export interface MediaItem {
   type: 'image' | 'video';
 }
 
-/** POST /api/v1/publish のレスポンス */
+/** 公開完了時の結果。contentHash は Title Protocol TEE が算出 (§2.1) */
 export interface PublishResult {
   shortId: string;
   pageUrl: string;
+  /** content_hash = SHA-256(Active Manifest の COSE 署名) — TEE が算出 */
   contentHash: string;
-  assetId: string;
+  /** Solana TX署名（delegateMint: true の場合） */
   txSignature: string;
 }
 

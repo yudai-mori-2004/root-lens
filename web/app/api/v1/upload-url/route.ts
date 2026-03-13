@@ -12,16 +12,18 @@ import { createPresignedPutUrl, contentKey, ogpKey } from "@/lib/server/r2";
 
 export async function POST(req: NextRequest) {
   try {
-    const { contentHash, contentType, kind } = await req.json();
+    const { fileId, contentType, kind } = await req.json();
 
-    if (!contentHash || !contentType) {
+    if (!fileId || !contentType) {
       return NextResponse.json(
-        { error: "contentHash and contentType are required" },
+        { error: "fileId and contentType are required" },
         { status: 400 },
       );
     }
 
-    const key = kind === "ogp" ? ogpKey(contentHash) : contentKey(contentHash);
+    // R2キーは fileId ベース（content_hash とは独立）
+    // content_hash は TEE が算出するため、アップロード時点では未知
+    const key = kind === "ogp" ? ogpKey(fileId) : contentKey(fileId);
     const uploadUrl = await createPresignedPutUrl(key, contentType);
     const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 

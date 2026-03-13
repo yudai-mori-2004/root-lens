@@ -12,7 +12,9 @@ const SERVER_URL = 'https://www.rootlens.io';
 
 export const config = {
   serverUrl: SERVER_URL,
-  /** パイプラインB: 画像保存 + ページ作成 — 仕様書 §6.2, §6.4 */
+  /** パイプラインB: presigned URL発行 — 仕様書 §6.2 */
+  uploadUrlEndpoint: `${SERVER_URL}/api/v1/upload-url`,
+  /** パイプラインB: ページ作成 — 仕様書 §6.4 */
   publishUrl: `${SERVER_URL}/api/v1/publish`,
   /** signed_json 保存 — storeSignedJsonコールバック用 */
   storeJsonUrl: `${SERVER_URL}/api/v1/store-json`,
@@ -22,4 +24,6 @@ export const config = {
   deviceCertificateRenewUrl: `${SERVER_URL}/api/v1/device-certificate/renew`,
   /** 証明書更新しきい値（日数） — 仕様書 §4.4.2 */
   certRenewalThresholdDays: 14,
+  /** Solana RPC URL（Helius devnet） */
+  solanaRpcUrl: 'https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1',
 };

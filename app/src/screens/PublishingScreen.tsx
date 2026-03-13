@@ -14,6 +14,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as Crypto from 'expo-crypto';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
@@ -22,20 +24,23 @@ import { registerOnTitleProtocol } from '../services/titleProtocol';
 
 // 仕様書 §2.4 公開パイプライン実行
 // §6.1 パイプラインA: Title Protocol登録（クライアント側）
-// §6.2 パイプラインB: R2保存 + ページ生成（サーバー側）
+// §6.2 パイプラインB: R2直接アップロード + ページ作成
 // 両パイプラインを並列実行
+
+const DISPLAY_MAX_WIDTH = 1600;
+const OGP_WIDTH = 1200;
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Publishing'>;
 
-type Phase = 'uploading' | 'registering' | 'done' | 'error';
+type Phase = 'publishing' | 'done' | 'error';
 
 export default function PublishingScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { signedUris } = route.params;
 
-  const [phase, setPhase] = useState<Phase>('uploading');
+  const [phase, setPhase] = useState<Phase>('publishing');
   const [result, setResult] = useState<PublishResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const publishingRef = useRef(false);
@@ -43,14 +48,14 @@ export default function PublishingScreen() {
   const publish = async () => {
     if (publishingRef.current) return;
     publishingRef.current = true;
-    setPhase('uploading');
+    setPhase('publishing');
     setErrorMessage('');
 
     try {
       const uri = signedUris[0];
       const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
 
-      // ファイルをバイナリとして読み取り（Title Protocol SDK用）
+      // 仕様書 §6.1, §6.2: ファイルをバイナリとして読み取り（Title Protocol SDK用）
       const fileBase64 = await FileSystem.readAsStringAsync(
         fileUri,
         { encoding: FileSystem.EncodingType.Base64 },
@@ -61,48 +66,95 @@ export default function PublishingScreen() {
         content[i] = binaryStr.charCodeAt(i);
       }
 
-      setPhase('registering');
+      // R2キーはcontent_hashと独立 — content_hashはTEEが算出するため事前に取得不可
+      const fileId = Crypto.randomUUID();
 
-      // §6: パイプラインA + B を並列実行
-      const [tpResult, uploadResponse] = await Promise.all([
-        // パイプラインA: Title Protocol登録（クライアント側 SDK）
+      // パイプラインA (§6.1) と パイプラインB (§6.2) を並列実行
+      const [tpResult, r2Urls] = await Promise.all([
+        // パイプラインA: Title Protocol登録（SDK → TEE → cNFTミント）
+        // content_hash = SHA-256(Active Manifest の COSE 署名) を TEE が算出
         registerOnTitleProtocol(content),
 
-        // パイプラインB: 画像保存 + ページ作成（サーバー側）
-        FileSystem.uploadAsync(config.publishUrl, fileUri, {
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          fieldName: 'content',
-          mimeType: 'image/jpeg',
-        }),
+        // パイプラインB: 表示用画像をリサイズ → R2に直接アップロード
+        (async () => {
+          const [displayResult, ogpResult] = await Promise.all([
+            ImageManipulator.manipulateAsync(
+              fileUri,
+              [{ resize: { width: DISPLAY_MAX_WIDTH } }],
+              { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+            ),
+            ImageManipulator.manipulateAsync(
+              fileUri,
+              [{ resize: { width: OGP_WIDTH } }],
+              { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
+            ),
+          ]);
+
+          const [displayUrlRes, ogpUrlRes] = await Promise.all([
+            fetch(config.uploadUrlEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'content' }),
+            }),
+            fetch(config.uploadUrlEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'ogp' }),
+            }),
+          ]);
+
+          if (!displayUrlRes.ok || !ogpUrlRes.ok) {
+            throw new Error('presigned URL の取得に失敗しました');
+          }
+
+          const displayUrlData = await displayUrlRes.json();
+          const ogpUrlData = await ogpUrlRes.json();
+
+          await Promise.all([
+            FileSystem.uploadAsync(displayUrlData.uploadUrl, displayResult.uri, {
+              httpMethod: 'PUT',
+              headers: { 'Content-Type': 'image/jpeg' },
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            }),
+            FileSystem.uploadAsync(ogpUrlData.uploadUrl, ogpResult.uri, {
+              httpMethod: 'PUT',
+              headers: { 'Content-Type': 'image/jpeg' },
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            }),
+          ]);
+
+          return {
+            displayPublicUrl: displayUrlData.publicUrl as string,
+            ogpPublicUrl: ogpUrlData.publicUrl as string,
+          };
+        })(),
       ]);
 
-      // パイプラインBのレスポンス確認
-      if (uploadResponse.status !== 200) {
-        const body = JSON.parse(uploadResponse.body);
-        throw new Error(body.error || `Server error: ${uploadResponse.status}`);
+      // 両パイプライン完了後、TP の content_hash + R2 URL でページ作成
+      // content_hash が公開ページからオンチェーンデータへの唯一のキー
+      const publishRes = await fetch(config.publishUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentHash: tpResult.contentHash,
+          thumbnailUrl: r2Urls.displayPublicUrl,
+          ogpImageUrl: r2Urls.ogpPublicUrl,
+        }),
+      });
+
+      if (!publishRes.ok) {
+        const errBody = await publishRes.text();
+        throw new Error(`ページ作成に失敗: ${errBody}`);
       }
 
-      const serverData = JSON.parse(uploadResponse.body);
+      const serverData = await publishRes.json();
 
-      // 両パイプラインの結果を統合
       const data: PublishResult = {
         shortId: serverData.shortId,
         pageUrl: serverData.pageUrl,
         contentHash: tpResult.contentHash,
-        assetId: tpResult.assetId,
         txSignature: tpResult.txSignature,
       };
-
-      // サーバーにTP登録結果を送信してページレコードを更新
-      await fetch(`${config.serverUrl}/api/v1/pages/${serverData.shortId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentHash: tpResult.contentHash,
-          assetId: tpResult.assetId,
-        }),
-      });
 
       setResult(data);
       setPhase('done');
@@ -137,17 +189,13 @@ export default function PublishingScreen() {
   };
 
   // --- ローディング ---
-  if (phase === 'uploading' || phase === 'registering') {
+  if (phase === 'publishing') {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1a1a1a" />
-        <Text style={styles.loadingTitle}>
-          {phase === 'uploading' ? 'アップロード中...' : '本物証明を登録中...'}
-        </Text>
+        <Text style={styles.loadingTitle}>公開中...</Text>
         <Text style={styles.loadingSubtitle}>
-          {phase === 'uploading'
-            ? 'コンテンツをサーバーに送信しています'
-            : 'Title Protocolに記録しています'}
+          本物証明の登録とアップロードを実行しています
         </Text>
       </SafeAreaView>
     );

@@ -1,3 +1,6 @@
+// Node.js polyfills — must be imported before anything else
+import './shim';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

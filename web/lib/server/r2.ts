@@ -83,16 +83,17 @@ export async function deletePublic(key: string): Promise<void> {
 
 /**
  * コンテンツ画像のR2キーを生成する。
- * 形式: content/{contentHash}.{ext}
+ * 形式: content/{fileId}.{ext}
+ * fileId は content_hash とは独立のランダム識別子。
  */
-export function contentKey(contentHash: string, ext: string = "jpg"): string {
-  return `content/${contentHash}.${ext}`;
+export function contentKey(fileId: string, ext: string = "jpg"): string {
+  return `content/${fileId}.${ext}`;
 }
 
 /**
  * OGP画像のR2キーを生成する。
- * 形式: ogp/{contentHash}.jpg
+ * 形式: ogp/{fileId}.jpg
  */
-export function ogpKey(contentHash: string): string {
-  return `ogp/${contentHash}.jpg`;
+export function ogpKey(fileId: string): string {
+  return `ogp/${fileId}.jpg`;
 }

@@ -3,14 +3,15 @@
 // delegateMint: true でGatewayにTXブロードキャストを委譲
 
 import { fetchGlobalConfig, TitleClient } from '@title-protocol/sdk';
+import { Connection } from '@solana/web3.js';
 import { config } from '../config';
 
 // devnet MVP: Privy未実装のためオペレーターウォレットを使用
 const OWNER_WALLET = 'wrVwsTuRzbsDutybqqpf9tBE7JUqRPYzJ3iPUgcFmna';
 
 export interface TitleProtocolResult {
+  /** content_hash = SHA-256(Active Manifest の COSE 署名) — TEE が算出 (§2.1) */
   contentHash: string;
-  assetId: string;
   txSignature: string;
 }
 
@@ -38,8 +39,10 @@ async function storeSignedJson(json: string): Promise<string> {
 export async function registerOnTitleProtocol(
   content: Uint8Array,
 ): Promise<TitleProtocolResult> {
-  // 1. GlobalConfig取得
-  const globalConfig = await fetchGlobalConfig('devnet');
+  // 1. GlobalConfig取得（Helius devnet RPC使用）
+  const rpcUrl = config.solanaRpcUrl || 'https://api.devnet.solana.com';
+  const connection = new Connection(rpcUrl);
+  const globalConfig = await fetchGlobalConfig(connection, 'devnet');
   const client = new TitleClient(globalConfig);
 
   // 2-7. SDK が一括実行: ノード選択 → E2EE → アップロード → 検証 → signed_json保存
@@ -52,13 +55,9 @@ export async function registerOnTitleProtocol(
     delegateMint: true,
   });
 
+  // content_hash は TEE が C2PA Active Manifest の署名から算出 (§2.1)
   const contentHash = result.contents[0]?.contentHash || '';
-
-  // delegateMint: true の場合、txSignatures が返る
   const txSignature = result.txSignatures?.[0] || '';
 
-  // assetId はトランザクションログから取得するか、contents から取得
-  const assetId = result.contents[0]?.assetId || '';
-
-  return { contentHash, assetId, txSignature };
+  return { contentHash, txSignature };
 }
