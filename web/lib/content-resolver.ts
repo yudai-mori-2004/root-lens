@@ -1,14 +1,14 @@
 /**
  * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
  *
- * ContentResolver: cNFT + Arweave オフチェーンデータを統合して返す抽象レイヤー。
- * 現在の実装は Helius DAS API だが、将来インデクサや別プロバイダに差し替え可能。
+ * ContentResolver: content_hash → cNFT + Arweave オフチェーンデータの解決レイヤー。
+ * DAS プロバイダ（Helius, Triton, 自前インデクサ等）は差し替え可能。
  */
 
 import type { SignedJson } from "@title-protocol/sdk";
 
 // ---------------------------------------------------------------------------
-// 解決結果の型
+// 解決結果
 // ---------------------------------------------------------------------------
 
 /** cNFT + オフチェーンデータを統合した解決済みコンテンツ */
@@ -34,15 +34,15 @@ export interface ResolvedContent {
 // ---------------------------------------------------------------------------
 
 export interface ContentResolver {
-  /**
-   * content_hash から cNFT を検索し、オフチェーンデータを含む完全なレコードを返す。
-   * コレクション内の cNFT を取得し、content_hash 属性でマッチングする。
-   */
+  /** content_hash trait から cNFT を検索し、オフチェーンデータを含むレコードを返す */
   resolveByContentHash(contentHash: string): Promise<ResolvedContent | null>;
-
-  /**
-   * asset_id (cNFT mint address) から直接取得する高速パス。
-   * サーバーが asset_id を保持している場合に使用。
-   */
-  resolveByAssetId(assetId: string): Promise<ResolvedContent | null>;
 }
+
+// ---------------------------------------------------------------------------
+// アクティブなリゾルバ（DAS プロバイダ実装を注入）
+// ---------------------------------------------------------------------------
+
+import { DasContentResolver } from "./resolvers/helius";
+
+/** 現在のDASプロバイダ実装。差し替え時はここだけ変更する */
+export const contentResolver: ContentResolver = new DasContentResolver();

@@ -10,13 +10,12 @@
 /** サーバーが shortId から解決するページ情報 */
 export interface PageMeta {
   shortId: string;
+  /** SHA-256(Active Manifest COSE署名) — TEE算出 */
   contentHash: string;
-  /** R2 パブリックバケットの表示用画像URL */
+  /** R2 表示用画像URL */
   thumbnailUrl: string;
-  /** OGP用バナー付き画像URL */
+  /** R2 OGP画像URL */
   ogpImageUrl: string;
-  /** cNFT Asset ID (Solana mint address)。検索の高速パスに使用 */
-  assetId?: string;
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

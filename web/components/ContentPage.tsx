@@ -34,15 +34,14 @@ export default function ContentPage({ page }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    // Title Protocol からコンテンツ記録を取得 → 取得結果で検証を実行
-    fetchContentRecord(page.contentHash, page.assetId).then(({ record: r, resolved }) => {
+    // content_hash → DAS API → cNFT → Arweave → 検証 (§7.4)
+    fetchContentRecord(page.contentHash).then(({ record: r, resolved }) => {
       setRecord(r);
-      // クライアントサイド検証を実行 (§7.4: サーバー関与なし)
       verifyContent(page.contentHash, page.thumbnailUrl, resolved).then(
         setVerification
       );
     });
-  }, [page.contentHash, page.thumbnailUrl, page.assetId]);
+  }, [page.contentHash, page.thumbnailUrl]);
 
   const capturedDate = record
     ? formatDate(record.capturedAt)
@@ -167,7 +166,9 @@ function VerificationSummary({
         <span className={styles.verifyTitle}>
           {allVerified
             ? "オンチェーン記録と一致"
-            : "記録の照合に問題があります"}
+            : record
+              ? "記録の照合に問題があります"
+              : "オンチェーン記録が見つかりません"}
         </span>
       </div>
 

@@ -1,20 +1,16 @@
 /**
  * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
  *
- * Helius DAS API を使った ContentResolver 実装。
- * cNFT の取得は Helius RPC (Solana DAS API) を、
- * オフチェーンデータの取得は Arweave gateway を直接使用する。
- *
- * Note: Helius はあくまで一実装。将来別の DAS プロバイダや
- * 自前インデクサに差し替え可能なよう ContentResolver IF の裏に配置。
+ * DAS (Digital Asset Standard) API を使った ContentResolver 実装。
+ * Helius / Triton 等の DAS 準拠プロバイダで動作する。
  */
 
 import type { SignedJson } from "@title-protocol/sdk";
 import type { ContentResolver, ResolvedContent } from "../content-resolver";
-import { HELIUS_RPC_URL, CORE_COLLECTION_MINT } from "../config";
+import { DAS_RPC_URL, CORE_COLLECTION_MINT } from "../config";
 
 // ---------------------------------------------------------------------------
-// Helius DAS レスポンスの型 (必要なフィールドのみ)
+// DAS レスポンス型 (必要なフィールドのみ)
 // ---------------------------------------------------------------------------
 
 interface DasAsset {
@@ -58,28 +54,19 @@ interface DasSearchAssetsResponse {
 // ---------------------------------------------------------------------------
 
 function getCollectionAddress(asset: DasAsset): string {
-  const coll = asset.grouping.find((g) => g.group_key === "collection");
-  return coll?.group_value ?? "";
+  return asset.grouping.find((g) => g.group_key === "collection")?.group_value ?? "";
 }
 
-function getAttribute(
-  asset: DasAsset,
-  traitType: string
-): string | undefined {
+function getAttribute(asset: DasAsset, traitType: string): string | undefined {
   return asset.content.metadata.attributes?.find(
     (a) => a.trait_type === traitType
   )?.value;
 }
 
-/** Arweave URI を HTTP gateway URL に変換 */
 function arweaveToHttpUrl(uri: string): string {
   if (uri.startsWith("ar://")) {
     return `https://arweave.net/${uri.slice(5)}`;
   }
-  if (uri.startsWith("https://")) {
-    return uri;
-  }
-  // Irys gateway URL はそのまま
   return uri;
 }
 
@@ -93,11 +80,11 @@ async function fetchArweaveJson(uri: string): Promise<unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Helius DAS API 呼び出し
+// DAS API 呼び出し
 // ---------------------------------------------------------------------------
 
 async function dasCall<T>(method: string, params: unknown): Promise<T> {
-  const res = await fetch(HELIUS_RPC_URL, {
+  const res = await fetch(DAS_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -109,19 +96,14 @@ async function dasCall<T>(method: string, params: unknown): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new Error(`Helius RPC error: ${res.status}`);
+    throw new Error(`DAS RPC error: ${res.status}`);
   }
 
   const json = await res.json();
   if (json.error) {
-    throw new Error(`Helius RPC error: ${json.error.message}`);
+    throw new Error(`DAS RPC error: ${json.error.message}`);
   }
   return json as T;
-}
-
-async function getAsset(assetId: string): Promise<DasAsset> {
-  const resp = await dasCall<DasGetAssetResponse>("getAsset", { id: assetId });
-  return resp.result;
 }
 
 async function searchAssetsByCollection(
@@ -138,23 +120,18 @@ async function searchAssetsByCollection(
 }
 
 // ---------------------------------------------------------------------------
-// cNFT → ResolvedContent 変換
+// cNFT → ResolvedContent
 // ---------------------------------------------------------------------------
 
-async function resolveFromAsset(
-  asset: DasAsset
-): Promise<ResolvedContent> {
+async function resolveFromAsset(asset: DasAsset): Promise<ResolvedContent> {
   const arweaveUri = asset.content.json_uri;
-  const collectionAddress = getCollectionAddress(asset);
   const attributes = asset.content.metadata.attributes ?? [];
 
-  // Arweave からオフチェーンデータを取得
   let coreSignedJson: SignedJson | null = null;
   const extensionSignedJsons: SignedJson[] = [];
 
   try {
     const offchain = await fetchArweaveJson(arweaveUri);
-    // signed_json はオフチェーンデータのトップレベルに格納される
     if (isSignedJson(offchain)) {
       const payload = offchain.payload;
       if ("nodes" in payload) {
@@ -167,12 +144,9 @@ async function resolveFromAsset(
     // Arweave 取得失敗は検証結果に反映（null のまま返す）
   }
 
-  // Extension cNFT は別途検索が必要な場合がある
-  // ここでは Core cNFT の解決に集中する
-
   return {
     assetId: asset.id,
-    collectionAddress,
+    collectionAddress: getCollectionAddress(asset),
     arweaveUri,
     attributes,
     coreSignedJson,
@@ -193,24 +167,14 @@ function isSignedJson(obj: unknown): obj is SignedJson {
 }
 
 // ---------------------------------------------------------------------------
-// HeliusContentResolver
+// DasContentResolver
 // ---------------------------------------------------------------------------
 
-export class HeliusContentResolver implements ContentResolver {
-  async resolveByAssetId(assetId: string): Promise<ResolvedContent | null> {
-    try {
-      const asset = await getAsset(assetId);
-      return resolveFromAsset(asset);
-    } catch {
-      return null;
-    }
-  }
-
+export class DasContentResolver implements ContentResolver {
   async resolveByContentHash(
     contentHash: string
   ): Promise<ResolvedContent | null> {
     try {
-      // コレクション内の cNFT を検索し、content_hash 属性でフィルタ
       const result = await searchAssetsByCollection(CORE_COLLECTION_MINT);
       const match = result.items.find(
         (item) => getAttribute(item, "content_hash") === contentHash
@@ -223,6 +187,3 @@ export class HeliusContentResolver implements ContentResolver {
     }
   }
 }
-
-/** デフォルトのリゾルバインスタンス */
-export const heliusResolver = new HeliusContentResolver();

@@ -1,39 +1,25 @@
 /**
  * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
  *
- * 公開ページのデータ取得・検証の統合モジュール。
- * モックモードとリアルモードをシームレスに切り替える。
- *
  * データフロー:
- *  1. サーバー: shortId → { contentHash, assetId, thumbnailUrl } (唯一のサーバー依存)
- *  2. Helius DAS API: assetId → cNFT メタデータ (Solana 直接)
- *  3. Arweave: json_uri → オフチェーンデータ (Arweave 直接)
+ *  1. サーバー: shortId → { contentHash, thumbnailUrl, ogpImageUrl }
+ *  2. DAS API: content_hash trait → cNFT メタデータ
+ *  3. Arweave: json_uri → オフチェーン signed_json
  *  4. ブラウザ内検証: Ed25519 + pHash (サーバー関与なし)
  */
 
 import type { PageMeta, ContentRecord, VerificationResult } from "./types";
 import type { ResolvedContent } from "./content-resolver";
 import type { CorePayload } from "@title-protocol/sdk";
-import { USE_MOCK } from "./config";
-import { heliusResolver } from "./resolvers/helius";
+import { contentResolver } from "./content-resolver";
 import { verifyContentOnChain } from "./verify";
 import { supabase } from "./supabase";
 
 // ---------------------------------------------------------------------------
-// モック (フォールバック)
+// Supabase: shortId → PageMeta
 // ---------------------------------------------------------------------------
 
-import {
-  resolvePageMeta as mockResolvePageMeta,
-  fetchContentRecord as mockFetchContentRecord,
-  verifyContent as mockVerifyContent,
-} from "./mock";
-
-// ---------------------------------------------------------------------------
-// Supabase: shortId 解決
-// ---------------------------------------------------------------------------
-
-async function resolvePageMetaFromSupabase(
+export async function resolvePageMeta(
   shortId: string
 ): Promise<PageMeta | null> {
   const { data, error } = await supabase
@@ -43,7 +29,6 @@ async function resolvePageMetaFromSupabase(
       short_id,
       contents (
         content_hash,
-        title_protocol_asset_id,
         thumbnail_url,
         ogp_image_url
       )
@@ -57,7 +42,6 @@ async function resolvePageMetaFromSupabase(
 
   const content = (data.contents as unknown as Array<{
     content_hash: string;
-    title_protocol_asset_id: string;
     thumbnail_url: string;
     ogp_image_url: string;
   }>)?.[0];
@@ -68,7 +52,6 @@ async function resolvePageMetaFromSupabase(
     contentHash: content.content_hash,
     thumbnailUrl: content.thumbnail_url || "",
     ogpImageUrl: content.ogp_image_url || "",
-    assetId: content.title_protocol_asset_id || undefined,
   };
 }
 
@@ -80,11 +63,9 @@ function toContentRecord(resolved: ResolvedContent): ContentRecord {
   const sj = resolved.coreSignedJson;
   const payload = sj?.payload;
 
-  // attributes からデバイス情報等を抽出
   const getAttr = (key: string) =>
     resolved.attributes.find((a) => a.trait_type === key)?.value;
 
-  // Core payload から情報を取得
   const contentType = getAttr("content_type") || "image/jpeg";
   const isVideo =
     contentType.startsWith("video/") || contentType === "video";
@@ -113,7 +94,6 @@ function parseDimensions(
   raw: string | undefined
 ): { width: number; height: number } {
   if (!raw) return { width: 0, height: 0 };
-  // "4032x3024" or "4032,3024" 形式
   const parts = raw.split(/[x,×]/);
   if (parts.length === 2) {
     return {
@@ -130,46 +110,17 @@ function parseAssuranceLevel(raw: string | undefined): 1 | 2 {
 }
 
 // ---------------------------------------------------------------------------
-// 公開 API
+// content_hash → DAS → ContentRecord
 // ---------------------------------------------------------------------------
 
 /**
- * shortId からページメタデータを解決する。
- * モードに応じてサーバー API またはモックを使う。
- */
-export async function resolvePageMeta(
-  shortId: string
-): Promise<PageMeta | null> {
-  if (USE_MOCK) {
-    return mockResolvePageMeta(shortId);
-  }
-  return resolvePageMetaFromSupabase(shortId);
-}
-
-/**
- * content_hash (+ 任意の assetId) からコンテンツ記録を取得する。
- * リアルモード: Helius DAS API → Arweave → パース
- * モックモード: モックデータ
+ * content_hash からオンチェーンのコンテンツ記録を取得する。
+ * DAS API で cNFT を trait 検索 → Arweave から signed_json 取得。
  */
 export async function fetchContentRecord(
   contentHash: string,
-  assetId?: string
 ): Promise<{ record: ContentRecord | null; resolved: ResolvedContent | null }> {
-  if (USE_MOCK) {
-    const record = await mockFetchContentRecord(contentHash);
-    return { record, resolved: null };
-  }
-
-  // 高速パス: assetId が分かっている場合
-  let resolved: ResolvedContent | null = null;
-  if (assetId) {
-    resolved = await heliusResolver.resolveByAssetId(assetId);
-  }
-
-  // フォールバック: content_hash で検索
-  if (!resolved) {
-    resolved = await heliusResolver.resolveByContentHash(contentHash);
-  }
+  const resolved = await contentResolver.resolveByContentHash(contentHash);
 
   if (!resolved) {
     return { record: null, resolved: null };
@@ -178,18 +129,27 @@ export async function fetchContentRecord(
   return { record: toContentRecord(resolved), resolved };
 }
 
+// ---------------------------------------------------------------------------
+// クライアントサイド検証
+// ---------------------------------------------------------------------------
+
 /**
- * クライアントサイド検証を実行する。
- * リアルモード: Solana + Arweave データから検証
- * モックモード: モック検証結果
+ * オンチェーンデータに基づくクライアントサイド検証を実行する。
+ * cNFT が見つからない場合は全ステップ failed を返す。
  */
 export async function verifyContent(
-  contentHash: string,
+  _contentHash: string,
   thumbnailUrl: string,
   resolved: ResolvedContent | null
 ): Promise<VerificationResult> {
-  if (USE_MOCK || !resolved) {
-    return mockVerifyContent(contentHash, thumbnailUrl);
+  if (!resolved) {
+    return {
+      collectionVerified: "failed",
+      teeSignatureVerified: "failed",
+      phashMatched: "skipped",
+      c2paChainVerified: "failed",
+      overall: "failed",
+    };
   }
 
   return verifyContentOnChain(resolved, thumbnailUrl);
