@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList, MediaItem } from '../navigation/types';
 import { useC2paCache, isTrustedAsset } from '../hooks/useC2paCache';
+import { colors, typography, spacing, radii, shadows } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.5 コンテンツ選択
 // カメラギャラリーと端末ギャラリーの共通コンポーネント
@@ -114,18 +116,18 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
 
   if (!permission.granted) {
     return (
-      <View style={[styles.centerContainer, onClose && { paddingTop: insets.top }]}>
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
         {onClose && (
           <TouchableOpacity style={[styles.closeBtn, { position: 'absolute', top: insets.top + 8, left: 12 }]} onPress={onClose}>
-            <Ionicons name="close" size={28} color="#1a1a1a" />
+            <Ionicons name="close" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
         )}
-        <Ionicons name="images-outline" size={64} color="#ccc" />
+        <Ionicons name="images-outline" size={64} color={colors.textDisabled} />
         <Text style={styles.permissionText}>
-          端末のコンテンツにアクセスする許可が必要です
+          {t('gallery.permissionMessage')}
         </Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.permissionButtonText}>許可する</Text>
+          <Text style={styles.permissionButtonText}>{t('gallery.permissionButton')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -133,34 +135,22 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
 
   if (loading) {
     return (
-      <View style={[styles.centerContainer, onClose && { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#1a1a1a" />
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, onClose && { paddingTop: insets.top }]}>
-      {/* ヘッダー / 選択バー */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {onClose && (
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={28} color="#1a1a1a" />
-            </TouchableOpacity>
-          )}
-          <Text style={styles.headerTitle}>
-            {selected.length > 0 ? `${selected.length}件選択中` : 'コンテンツを選択'}
-          </Text>
-        </View>
-
-        {selected.length > 0 && (
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Ionicons name="shield-checkmark" size={16} color="#fff" />
-            <Text style={styles.shareButtonText}>本物証明をシェア</Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* モーダル時のみ閉じるボタン */}
+      {onClose && (
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+            <Ionicons name="close" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
 
       <FlatList
         data={assets}
@@ -187,7 +177,7 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
               {/* 動画バッジ */}
               {item.mediaType === 'video' && (
                 <View style={styles.videoBadge}>
-                  <Ionicons name="videocam" size={11} color="#fff" />
+                  <Ionicons name="videocam" size={11} color={colors.white} />
                   {item.duration > 0 && (
                     <Text style={styles.videoDuration}>
                       {Math.floor(item.duration / 60)}:{String(Math.floor(item.duration % 60)).padStart(2, '0')}
@@ -202,13 +192,13 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
               {/* チェック中 */}
               {checking && (
                 <View style={styles.checkingOverlay}>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.white} />
                 </View>
               )}
-              {/* C2PA認証済みバッジ */}
+              {/* 本物証明バッジ（§3.1.2: C2PA → 本物証明） */}
               {selectable && (
                 <View style={styles.c2paBadge}>
-                  <Ionicons name="shield-checkmark" size={14} color="#fff" />
+                  <Ionicons name="checkmark-circle" size={14} color={colors.white} />
                 </View>
               )}
               {/* 選択インジケーター */}
@@ -228,6 +218,23 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
           );
         }}
       />
+
+      {/* フローティングCTA（選択時に下部表示） */}
+      {selected.length > 0 && (
+        <View style={[styles.floatingCta, { paddingBottom: insets.bottom + spacing.lg }]}>
+          <View style={styles.floatingRow}>
+            <Text style={styles.floatingCount}>
+              {t('gallery.selectedCount', { count: selected.length })}
+            </Text>
+            <TouchableOpacity onPress={() => setSelected([])}>
+              <Text style={styles.floatingClear}>{t('editTool.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.floatingButton} onPress={handleShare}>
+            <Text style={styles.floatingButtonText}>{t('gallery.shareButton')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -235,54 +242,27 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.lg,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    paddingHorizontal: spacing.lg,
+    height: 44,
   },
   closeBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    gap: 6,
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
   },
   grid: {
     padding: SPACING,
@@ -306,28 +286,28 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#fff',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderColor: colors.white,
+    backgroundColor: colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectIndicatorActive: {
-    backgroundColor: '#1a1a1a',
-    borderColor: '#1a1a1a',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   selectNumber: {
-    color: '#fff',
-    fontSize: 12,
+    color: colors.white,
+    ...typography.small,
     fontWeight: '700',
   },
   greyOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlayMedium,
     borderRadius: 2,
   },
   checkingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.15)',
+    backgroundColor: colors.overlayLight,
     borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -339,42 +319,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 4,
-    paddingHorizontal: 4,
+    backgroundColor: colors.overlayDark,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
   },
   videoDuration: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
+    color: colors.white,
+    ...typography.small,
     fontVariant: ['tabular-nums'],
   },
   c2paBadge: {
     position: 'absolute',
     bottom: 4,
     left: 4,
-    backgroundColor: '#2e7d32',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   permissionText: {
-    fontSize: 16,
-    color: '#666',
+    ...typography.body,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   permissionButton: {
-    backgroundColor: '#1a1a1a',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 8,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radii.md,
   },
   permissionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.white,
+    ...typography.title,
+  },
+  // フローティングCTA
+  floatingCta: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.md,
+    ...shadows.md,
+  },
+  floatingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  floatingCount: {
+    ...typography.captionMedium,
+    color: colors.textPrimary,
+  },
+  floatingClear: {
+    ...typography.captionMedium,
+    color: colors.textHint,
+  },
+  floatingButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    borderRadius: radii.md,
+  },
+  floatingButtonText: {
+    color: colors.white,
+    ...typography.title,
   },
 });

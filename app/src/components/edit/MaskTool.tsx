@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, spacing, radii } from '../../theme';
+import { t } from '../../i18n';
 
 // 仕様書 §3.6: 情報を減らす操作 — 黒マスク（矩形）の付与
 // マスクはViewオーバーレイとして描画（ピクセル加工は保存時のみ）
@@ -128,14 +130,11 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
   };
 
   // 回転ハンドル位置計算
-  // マスク上端中央から「上方向」（回転後の座標系）にDIST分伸びた位置
   const getRotHandleInfo = (m: MaskRect) => {
     const rad = m.rotation * Math.PI / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
-    // 上端中央: local (0, -h/2)
     const topX = m.cx + 0 * cos - (-m.h / 2) * sin;
     const topY = m.cy + 0 * sin + (-m.h / 2) * cos;
-    // 回転後の「上」方向: (sin(rad), -cos(rad))
     const hx = topX + sin * ROTATION_HANDLE_DIST;
     const hy = topY - cos * ROTATION_HANDLE_DIST;
     return { topX, topY, hx, hy };
@@ -156,7 +155,6 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        // 子View全てがpointerEvents="none"のため、locationX/Yはコンテナ相対
         const { locationX: px, locationY: py } = evt.nativeEvent;
 
         const sel = selectedIdRef.current;
@@ -303,10 +301,8 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
     });
 
     if (isExistingModified) {
-      // 既存マスク変更あり → 全マスクを返して置換
       onApply(masks.map(toCanvas), true);
     } else {
-      // 新規マスクのみ追加
       onApply(masks.slice(existingMasks.length).map(toCanvas), false);
     }
   };
@@ -339,16 +335,16 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.cancelText}>キャンセル</Text>
+          <Text style={styles.cancelText}>{t('editTool.cancel')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerHint}>ドラッグで黒塗り</Text>
+        <Text style={styles.headerHint}>{t('mask.hint')}</Text>
         <TouchableOpacity
           onPress={handleApply}
           disabled={!canApply}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={[styles.applyText, !canApply && styles.applyTextDisabled]}>
-            適用{newMaskCount > 0 ? `(${newMaskCount})` : ''}
+            {t('editTool.apply')}{newMaskCount > 0 ? `(${newMaskCount})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -391,12 +387,12 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
                 top: (topY + hy) / 2 - ROTATION_HANDLE_DIST / 2,
                 width: 1,
                 height: ROTATION_HANDLE_DIST,
-                backgroundColor: 'rgba(255,255,255,0.4)',
+                backgroundColor: colors.overlayWhiteLine,
                 transform: [{ rotate: `${selectedMask.rotation}deg` }],
               }} />
               {/* 回転ハンドル */}
               <View style={[styles.rotationHandle, { left: hx - 12, top: hy - 12 }]}>
-                <Ionicons name="refresh-outline" size={16} color="#fff" />
+                <Ionicons name="refresh-outline" size={16} color={colors.darkText} />
               </View>
             </View>
           );
@@ -406,8 +402,8 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
       <View style={styles.bottomBar}>
         {masks.length > 0 ? (
           <TouchableOpacity style={styles.undoBtn} onPress={removeLast}>
-            <Ionicons name="arrow-undo" size={18} color="#fff" />
-            <Text style={styles.undoBtnText}>取り消し</Text>
+            <Ionicons name="arrow-undo" size={18} color={colors.darkText} />
+            <Text style={styles.undoBtnText}>{t('mask.undo')}</Text>
           </TouchableOpacity>
         ) : (
           <View />
@@ -418,18 +414,18 @@ export default function MaskTool({ imageUri, sourceRegion, existingMasks, onAppl
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, height: 48 },
-  cancelText: { color: '#fff', fontSize: 16 },
-  headerHint: { color: '#888', fontSize: 13 },
-  applyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  applyTextDisabled: { color: '#555' },
+  container: { flex: 1, backgroundColor: colors.darkBg },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, height: 52 },
+  cancelText: { color: colors.darkText, ...typography.body },
+  headerHint: { color: colors.darkTextSecondary, ...typography.caption },
+  applyText: { color: colors.darkText, ...typography.bodyMedium },
+  applyTextDisabled: { color: colors.darkTextDisabled },
   maskArea: { flex: 1, overflow: 'hidden' },
-  maskRect: { position: 'absolute', backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  maskRect: { position: 'absolute', backgroundColor: colors.darkBg, borderWidth: 1, borderColor: colors.darkSeparator },
   maskRectExisting: { opacity: 0.7 },
-  maskRectSelected: { borderColor: '#fff', borderWidth: 2 },
-  rotationHandle: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
-  bottomBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 48 },
-  undoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 18, backgroundColor: '#222' },
-  undoBtnText: { color: '#fff', fontSize: 14 },
+  maskRectSelected: { borderColor: colors.darkText, borderWidth: 2 },
+  rotationHandle: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: colors.overlayWhiteMask, alignItems: 'center', justifyContent: 'center' },
+  bottomBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 52 },
+  undoBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: 18, backgroundColor: colors.overlayWhiteSubtle },
+  undoBtnText: { color: colors.darkText, ...typography.body, fontSize: 14 },
 });

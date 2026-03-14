@@ -16,6 +16,8 @@ import PreviewScreen from './src/screens/PreviewScreen';
 import RegistrationScreen from './src/screens/RegistrationScreen';
 import type { RootStackParamList } from './src/navigation/types';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
+import { colors, typography, spacing, radii } from './src/theme';
+import { t } from './src/i18n';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
@@ -30,7 +32,7 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a1a1a" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -40,9 +42,9 @@ export default function App() {
     return (
       <View style={styles.center}>
         <Text style={styles.logo}>RootLens</Text>
-        <ActivityIndicator size="small" color="#666" style={{ marginTop: 16 }} />
+        <ActivityIndicator size="small" color={colors.textHint} style={{ marginTop: spacing.lg }} />
         <Text style={styles.statusText}>
-          {cert.status === 'checking' ? '確認中...' : 'デバイス証明書を取得中...'}
+          {cert.status === 'checking' ? t('app.checking') : t('app.provisioning')}
         </Text>
       </View>
     );
@@ -53,10 +55,10 @@ export default function App() {
     return (
       <View style={styles.center}>
         <Text style={styles.logo}>RootLens</Text>
-        <Text style={styles.errorText}>証明書の取得に失敗しました</Text>
+        <Text style={styles.errorText}>{t('app.provisionError')}</Text>
         <Text style={styles.errorDetail}>{cert.error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={cert.retry}>
-          <Text style={styles.retryButtonText}>再試行</Text>
+          <Text style={styles.retryButtonText}>{t('app.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -130,42 +132,40 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   logo: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: colors.textPrimary,
     letterSpacing: 1,
   },
   statusText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#999',
+    marginTop: spacing.sm,
+    ...typography.caption,
+    color: colors.textHint,
   },
   errorText: {
-    marginTop: 24,
-    fontSize: 15,
-    color: '#d32f2f',
-    fontWeight: '600',
+    marginTop: spacing.xl,
+    ...typography.bodyMedium,
+    color: colors.error,
   },
   errorDetail: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#999',
+    marginTop: spacing.sm,
+    ...typography.caption,
+    color: colors.textHint,
     textAlign: 'center',
     paddingHorizontal: 40,
   },
   retryButton: {
-    marginTop: 24,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
   },
   retryButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: colors.white,
+    ...typography.bodyMedium,
   },
 });

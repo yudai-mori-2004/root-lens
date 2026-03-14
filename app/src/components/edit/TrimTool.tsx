@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { colors, typography, spacing, radii } from '../../theme';
+import { t } from '../../i18n';
 
 // 動画トリミングツール（時間方向）
 // - タイムラインバー上でドラッグして開始/終了を指定
@@ -92,7 +94,6 @@ export default function TrimTool({ videoUri, existingTrim, onApply, onCancel }: 
   }, []);
 
   // タイムライン全体を1つのPanResponderで管理
-  // タッチ位置が左半分→開始ハンドル、右半分→終了ハンドルを操作
   type DragTarget = 'start' | 'end' | null;
   const dragTarget = useRef<DragTarget>(null);
   const dragOriginX = useRef(0);
@@ -108,7 +109,6 @@ export default function TrimTool({ videoUri, existingTrim, onApply, onCancel }: 
         const endX = msToXRef(endRef.current);
         const midX = (startX + endX) / 2;
 
-        // タッチ位置で開始/終了のどちらを操作するか判定
         if (touchX <= midX) {
           dragTarget.current = 'start';
           dragOriginMs.current = startRef.current;
@@ -178,11 +178,11 @@ export default function TrimTool({ videoUri, existingTrim, onApply, onCancel }: 
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.cancelText}>キャンセル</Text>
+          <Text style={styles.cancelText}>{t('editTool.cancel')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>トリミング</Text>
+        <Text style={styles.headerTitle}>{t('trim.title')}</Text>
         <TouchableOpacity onPress={handleApply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.applyText}>適用</Text>
+          <Text style={styles.applyText}>{t('editTool.apply')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -218,7 +218,7 @@ export default function TrimTool({ videoUri, existingTrim, onApply, onCancel }: 
       <View style={styles.timeRow}>
         <Text style={styles.timeText}>{formatTime(startMs)}</Text>
         <Text style={styles.durationText}>
-          選択: {formatTime(selectedDuration)}
+          {t('trim.selected', { time: formatTime(selectedDuration) })}
         </Text>
         <Text style={styles.timeText}>{formatTime(endMs)}</Text>
       </View>
@@ -258,28 +258,27 @@ export default function TrimTool({ videoUri, existingTrim, onApply, onCancel }: 
 
       {/* 全体時間 */}
       <Text style={styles.totalDuration}>
-        全体: {formatTime(durationMs)}
+        {t('trim.total', { time: formatTime(durationMs) })}
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: colors.darkBg },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 48,
+    paddingHorizontal: spacing.lg,
+    height: 52,
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.darkText,
+    ...typography.title,
   },
-  cancelText: { color: '#fff', fontSize: 16 },
-  applyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  cancelText: { color: colors.darkText, ...typography.body },
+  applyText: { color: colors.darkText, ...typography.bodyMedium },
   videoArea: {
     flex: 1,
     justifyContent: 'center',
@@ -298,12 +297,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlayMedium,
     justifyContent: 'center',
     alignItems: 'center',
   },
   playIcon: {
-    color: '#fff',
+    color: colors.darkText,
     fontSize: 22,
     marginLeft: 3,
   },
@@ -312,22 +311,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: TIMELINE_PAD,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   timeText: {
-    color: '#aaa',
-    fontSize: 13,
+    color: colors.darkTextSecondary,
+    ...typography.caption,
     fontVariant: ['tabular-nums'],
   },
   durationText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '500',
+    color: colors.darkText,
+    ...typography.captionMedium,
     fontVariant: ['tabular-nums'],
   },
   timelineOuter: {
     paddingHorizontal: TIMELINE_PAD,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   timelineContainer: {
     height: TIMELINE_H,
@@ -336,13 +334,13 @@ const styles = StyleSheet.create({
   },
   timelineBar: {
     height: 6,
-    backgroundColor: '#333',
+    backgroundColor: colors.overlayWhite,
     borderRadius: 3,
   },
   selectedRange: {
     position: 'absolute',
     height: 6,
-    backgroundColor: '#fff',
+    backgroundColor: colors.darkText,
     borderRadius: 3,
     top: (TIMELINE_H - 6) / 2,
   },
@@ -350,7 +348,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: TIMELINE_H - 8,
-    backgroundColor: '#e53935',
+    backgroundColor: colors.recording,
     borderRadius: 1,
     top: 4,
   },
@@ -364,7 +362,7 @@ const styles = StyleSheet.create({
   handleLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.darkText,
     borderRadius: 1,
   },
   handleKnob: {
@@ -372,14 +370,15 @@ const styles = StyleSheet.create({
     top: (TIMELINE_H - 20) / 2,
     width: 14,
     height: 20,
-    borderRadius: 4,
-    backgroundColor: '#fff',
+    borderRadius: radii.sm,
+    backgroundColor: colors.darkText,
   },
   totalDuration: {
-    color: '#666',
+    color: colors.darkTextSecondary,
+    ...typography.caption,
     fontSize: 12,
     textAlign: 'center',
-    paddingBottom: 16,
+    paddingBottom: spacing.lg,
     fontVariant: ['tabular-nums'],
   },
 });

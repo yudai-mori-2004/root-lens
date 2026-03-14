@@ -14,6 +14,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { loadContents, type ContentItem } from '../store/contentStore';
+import { colors, typography, spacing, radii } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.7 公開ページプレビュー
 // 公開済みギャラリーから選択した際に表示
@@ -37,7 +39,7 @@ export default function PreviewScreen() {
   if (!content) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>読み込み中...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -50,17 +52,22 @@ export default function PreviewScreen() {
     } catch (_) {}
   };
 
+  const handleCopyLink = () => {
+    // TODO: Clipboard copy
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* ヘッダー */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color="#1a1a1a" />
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="close" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>プレビュー</Text>
-        <TouchableOpacity onPress={handleShare}>
-          <Ionicons name="share-outline" size={24} color="#1a1a1a" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('preview.title')}</Text>
+        <View style={styles.headerButton} />
       </View>
 
       {/* 画像 */}
@@ -68,26 +75,23 @@ export default function PreviewScreen() {
         <Image source={{ uri: content.uri }} style={styles.image} />
       </View>
 
-      {/* 証明バッジ */}
-      <View style={styles.badgeContainer}>
-        <View style={styles.badge}>
-          <Ionicons name="shield-checkmark" size={16} color="#4caf50" />
-          <Text style={styles.badgeText}>Shot on RootLens</Text>
-        </View>
+      {/* 証明ステータス（§3.1.3 本物証明の表示基準） */}
+      <View style={styles.proofBar}>
+        <Text style={styles.proofText}>Shot on RootLens</Text>
         {content.editedAt && (
-          <Text style={styles.editedText}>Edited on RootLens</Text>
+          <Text style={styles.proofSub}> · Edited</Text>
         )}
       </View>
 
-      {/* アクション */}
+      {/* 共有アクション（大きなCTA） */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="link-outline" size={22} color="#1a1a1a" />
-          <Text style={styles.actionLabel}>リンクをコピー</Text>
+        <TouchableOpacity style={styles.sharePrimaryButton} onPress={handleShare}>
+          <Ionicons name="share-outline" size={20} color={colors.white} />
+          <Text style={styles.sharePrimaryText}>{t('preview.share')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={22} color="#1a1a1a" />
-          <Text style={styles.actionLabel}>共有</Text>
+        <TouchableOpacity style={styles.shareLinkButton} onPress={handleCopyLink}>
+          <Ionicons name="link-outline" size={18} color={colors.accent} />
+          <Text style={styles.shareLinkText}>{t('preview.copyLink')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -97,11 +101,11 @@ export default function PreviewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#999',
+    ...typography.body,
+    color: colors.textHint,
     textAlign: 'center',
     marginTop: 100,
   },
@@ -109,59 +113,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    height: 52,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.borderLight,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    ...typography.title,
+    color: colors.textPrimary,
   },
   imageContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface,
   },
   image: {
     width: '100%',
     height: '100%',
     resizeMode: 'contain',
   },
-  badgeContainer: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  badgeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  editedText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
-  actions: {
+  // 証明ステータス
+  proofBar: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 32,
-    paddingVertical: 16,
-    paddingBottom: 24,
+    alignItems: 'baseline',
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
   },
-  actionButton: {
+  proofText: {
+    ...typography.captionMedium,
+    color: colors.textPrimary,
+  },
+  proofSub: {
+    ...typography.caption,
+    color: colors.textHint,
+  },
+  // 共有アクション
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sharePrimaryButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent,
   },
-  actionLabel: {
-    fontSize: 12,
-    color: '#666',
+  sharePrimaryText: {
+    color: colors.white,
+    ...typography.bodyMedium,
+  },
+  shareLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+  },
+  shareLinkText: {
+    color: colors.accent,
+    ...typography.captionMedium,
   },
 });

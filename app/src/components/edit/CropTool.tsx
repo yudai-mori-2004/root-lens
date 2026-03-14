@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
+import { colors, typography, spacing, radii } from '../../theme';
+import { t } from '../../i18n';
 
 // 仕様書 §3.6: 情報を減らす操作 — クロップ
 // sourceRegionで渡された範囲のみ表示し、その中でクロップ操作を行う
@@ -31,7 +33,7 @@ interface CropToolProps {
 type AspectRatio = 'free' | '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
 
 const ASPECT_RATIOS: { label: string; value: AspectRatio; ratio?: number }[] = [
-  { label: 'フリー', value: 'free' },
+  { label: 'crop.free', value: 'free' },
   { label: '1:1', value: '1:1', ratio: 1 },
   { label: '4:3', value: '4:3', ratio: 4 / 3 },
   { label: '3:4', value: '3:4', ratio: 3 / 4 },
@@ -285,10 +287,10 @@ export default function CropTool({ imageUri, mediaType = 'image', sourceRegion, 
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.cancelText}>キャンセル</Text>
+          <Text style={styles.cancelText}>{t('editTool.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleApply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.applyText}>適用</Text>
+          <Text style={styles.applyText}>{t('editTool.apply')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -339,7 +341,7 @@ export default function CropTool({ imageUri, mediaType = 'image', sourceRegion, 
             onPress={() => handleAspectChange(ar.value)}
           >
             <Text style={[styles.aspectText, aspectRatio === ar.value && styles.aspectTextActive]}>
-              {ar.label}
+              {ar.value === 'free' ? t(ar.label) : ar.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -349,19 +351,19 @@ export default function CropTool({ imageUri, mediaType = 'image', sourceRegion, 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, height: 48 },
-  cancelText: { color: '#fff', fontSize: 16 },
-  applyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  container: { flex: 1, backgroundColor: colors.darkBg },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, height: 52 },
+  cancelText: { color: colors.darkText, ...typography.body },
+  applyText: { color: colors.darkText, ...typography.bodyMedium },
   cropArea: { flex: 1, overflow: 'hidden' },
-  overlay: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.55)' },
-  cropFrame: { position: 'absolute', borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' },
-  gridH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.25)' },
-  gridV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.25)' },
-  cornerBar: { position: 'absolute', backgroundColor: '#fff' },
-  aspectRow: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 12, gap: 6 },
-  aspectBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#222' },
-  aspectBtnActive: { backgroundColor: '#fff' },
-  aspectText: { color: '#888', fontSize: 13, fontWeight: '500' },
-  aspectTextActive: { color: '#000' },
+  overlay: { position: 'absolute', backgroundColor: colors.overlayCrop },
+  cropFrame: { position: 'absolute', borderWidth: 1, borderColor: colors.overlayWhiteFrame },
+  gridH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.overlayWhiteGrid },
+  gridV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: colors.overlayWhiteGrid },
+  cornerBar: { position: 'absolute', backgroundColor: colors.darkText },
+  aspectRow: { flexDirection: 'row', justifyContent: 'center', paddingVertical: spacing.md, gap: spacing.sm },
+  aspectBtn: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 14, backgroundColor: colors.overlayWhiteSubtle },
+  aspectBtnActive: { backgroundColor: colors.darkText },
+  aspectText: { color: colors.darkTextSecondary, ...typography.captionMedium },
+  aspectTextActive: { color: colors.darkBg },
 });

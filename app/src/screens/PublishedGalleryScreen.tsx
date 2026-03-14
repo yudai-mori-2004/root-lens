@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,18 +7,27 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Animated,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Clipboard from 'expo-clipboard';
 import { loadContents, type ContentItem } from '../store/contentStore';
-import type { RootStackParamList } from '../navigation/types';
+import { loadProfile, shortenAddress, type Profile } from '../store/profileStore';
+import type { RootStackParamList, GalleryStackParamList } from '../navigation/types';
+import { colors, typography, spacing, radii } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.3 公開済みギャラリー（ホーム画面）
 // - 3列グリッドレイアウト
 // - 公開済みコンテンツと、編集途中のドラフトが並ぶ
 // - ドラフトにはバッジが表示される
 // - コンテンツが0件の場合は、撮影・ギャラリーへの誘導UIを表示する
+// デザイン方針: 「ここに写真が並ぶ」空間を想像させる。
+//   テキストとCTAは下に寄せ、上部は空けてギャラリー体験を予感させる。
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -27,32 +36,141 @@ const SPACING = 2;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
+// セルごとにランダムなアクセント色を割り当て、波のように明滅させる
+const GHOST_TINTS = [
+  colors.accent,     // ネイビー
+  '#D97706',         // アンバー（暖色）
+  '#0D9488',         // ティール
+  colors.accent,
+  '#C2410C',         // オレンジ寄り
+  '#7C3AED',         // バイオレット
+  colors.accent,
+  '#0369A1',         // スカイブルー
+  '#BE185D',         // ローズ
+];
+
+function GhostCell({ index }: { index: number }) {
+  const baseOpacity = useRef(new Animated.Value(0.5)).current;
+  const tintOpacity = useRef(new Animated.Value(0)).current;
+  const tintColor = GHOST_TINTS[index % GHOST_TINTS.length];
+
+  useEffect(() => {
+    const delay = index * 150;
+
+    // ベースの明滅
+    const baseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(baseOpacity, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(baseOpacity, { toValue: 0.5, duration: 900, useNativeDriver: true }),
+      ]),
+    );
+
+    // 色付きレイヤーが時々ふわっと現れる
+    const tintLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay + 2000 + index * 300),
+        Animated.timing(tintOpacity, { toValue: 0.35, duration: 1200, useNativeDriver: true }),
+        Animated.timing(tintOpacity, { toValue: 0, duration: 1200, useNativeDriver: true }),
+        Animated.delay(3000),
+      ]),
+    );
+
+    baseLoop.start();
+    tintLoop.start();
+    return () => { baseLoop.stop(); tintLoop.stop(); };
+  }, [index, baseOpacity, tintOpacity]);
+
+  return (
+    <View style={styles.ghostCell}>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.ghostCellBase, { opacity: baseOpacity }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, styles.ghostCellTint, { backgroundColor: tintColor, opacity: tintOpacity }]} />
+    </View>
+  );
+}
+
+function FloatingHeader() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+
+  return (
+    <View style={[styles.floatingHeader, { paddingTop: insets.top + spacing.xs }]}>
+      <Text style={styles.brandTitle}>RootLens</Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Settings')}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// モックコンテンツ（開発プレビュー用）
+const MOCK_CONTENTS: ContentItem[] = [
+  { id: 'mock-1', uri: '', status: 'published' },
+  { id: 'mock-2', uri: '', status: 'published' },
+  { id: 'mock-3', uri: '', status: 'published' },
+  { id: 'mock-4', uri: '', status: 'draft' },
+];
+const USE_MOCK = true; // 開発中はtrue、実データが入ったらfalse
+
 export default function PublishedGalleryScreen() {
   const navigation = useNavigation<Nav>();
   const [contents, setContents] = useState<ContentItem[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadContents().then(setContents);
+      loadContents().then((real) => {
+        setContents(real.length > 0 ? real : USE_MOCK ? MOCK_CONTENTS : []);
+      });
+      loadProfile().then(setProfile);
     }, []),
   );
 
   if (contents.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="shield-checkmark-outline" size={56} color="#ccc" />
-        <Text style={styles.emptyTitle}>本物を、証明しよう</Text>
-        <Text style={styles.emptyDescription}>
-          あなたが撮影した本物のコンテンツに{'\n'}改ざん不可能な証明を付けて、SNSでシェアできます
-        </Text>
-        <Text style={styles.emptyHint}>
-          カメラで撮影するか、ギャラリーからコンテンツを選択
-        </Text>
+        <FloatingHeader />
+        {/* ゴーストグリッド — 画面全体に広がる背景 */}
+        <View style={styles.ghostGrid}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <GhostCell key={i} index={i} />
+          ))}
+        </View>
+
+        {/* 下部カード — グリッドの上に浮くシート */}
+        <View style={styles.bottomSheet}>
+          <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+          <Text style={styles.emptyDescription}>
+            {t('home.emptyDescription')}
+          </Text>
+
+          <View style={styles.ctaGroup}>
+            <TouchableOpacity
+              style={styles.ctaPrimary}
+              onPress={() => navigation.navigate('Camera')}
+            >
+              <Ionicons name="camera" size={20} color={colors.white} />
+              <Text style={styles.ctaPrimaryText}>{t('home.ctaCamera')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.ctaSecondary}
+              onPress={() => navigation.navigate('Main', { screen: 'DeviceGalleryTab' } as any)}
+            >
+              <Ionicons name="images-outline" size={20} color={colors.accent} />
+              <Text style={styles.ctaSecondaryText}>{t('home.ctaGallery')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
 
   const handlePress = (item: ContentItem) => {
+    if (item.id.startsWith('mock-')) return; // モックはタップ無効
     if (item.status === 'draft') {
       navigation.navigate('Edit', { mediaItems: [{ uri: item.uri, type: 'image' as const }] });
     } else {
@@ -60,22 +178,53 @@ export default function PublishedGalleryScreen() {
     }
   };
 
+  const profileHeader = profile && (profile.displayName || profile.address) ? (
+    <View style={styles.profileSection}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
+          {(profile.displayName || '?')[0].toUpperCase()}
+        </Text>
+      </View>
+      <View style={styles.profileInfo}>
+        {profile.displayName ? (
+          <Text style={styles.profileName}>{profile.displayName}</Text>
+        ) : null}
+        {profile.address ? (
+          <TouchableOpacity
+            style={styles.addressRow}
+            onPress={() => Clipboard.setStringAsync(profile.address)}
+          >
+            <Text style={styles.profileAddress}>{shortenAddress(profile.address)}</Text>
+            <Ionicons name="copy-outline" size={12} color={colors.textHint} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  ) : null;
+
   return (
     <View style={styles.container}>
+      <FloatingHeader />
       <FlatList
         data={contents}
         numColumns={NUM_COLUMNS}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.grid}
+        ListHeaderComponent={profileHeader}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.gridItem}
             onPress={() => handlePress(item)}
+            activeOpacity={item.id.startsWith('mock-') ? 1 : 0.7}
           >
-            <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+            {item.uri ? (
+              <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+            ) : (
+              <View style={[styles.thumbnail, styles.mockThumb]} />
+            )}
             {item.status === 'draft' && (
               <View style={styles.draftBadge}>
-                <Text style={styles.draftBadgeText}>下書き</Text>
+                <Text style={styles.draftBadgeText}>{t('home.draft')}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -88,7 +237,60 @@ export default function PublishedGalleryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
+  },
+  floatingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  brandTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  // プロフィール
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  profileInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  profileName: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  profileAddress: {
+    ...typography.caption,
+    color: colors.textHint,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
   },
   grid: {
     padding: SPACING,
@@ -104,44 +306,99 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 2,
   },
+  mockThumb: {
+    backgroundColor: colors.surfaceAlt,
+  },
   draftBadge: {
     position: 'absolute',
     bottom: 4,
     left: 4,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
+    backgroundColor: colors.overlayDark,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: radii.sm,
   },
   draftBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
+    color: colors.white,
+    ...typography.small,
   },
+  // Empty state
   emptyContainer: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
+    backgroundColor: colors.surface,
+  },
+  ghostGrid: {
+    flex: 1,
+    width: SCREEN_WIDTH,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING / 2,
+    paddingTop: SPACING / 2,
+    alignContent: 'flex-start',
+  },
+  ghostCell: {
+    width: ITEM_SIZE,
+    height: ITEM_SIZE,
+    margin: SPACING / 2,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  ghostCellBase: {
+    backgroundColor: colors.surfaceAlt,
+  },
+  ghostCellTint: {
+    borderRadius: 2,
+  },
+  bottomSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.sm,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
+    ...typography.heading,
+    color: colors.textPrimary,
   },
   emptyDescription: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
+    ...typography.body,
+    color: colors.textSecondary,
   },
-  emptyHint: {
-    fontSize: 13,
-    color: '#bbb',
-    textAlign: 'center',
-    marginTop: 8,
+  ctaGroup: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  ctaPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    borderRadius: radii.md,
+    gap: spacing.sm,
+  },
+  ctaPrimaryText: {
+    color: colors.white,
+    ...typography.bodyMedium,
+  },
+  ctaSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    paddingVertical: 14,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  ctaSecondaryText: {
+    color: colors.textPrimary,
+    ...typography.bodyMedium,
   },
 });

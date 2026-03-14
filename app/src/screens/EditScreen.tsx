@@ -26,11 +26,13 @@ import ResizeTool from '../components/edit/ResizeTool';
 import TrimTool from '../components/edit/TrimTool';
 import type { EditAction, EditState } from '../types/editActions';
 import { computePreviewTransform, getEffectiveSize } from '../types/editActions';
+import { colors, typography, spacing, radii } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.6 編集画面
 // - 編集操作はアクション履歴として保持
 // - プレビューは動的レンダリング（中間画像ファイルを作らない）
-// - 保存/登録時のみ最終画像を生成 → C2PA署名
+// - 保存/登録時のみ最終画像を生成 → 本物証明付与
 // - 画像・動画の両方に対応
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -429,7 +431,7 @@ export default function EditScreen() {
   const handleDownload = async () => {
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('エラー', 'ギャラリーへのアクセス許可が必要です');
+      Alert.alert(t('common.error'), t('edit.savePermissionError'));
       return;
     }
     setSigning(true);
@@ -438,9 +440,9 @@ export default function EditScreen() {
       const signedPath = await signContent(finalUri);
       const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
       await MediaLibrary.saveToLibraryAsync(signedUri);
-      Alert.alert('保存完了', '署名済みコンテンツをギャラリーに保存しました');
+      Alert.alert(t('edit.saveSuccessTitle'), t('edit.saveSuccess'));
     } catch (e: any) {
-      Alert.alert('エラー', `保存に失敗しました: ${e?.message || String(e)}`);
+      Alert.alert(t('common.error'), t('common.saveFailed', { message: e?.message || String(e) }));
     } finally {
       setSigning(false);
     }
@@ -464,7 +466,7 @@ export default function EditScreen() {
       await clearDraft();
       navigation.replace('Registration', { signedUris });
     } catch (e) {
-      Alert.alert('署名エラー', 'C2PA署名に失敗しました。登録を中止します。');
+      Alert.alert(t('edit.signErrorTitle'), t('edit.signError'));
     } finally {
       setSigning(false);
     }
@@ -583,7 +585,7 @@ export default function EditScreen() {
               {!isPlaying && (
                 <View style={styles.playOverlay}>
                   <View style={styles.playCircle}>
-                    <Ionicons name="play" size={28} color="#fff" />
+                    <Ionicons name="play" size={28} color={colors.darkText} />
                   </View>
                 </View>
               )}
@@ -601,7 +603,7 @@ export default function EditScreen() {
     if (!preview || !currentEdit.originalWidth || !previewContainerSize) {
       return (
         <View style={styles.imageArea} onLayout={onPreviewLayout}>
-          <ActivityIndicator size="large" color="#fff" style={styles.loading} />
+          <ActivityIndicator size="large" color={colors.darkText} style={styles.loading} />
         </View>
       );
     }
@@ -676,7 +678,7 @@ export default function EditScreen() {
       {/* ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={26} color="#fff" />
+          <Ionicons name="close" size={26} color={colors.darkText} />
         </TouchableOpacity>
 
         {totalPages > 1 ? (
@@ -686,7 +688,7 @@ export default function EditScreen() {
               disabled={pageIndex === 0}
               hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
             >
-              <Ionicons name="chevron-back" size={20} color={pageIndex === 0 ? '#555' : '#fff'} />
+              <Ionicons name="chevron-back" size={20} color={pageIndex === 0 ? colors.darkTextDisabled : colors.darkText} />
             </TouchableOpacity>
             <Text style={styles.pageText}>{pageIndex + 1} / {totalPages}</Text>
             <TouchableOpacity
@@ -694,7 +696,7 @@ export default function EditScreen() {
               disabled={pageIndex === totalPages - 1}
               hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
             >
-              <Ionicons name="chevron-forward" size={20} color={pageIndex === totalPages - 1 ? '#555' : '#fff'} />
+              <Ionicons name="chevron-forward" size={20} color={pageIndex === totalPages - 1 ? colors.darkTextDisabled : colors.darkText} />
             </TouchableOpacity>
           </View>
         ) : (
@@ -707,9 +709,12 @@ export default function EditScreen() {
           disabled={signing}
         >
           {signing ? (
-            <ActivityIndicator size="small" color="#000" />
+            <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Text style={styles.registerChipText}>シェア({totalPages})</Text>
+            <>
+              <Ionicons name="arrow-up-circle" size={14} color={colors.white} />
+              <Text style={styles.registerChipText}>{t('edit.share', { count: totalPages })}</Text>
+            </>
           )}
         </TouchableOpacity>
       </View>
@@ -717,13 +722,15 @@ export default function EditScreen() {
       {/* プレビュー */}
       {renderPreview()}
 
-      {/* ツールバー */}
+      {/* ツールバー（ラベル付き） */}
       <View style={styles.toolbar}>
         <TouchableOpacity style={styles.toolBtn} onPress={handleUndo} disabled={!canUndo}>
-          <Ionicons name="arrow-undo" size={22} color={canUndo ? '#fff' : '#555'} />
+          <Ionicons name="arrow-undo" size={20} color={canUndo ? colors.darkText : colors.darkTextDisabled} />
+          <Text style={[styles.toolLabel, !canUndo && styles.toolLabelDisabled]}>{t('edit.undo')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.toolBtn} onPress={handleRedo} disabled={!canRedo}>
-          <Ionicons name="arrow-redo" size={22} color={canRedo ? '#fff' : '#555'} />
+          <Ionicons name="arrow-redo" size={20} color={canRedo ? colors.darkText : colors.darkTextDisabled} />
+          <Text style={[styles.toolLabel, !canRedo && styles.toolLabelDisabled]}>{t('edit.redo')}</Text>
         </TouchableOpacity>
 
         <View style={styles.toolSep} />
@@ -734,7 +741,8 @@ export default function EditScreen() {
             style={styles.toolBtn}
             onPress={() => setActiveTool('trim')}
           >
-            <Ionicons name="cut-outline" size={22} color="#fff" />
+            <Ionicons name="cut-outline" size={20} color={colors.darkText} />
+            <Text style={styles.toolLabel}>{t('edit.trim')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -742,7 +750,8 @@ export default function EditScreen() {
           onPress={() => setActiveTool('crop')}
           disabled={!effectiveSize}
         >
-          <Ionicons name="crop-outline" size={22} color={effectiveSize ? '#fff' : '#555'} />
+          <Ionicons name="crop-outline" size={20} color={effectiveSize ? colors.darkText : colors.darkTextDisabled} />
+          <Text style={[styles.toolLabel, !effectiveSize && styles.toolLabelDisabled]}>{t('edit.crop')}</Text>
         </TouchableOpacity>
         {/* マスクは画像専用 */}
         {!currentIsVideo && (
@@ -751,7 +760,8 @@ export default function EditScreen() {
             onPress={() => setActiveTool('mask')}
             disabled={!effectiveSize}
           >
-            <Ionicons name="eye-off-outline" size={22} color={effectiveSize ? '#fff' : '#555'} />
+            <Ionicons name="eye-off-outline" size={20} color={effectiveSize ? colors.darkText : colors.darkTextDisabled} />
+            <Text style={[styles.toolLabel, !effectiveSize && styles.toolLabelDisabled]}>{t('edit.mask')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -759,7 +769,8 @@ export default function EditScreen() {
           onPress={() => setActiveTool('resize')}
           disabled={!effectiveSize}
         >
-          <Ionicons name="resize-outline" size={22} color={effectiveSize ? '#fff' : '#555'} />
+          <Ionicons name="resize-outline" size={20} color={effectiveSize ? colors.darkText : colors.darkTextDisabled} />
+          <Text style={[styles.toolLabel, !effectiveSize && styles.toolLabelDisabled]}>{t('edit.resize')}</Text>
         </TouchableOpacity>
 
         <View style={styles.toolSep} />
@@ -769,7 +780,8 @@ export default function EditScreen() {
           onPress={handleDownload}
           disabled={signing}
         >
-          <Ionicons name="download-outline" size={22} color="#fff" />
+          <Ionicons name="download-outline" size={20} color={colors.darkText} />
+          <Text style={styles.toolLabel}>{t('edit.save')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -779,7 +791,7 @@ export default function EditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.darkBg,
   },
   loading: {
     flex: 1,
@@ -788,8 +800,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    height: 48,
+    paddingHorizontal: spacing.lg,
+    height: 52,
   },
   headerBtn: {
     width: 40,
@@ -800,29 +812,30 @@ const styles = StyleSheet.create({
   pageNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
   },
   pageText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '500',
+    color: colors.darkText,
+    ...typography.bodyMedium,
     fontVariant: ['tabular-nums'],
     minWidth: 36,
     textAlign: 'center',
   },
   registerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#fff',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.accent,
+    gap: spacing.xs,
   },
   registerChipDisabled: {
     opacity: 0.5,
   },
   registerChipText: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.white,
+    ...typography.captionMedium,
   },
   imageArea: {
     flex: 1,
@@ -831,7 +844,7 @@ const styles = StyleSheet.create({
   },
   maskOverlay: {
     position: 'absolute',
-    backgroundColor: '#000',
+    backgroundColor: colors.darkBg,
   },
   videoPreview: {
     width: '100%',
@@ -846,42 +859,53 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlayMedium,
     justifyContent: 'center',
     alignItems: 'center',
     paddingLeft: 3,
   },
   resolutionBadge: {
     position: 'absolute',
-    bottom: 8,
+    bottom: spacing.sm,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
+    backgroundColor: colors.overlayMedium,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: radii.sm,
   },
   resolutionText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
+    color: colors.overlayWhiteFrame,
+    ...typography.label,
     fontVariant: ['tabular-nums'],
   },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
-    gap: 2,
+    height: 56,
+    gap: 0,
   },
   toolBtn: {
-    width: 44,
-    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    minWidth: 48,
+  },
+  toolLabel: {
+    color: colors.darkText,
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 2,
+    opacity: 0.8,
+  },
+  toolLabelDisabled: {
+    color: colors.darkTextDisabled,
   },
   toolSep: {
     width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: 4,
+    height: 24,
+    backgroundColor: colors.darkSeparator,
+    marginHorizontal: spacing.xs,
   },
 });

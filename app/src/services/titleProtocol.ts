@@ -1,13 +1,13 @@
 // 仕様書 §6.1 パイプラインA: Title Protocol登録
 // 実行主体: アプリ（Title Protocol SDK）
-// delegateMint: true でGatewayにTXブロードキャストを委譲
+// delegateMint: true でGatewayにTXブロードキャスト + signed_json保存を委譲
 
 import { fetchGlobalConfig, TitleClient } from '@title-protocol/sdk';
 import { Connection } from '@solana/web3.js';
-import { config } from '../config';
 
 // devnet MVP: Privy未実装のためオペレーターウォレットを使用
 const OWNER_WALLET = 'wrVwsTuRzbsDutybqqpf9tBE7JUqRPYzJ3iPUgcFmna';
+const SOLANA_RPC_URL = 'https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1';
 
 export interface TitleProtocolResult {
   /** content_hash = SHA-256(Active Manifest の COSE 署名) — TEE が算出 (§2.1) */
@@ -16,46 +16,26 @@ export interface TitleProtocolResult {
 }
 
 /**
- * storeSignedJson コールバック: サーバー経由でストレージに保存しURIを返す
- */
-async function storeSignedJson(json: string): Promise<string> {
-  const response = await fetch(`${config.serverUrl}/api/v1/store-json`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ json }),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`storeSignedJson failed: ${err}`);
-  }
-  const { uri } = await response.json();
-  return uri;
-}
-
-/**
  * Title Protocol にコンテンツを登録する（クライアント側）
  * 仕様書 §6.1 ステップ1-9
+ *
+ * Gateway が signed_json の保存（Irys/S3）と cNFT ミントを全て代行する。
+ * アプリ側はSDKの register() を呼ぶだけで完結する。
  */
 export async function registerOnTitleProtocol(
   content: Uint8Array,
 ): Promise<TitleProtocolResult> {
-  // 1. GlobalConfig取得（Helius devnet RPC使用）
-  const rpcUrl = config.solanaRpcUrl || 'https://api.devnet.solana.com';
-  const connection = new Connection(rpcUrl);
+  const connection = new Connection(SOLANA_RPC_URL);
   const globalConfig = await fetchGlobalConfig(connection, 'devnet');
   const client = new TitleClient(globalConfig);
 
-  // 2-7. SDK が一括実行: ノード選択 → E2EE → アップロード → 検証 → signed_json保存
-  // 8-9. delegateMint: true でGatewayがcNFTをミント
   const result = await client.register({
     content,
     ownerWallet: OWNER_WALLET,
-    processorIds: ['core-c2pa'],
-    storeSignedJson,
+    processorIds: ['core-c2pa', 'phash-v1'],
     delegateMint: true,
   });
 
-  // content_hash は TEE が C2PA Active Manifest の署名から算出 (§2.1)
   const contentHash = result.contents[0]?.contentHash || '';
   const txSignature = result.txSignatures?.[0] || '';
 

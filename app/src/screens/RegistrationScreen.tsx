@@ -14,17 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
+import { colors, typography, spacing, radii, shadows } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.7 登録準備画面
-// - 署名済みコンテンツのサマリー表示
-// - 「登録する」ボタン（現時点ではプレースホルダー）
-// - プロトコル登録は次タスク以降で実装
+// §3.1.2: 技術用語をUIに表示しない
+// デザイン方針: 写真が主役。テキストは添え物。
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Registration'>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const THUMB_SIZE = (SCREEN_WIDTH - 48 - 8) / 3;
 
 export default function RegistrationScreen() {
   const navigation = useNavigation<Nav>();
@@ -41,51 +41,52 @@ export default function RegistrationScreen() {
     navigation.goBack();
   };
 
+  // 写真プレビューのサイズ計算
+  const previewPad = spacing.xl;
+  const previewWidth = SCREEN_WIDTH - previewPad * 2;
+  const multiThumbSize = (previewWidth - spacing.sm * 2) / 3;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* ヘッダー */}
+      {/* ヘッダー — 最小限 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Ionicons name="arrow-back" size={22} color="#1a1a1a" />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>登録準備</Text>
-        <View style={styles.backButton} />
       </View>
 
-      {/* サマリー */}
+      {/* 写真を大きく見せる */}
       <View style={styles.content}>
-        <View style={styles.summaryCard}>
-          <Ionicons name="shield-checkmark" size={40} color="#2e7d32" />
-          <Text style={styles.summaryTitle}>
-            {signedUris.length}枚のコンテンツが署名済み
-          </Text>
-          <Text style={styles.summaryText}>
-            すべてのコンテンツにC2PA署名が付与されています。{'\n'}
-            登録するとTitle Protocolに記録されます。
-          </Text>
-        </View>
+        {signedUris.length === 1 ? (
+          <Image
+            source={{ uri: signedUris[0].startsWith('file://') ? signedUris[0] : `file://${signedUris[0]}` }}
+            style={[styles.heroImage, { width: previewWidth, height: previewWidth * 1.1 }]}
+          />
+        ) : (
+          <View style={[styles.multiGrid, { width: previewWidth }]}>
+            {signedUris.slice(0, 6).map((uri, i) => (
+              <Image
+                key={i}
+                source={{ uri: uri.startsWith('file://') ? uri : `file://${uri}` }}
+                style={[styles.multiThumb, { width: multiThumbSize, height: multiThumbSize }]}
+              />
+            ))}
+          </View>
+        )}
 
-        {/* サムネイル一覧 */}
-        <FlatList
-          data={signedUris}
-          horizontal
-          keyExtractor={(_, i) => i.toString()}
-          contentContainerStyle={styles.thumbnailList}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <Image
-              source={{ uri: item.startsWith('file://') ? item : `file://${item}` }}
-              style={styles.thumbnail}
-            />
-          )}
-        />
+        {/* テキストは写真の下に控えめに */}
+        <Text style={styles.caption}>
+          {t('registration.summaryTitle', { count: signedUris.length })}
+        </Text>
+        <Text style={styles.subCaption}>
+          {t('registration.summaryText')}
+        </Text>
       </View>
 
-      {/* 登録ボタン */}
+      {/* 公開ボタン */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-          <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-          <Text style={styles.registerButtonText}>登録する</Text>
+        <TouchableOpacity style={styles.publishButton} onPress={handleRegister}>
+          <Text style={styles.publishButtonText}>{t('registration.button')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -95,79 +96,69 @@ export default function RegistrationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingHorizontal: spacing.lg,
+    height: 52,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
   },
   content: {
     flex: 1,
+    paddingHorizontal: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
   },
-  summaryCard: {
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 32,
+  // 1枚: 大きなプレビュー
+  heroImage: {
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceAlt,
   },
-  summaryTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  thumbnailList: {
-    gap: 8,
-  },
-  thumbnail: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  registerButton: {
+  // 複数枚: グリッド
+  multiGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  multiThumb: {
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceAlt,
+  },
+  // テキストは控えめ
+  caption: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+  subCaption: {
+    ...typography.caption,
+    color: colors.textHint,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  // フッター
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+  },
+  publishButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    borderRadius: radii.md,
   },
-  registerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  publishButtonText: {
+    color: colors.white,
+    ...typography.title,
   },
 });

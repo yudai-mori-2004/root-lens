@@ -16,14 +16,10 @@ export const config = {
   uploadUrlEndpoint: `${SERVER_URL}/api/v1/upload-url`,
   /** パイプラインB: ページ作成 — 仕様書 §6.4 */
   publishUrl: `${SERVER_URL}/api/v1/publish`,
-  /** signed_json 保存 — storeSignedJsonコールバック用 */
-  storeJsonUrl: `${SERVER_URL}/api/v1/store-json`,
   /** 証明書発行API */
   deviceCertificateUrl: `${SERVER_URL}/api/v1/device-certificate`,
   /** 証明書更新API */
   deviceCertificateRenewUrl: `${SERVER_URL}/api/v1/device-certificate/renew`,
   /** 証明書更新しきい値（日数） — 仕様書 §4.4.2 */
   certRenewalThresholdDays: 14,
-  /** Solana RPC URL（Helius devnet） */
-  solanaRpcUrl: 'https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1',
 };

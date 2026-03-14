@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, typography, spacing, radii } from '../../theme';
+import { t } from '../../i18n';
 
 // 仕様書 §3.6: 情報を減らす操作 — サイズ変更（縮小のみ）
 // アスペクト比は固定。解像度（ピクセル数）のみ均一に縮小する
@@ -39,16 +41,16 @@ export default function ResizeTool({ effectiveWidth, effectiveHeight, onApply, o
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.cancelText}>キャンセル</Text>
+          <Text style={styles.cancelText}>{t('editTool.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleApply} disabled={selectedScale == null} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[styles.applyText, selectedScale == null && styles.applyTextDisabled]}>適用</Text>
+          <Text style={[styles.applyText, selectedScale == null && styles.applyTextDisabled]}>{t('editTool.apply')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
         <Text style={styles.currentSize}>
-          現在の解像度: {effectiveWidth} x {effectiveHeight} px
+          {t('resize.currentSize', { width: effectiveWidth, height: effectiveHeight })}
         </Text>
 
         <View style={styles.presetList}>
@@ -78,25 +80,25 @@ export default function ResizeTool({ effectiveWidth, effectiveHeight, onApply, o
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: colors.darkBg },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, height: 48,
+    paddingHorizontal: spacing.lg, height: 52,
   },
-  cancelText: { color: '#fff', fontSize: 16 },
-  applyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  applyTextDisabled: { color: '#555' },
-  content: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  currentSize: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 32 },
-  presetList: { gap: 12 },
+  cancelText: { color: colors.darkText, ...typography.body },
+  applyText: { color: colors.darkText, ...typography.bodyMedium },
+  applyTextDisabled: { color: colors.darkTextDisabled },
+  content: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl },
+  currentSize: { color: colors.darkTextSecondary, ...typography.body, fontSize: 14, textAlign: 'center', marginBottom: spacing.xxl },
+  presetList: { gap: spacing.md },
   presetItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1a1a1a', borderRadius: 12,
-    paddingVertical: 16, paddingHorizontal: 20,
+    backgroundColor: colors.overlayWhiteFaint, borderRadius: radii.md,
+    paddingVertical: spacing.lg, paddingHorizontal: 20,
   },
-  presetItemActive: { backgroundColor: '#fff' },
-  presetLabel: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  presetLabelActive: { color: '#000' },
-  presetDimensions: { color: '#666', fontSize: 14 },
-  presetDimensionsActive: { color: '#444' },
+  presetItemActive: { backgroundColor: colors.darkText },
+  presetLabel: { color: colors.darkText, ...typography.title },
+  presetLabelActive: { color: colors.darkBg },
+  presetDimensions: { color: colors.darkTextSecondary, ...typography.body, fontSize: 14 },
+  presetDimensionsActive: { color: colors.overlayDark },
 });

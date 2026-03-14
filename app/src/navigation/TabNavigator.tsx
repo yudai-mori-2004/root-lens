@@ -10,6 +10,8 @@ import PublishedGalleryScreen from '../screens/PublishedGalleryScreen';
 import DeviceGalleryScreen from '../screens/DeviceGalleryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { GalleryStackParamList, TabParamList, RootStackParamList } from './types';
+import { colors, typography, spacing, radii, shadows, navigationHeaderOptions } from '../theme';
+import { t } from '../i18n';
 
 // 仕様書 §3.2 画面構成
 
@@ -17,26 +19,16 @@ const GalleryStack = createNativeStackNavigator<GalleryStackParamList>();
 
 function PublishedGalleryStack() {
   return (
-    <GalleryStack.Navigator>
+    <GalleryStack.Navigator screenOptions={navigationHeaderOptions}>
       <GalleryStack.Screen
         name="Gallery"
         component={PublishedGalleryScreen}
-        options={({ navigation }) => ({
-          title: 'RootLens',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Settings')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="settings-outline" size={24} color="#1a1a1a" />
-            </TouchableOpacity>
-          ),
-        })}
+        options={{ headerShown: false }}
       />
       <GalleryStack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ title: '設定' }}
+        options={{ title: t('settings.title') }}
       />
     </GalleryStack.Navigator>
   );
@@ -46,10 +38,10 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 // 空のプレースホルダー（カメラタブは実際にはモーダルを開く）
 function CameraPlaceholder() {
-  return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+  return <View style={{ flex: 1, backgroundColor: colors.darkBg }} />;
 }
 
-// 中央カメラボタン（§3.2: 丸いカメラボタン）
+// 中央カメラボタン（§3.2: 丸いカメラボタン + ブランドアクセント）
 function CameraTabButton({ onPress }: { onPress?: (...args: any[]) => void }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -71,8 +63,8 @@ export default function TabNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#000',
-        tabBarInactiveTintColor: '#bbb',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textDisabled,
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -80,7 +72,7 @@ export default function TabNavigator() {
         name="PublishedTab"
         component={PublishedGalleryStack}
         options={{
-          tabBarLabel: 'ホーム',
+          tabBarLabel: t('tab.home'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
           ),
@@ -99,12 +91,11 @@ export default function TabNavigator() {
         name="DeviceGalleryTab"
         component={DeviceGalleryScreen}
         options={{
-          tabBarLabel: 'ギャラリー',
+          tabBarLabel: t('tab.gallery'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'images' : 'images-outline'} size={size} color={color} />
           ),
-          headerShown: true,
-          headerTitle: 'ギャラリー',
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
@@ -114,14 +105,13 @@ export default function TabNavigator() {
 const styles = StyleSheet.create({
   tabBar: {
     height: 88,
-    paddingTop: 8,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
-    backgroundColor: '#fff',
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
   },
   tabBarLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...typography.label,
     marginTop: 2,
   },
   cameraButtonOuter: {
@@ -133,21 +123,15 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...shadows.md,
   },
   cameraButtonInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 3,
-    borderColor: '#fff',
-    backgroundColor: 'transparent',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.white,
   },
 });
