@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
-import { loadContents, type ContentItem } from '../store/contentStore';
 import { loadProfile, shortenAddress, type Profile } from '../store/profileStore';
+import { config } from '../config';
 import type { RootStackParamList, GalleryStackParamList } from '../navigation/types';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
@@ -106,26 +106,38 @@ function FloatingHeader() {
   );
 }
 
-// モックコンテンツ（開発プレビュー用）
-const MOCK_CONTENTS: ContentItem[] = [
-  { id: 'mock-1', uri: '', status: 'published' },
-  { id: 'mock-2', uri: '', status: 'published' },
-  { id: 'mock-3', uri: '', status: 'published' },
-  { id: 'mock-4', uri: '', status: 'draft' },
-];
-const USE_MOCK = true; // 開発中はtrue、実データが入ったらfalse
+interface PublishedItem {
+  shortId: string;
+  thumbnailUrl: string;
+  contentHash: string;
+  createdAt: string;
+}
+
+async function fetchMyPages(userId: string): Promise<PublishedItem[]> {
+  try {
+    const res = await fetch(`${config.serverUrl}/api/v1/pages?user_id=${userId}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
 
 export default function PublishedGalleryScreen() {
   const navigation = useNavigation<Nav>();
-  const [contents, setContents] = useState<ContentItem[]>([]);
+  const [contents, setContents] = useState<PublishedItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadContents().then((real) => {
-        setContents(real.length > 0 ? real : USE_MOCK ? MOCK_CONTENTS : []);
+      loadProfile().then((p) => {
+        setProfile(p);
+        if (p.userId) {
+          fetchMyPages(p.userId).then(setContents);
+        } else {
+          setContents([]);
+        }
       });
-      loadProfile().then(setProfile);
     }, []),
   );
 
@@ -169,13 +181,9 @@ export default function PublishedGalleryScreen() {
     );
   }
 
-  const handlePress = (item: ContentItem) => {
-    if (item.id.startsWith('mock-')) return; // モックはタップ無効
-    if (item.status === 'draft') {
-      navigation.navigate('Edit', { mediaItems: [{ uri: item.uri, type: 'image' as const }] });
-    } else {
-      navigation.navigate('Preview', { contentIds: [item.id] });
-    }
+  const handlePress = (item: PublishedItem) => {
+    const pageUrl = `${config.serverUrl}/p/${item.shortId}`;
+    navigation.navigate('Preview', { contentIds: [item.shortId] });
   };
 
   const profileHeader = profile && (profile.displayName || profile.address) ? (
@@ -208,24 +216,18 @@ export default function PublishedGalleryScreen() {
       <FlatList
         data={contents}
         numColumns={NUM_COLUMNS}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.shortId}
         contentContainerStyle={styles.grid}
         ListHeaderComponent={profileHeader}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.gridItem}
             onPress={() => handlePress(item)}
-            activeOpacity={item.id.startsWith('mock-') ? 1 : 0.7}
           >
-            {item.uri ? (
-              <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+            {item.thumbnailUrl ? (
+              <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} />
             ) : (
               <View style={[styles.thumbnail, styles.mockThumb]} />
-            )}
-            {item.status === 'draft' && (
-              <View style={styles.draftBadge}>
-                <Text style={styles.draftBadgeText}>{t('home.draft')}</Text>
-              </View>
             )}
           </TouchableOpacity>
         )}

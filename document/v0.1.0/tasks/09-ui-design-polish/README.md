@@ -24,116 +24,131 @@
 ## 実装内容
 
 ### 1. デザイントークン定義 (`app/src/theme.ts`)
-- **ブランドカラー**: ティール系アクセント（`#0D9488` / teal-600ベース）
-  - 「本物の証明」を想起させる色。信頼・透明・自然の連想
+- **ブランドカラー**: ネイビーブルー（`#1E3A5F`）
+  - 紋章・証明の重厚さ。紫感を排した深い青
 - **カラーパレット**: background, surface, text (primary/secondary/hint), accent, success, error, overlay等
 - **タイポグラフィ**: heading, body, caption, label の fontSize / fontWeight / lineHeight
 - **スペーシング**: 4px単位の間隔トークン (xs=4, sm=8, md=12, lg=16, xl=24, xxl=32)
 - **形状**: borderRadius (sm=6, md=10, lg=16, full=9999)
+- **ナビゲーションヘッダー**: `navigationHeaderOptions` で全スタックに統一
 
 ### 2. 技術用語リライト（§3.1.2 準拠）
-| 画面 | 現状 | 修正後 |
-|------|------|--------|
+| 画面 | 修正前 | 修正後 |
+|------|--------|--------|
 | RegistrationScreen | 「C2PA署名が付与されています」 | 「本物証明が付いています」 |
 | RegistrationScreen | 「Title Protocolに記録されます」 | 「改ざん不可能な記録として公開されます」 |
 | PublishingScreen | 「本物証明の登録とアップロード」 | 「本物証明の記録と公開の準備」 |
 | CameraScreen | 「署名中...」 | 「証明付与中...」 |
-| CameraScreen | 「C2PA署名に失敗」 | 「本物証明の付与に失敗」 |
-| EditScreen | 「署名エラー」「C2PA署名に失敗」 | 「本物証明エラー」「本物証明の付与に失敗」 |
-| EditScreen | 「署名済みコンテンツ」 | 「証明付きコンテンツ」 |
+| EditScreen | 「署名エラー」 | 「本物証明エラー」 |
 
-### 3. ホーム画面（空状態）CTA強化
-- 「撮影する」「ギャラリーから選ぶ」の2つのCTAボタン追加
-- アイコンをアクセントカラーに変更、サイズアップ
-- 全体の余白・階層を整理
+### 3. ホーム画面の再設計
+- ゴーストグリッド（3列、色付きシマーアニメーション）
+- 下部のボトムシート（角丸カード）にCTA配置
+- フローティングヘッダー（RootLens + 設定アイコン）
+- プロフィール表示（名前 + アドレスコピー）
+- Supabase APIからコンテンツ一覧を取得して表示
 
-### 4. タブバー改善
-- カメラボタンにレンズ+シールドのモチーフ（Ionicons組み合わせ）
-- アクセントカラーの導入（ボタン背景）
-- タブバー全体にデザイントークン適用
+### 4. カメラ画面の強化
+- トップバー・ボトムバーをプレビュー範囲外に分離（黒帯レイアウト）
+- フラッシュ3段トグル（off / on / auto）
+- セルフタイマー（off / 3s / 10s）+ カウントダウン表示
+- 三分割グリッドオーバーレイ
+- ピンチズーム + 倍率バッジ
+- 設定永続化（cameraSettings ストア）
 
-### 5. カメラ画面のインジケータ改善
-- 「証明付与中...」の表示を改善（チェックマーク付きピル）
-- モード切替にアクティブインジケータ（下線）追加
+### 5. ギャラリー画面
+- ヘッダー削除（タブと重複）、グリッドを上端から表示
+- 選択UIを下部フローティングCTAに統合（選択数 + キャンセル + シェアボタン）
 
-### 6. ギャラリー（GalleryView）改善
-- 「本物証明をシェア」ボタンを画面下部のフローティングCTAに移動
-- C2PAバッジをやや大きくし、ツールチップ的な存在感を付与
-- グリッドのborderRadiusをデザイントークンに統一
+### 6. 編集画面（ビジュアルのみ）
+- ツールバーにテキストラベル追加（切り抜き/マスク/サイズ/トリム/保存）
+- シェアボタンをアクセントカラーに
+- ヘッダー高さ52pxに統一
 
-### 7. 編集画面（ビジュアルのみ）
-- ツールバーアイコンの下にテキストラベル追加（クロップ/マスク/サイズ/トリム/保存）
-- デザイントークンの色・間隔を適用
-- 「シェア」ボタンをアクセントカラーに
+### 7. 登録準備画面
+- 写真を大きく表示（主役）。テキストは控えめに
+- 丸アイコン+中央テキストのテンプレートパターンを排除
 
-### 8. 登録準備画面
-- 技術用語リライト
-- サムネイル1枚時のセンタリング対応
-- デザイントークン適用
+### 8. 公開画面（PublishingScreen）
+- ステップ表示を下寄せ、各ステップ横にインラインスピナー/チェック
+- エラーUIも下寄せ
 
-### 9. 公開画面（PublishingScreen）
-- ローディング: プログレスステップUI（3段階表示）
-- 完了: 共有ボタンを大きなCTAに昇格
-- デザイントークン適用
+### 9. プレビュー画面
+- WebViewで公開ページを直接表示
+- ローカルcontentStore依存を排除
 
-### 10. プレビュー画面
-- 「Shot on RootLens」バッジの視覚的強調
-- シェアボタンを大きなCTAに
-- デザイントークン適用
+### 10. 設定画面
+- プロフィール編集（表示名 / Solanaアドレス表示+コピー / 自己紹介 / 端末名トグル）
+- カメラ設定（グリッド / シャッター音）
+- バージョン + 端末名表示
 
-### 11. 編集ツールコンポーネント
-- CropTool / MaskTool / ResizeTool / TrimTool にデザイントークン適用
-- ハードコード色値をすべて `theme.ts` のトークンに置換
+### 11. 多言語化（i18n）
+- `t()` 関数 + ja/en 辞書
+- 全画面のUI文字列を翻訳キーに置換（ハードコード日本語ゼロ）
 
-### 12. App.tsx スプラッシュ/エラーUI
-- デザイントークン適用
-- リトライボタンをアクセントカラーに
+### 12. 公開ページ（web）デザイン刷新
+- ネイビーブランドカラー適用（ライト/ダークモード両対応）
+- 検証サマリーの用語を一般向けにリライト（技術詳細セクションは正確な技術用語を維持）
+- OGP・ランディングページを英語化（国際向け）
+- フッターにブランドカラー
 
-### 13. 多言語化（i18n）基盤
-- `app/src/i18n/index.ts` — 翻訳関数 `t()` + ja/en 辞書
-- デバイスロケール自動検出 (`NativeModules` ベース)
-- プレースホルダー置換サポート (`{count}`, `{width}` 等)
-- 全UI文字列を翻訳キーとして定義済み（画面側の適用は次ステップ）
+### 13. データアーキテクチャ変更
+- Supabase `users` テーブル追加 + `pages.user_id` 紐付け
+- `/api/v1/users` — upsert API
+- `/api/v1/pages?user_id=xxx` — 自分のコンテンツ取得API
+- publish時に `address` 送信 → `user_id` 自動紐付け
+- `contentStore` 削除（ローカル保存から Supabase 取得に移行）
+- `profileStore` に `userId` 追加、サーバー同期対応
 
-## スコープ外
-
-- 編集画面の操作ロジック・インタラクション変更
-- カスタムフォントの導入（システムフォントを維持）
-- アニメーション追加（既存のシャッターアニメーション以外）
-- ネイティブモジュールの変更
+### 14. アイコン整理
+- shield-checkmarkの全面使用を廃止
+- カメラボタン: クリーンなシャッターデザイン（アイコンなし）
+- 認証バッジ: `checkmark-circle`
+- アクション: `arrow-up-circle`
+- 各用途に適したアイコンに個別変更
 
 ## ディレクトリ変更
 
 ### 新規
 - `app/src/theme.ts` — デザイントークン定義
 - `app/src/i18n/index.ts` — 多言語化基盤 (ja/en)
+- `app/src/store/cameraSettings.ts` — カメラ設定永続化
+- `app/src/store/profileStore.ts` — プロフィール管理 + Supabase同期
+- `supabase/migrations/20260315_create_users.sql` — usersテーブル
+- `web/app/api/v1/users/route.ts` — ユーザーAPI
 
 ### 変更
 - `app/App.tsx` — トークン適用
-- `app/src/screens/PublishedGalleryScreen.tsx` — 空状態CTA + トークン適用
-- `app/src/screens/CameraScreen.tsx` — インジケータ改善 + 用語リライト + トークン適用
-- `app/src/screens/EditScreen.tsx` — ツールバーラベル + トークン適用（操作ロジック不変）
-- `app/src/screens/RegistrationScreen.tsx` — 用語リライト + トークン適用
-- `app/src/screens/PublishingScreen.tsx` — プログレスUI + 共有CTA + トークン適用
-- `app/src/screens/PreviewScreen.tsx` — バッジ強調 + シェアCTA + トークン適用
-- `app/src/screens/SettingsScreen.tsx` — トークン適用
-- `app/src/components/GalleryView.tsx` — フローティングCTA + バッジ改善 + トークン適用
-- `app/src/components/edit/CropTool.tsx` — トークン適用
-- `app/src/components/edit/MaskTool.tsx` — トークン適用
-- `app/src/components/edit/ResizeTool.tsx` — トークン適用
-- `app/src/components/edit/TrimTool.tsx` — トークン適用
-- `app/src/navigation/TabNavigator.tsx` — カメラボタン + トークン適用
+- `app/src/screens/` — 全画面リデザイン
+- `app/src/components/` — 全コンポーネントトークン適用
+- `app/src/navigation/TabNavigator.tsx` — カメラボタン + ヘッダー統一
+- `web/components/ContentPage.tsx` — 用語リライト + ブランドカラー
+- `web/app/globals.css` — ブランドカラー変数追加
+- `web/app/api/v1/publish/route.ts` — address パラメータ追加
+- `web/app/api/v1/pages/route.ts` — GET追加（user_idでフィルタ）
+- `web/lib/server/page-store.ts` — user_id紐付け
+
+### 削除
+- `app/src/store/contentStore.ts` — Supabase取得に移行
+- `web/app/api/v1/store-json/route.ts` — 不要
+- `web/lib/server/title-protocol.ts` — 不要
 
 ## 完了条件
 
 - [x] `theme.ts` でデザイントークンが定義され、全画面・全コンポーネントで使用されている
-- [x] UI上に技術用語が一切表示されていない（§3.1.2 完全準拠）
-- [x] ホーム空状態に撮影・ギャラリーへのCTAボタンがある
+- [x] UI上に技術用語が一切表示されていない（§3.1.2 完全準拠、技術詳細セクション除く）
+- [x] ホーム空状態にゴーストグリッド + ボトムシートCTA
 - [x] 編集画面のツールバーにテキストラベルが付いている
 - [x] 共有UI（Publishing/Preview）が目立つCTAになっている
-- [x] ブランドカラー（ティール系）がアクセントとして一貫使用されている
+- [x] ブランドカラー（ネイビー #1E3A5F）がアクセントとして一貫使用されている
 - [x] 編集画面の操作ロジックが一切変更されていない
-- [x] 多言語化基盤（i18n）が ja/en 対応で作成されている
-- [x] 全画面で `t()` 関数による翻訳が適用されている（UI上のハードコード日本語ゼロ）
-- [ ] 色の最終選定・微調整
-- [ ] アイコンの最終選定
+- [x] 多言語化基盤（i18n）が ja/en 対応で全画面に適用されている
+- [x] カメラにグリッド・タイマー・フラッシュ3段・ピンチズームが追加されている
+- [x] 設定画面にプロフィール編集・カメラ設定が実装されている
+- [x] ホーム画面がSupabaseからコンテンツを取得して表示する
+- [x] 公開ページにブランドカラー・用語リライトが適用されている
+- [x] contentStore が削除されている
+
+## 完了日
+
+2026-03-15

@@ -18,12 +18,20 @@ import type {
 import { fetchContentRecord, verifyContent } from "@/lib/data";
 import styles from "./ContentPage.module.css";
 
+interface UserProfile {
+  displayName: string;
+  address: string;
+  bio: string;
+  deviceName: string;
+}
+
 interface Props {
   page: PageMeta;
 }
 
 export default function ContentPage({ page }: Props) {
   const [record, setRecord] = useState<ContentRecord | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [verification, setVerification] = useState<VerificationResult>({
     collectionVerified: "pending",
     teeSignatureVerified: "pending",
@@ -43,13 +51,11 @@ export default function ContentPage({ page }: Props) {
     });
   }, [page.contentHash, page.thumbnailUrl]);
 
-  const capturedDate = record
-    ? formatDate(record.capturedAt)
-    : null;
+  // プロフィール取得（page に userId が紐付いている場合）
+  // 現時点では pages テーブルに user_id が入ったらここで取得
+  // TODO: page.userId が渡される仕組みを追加
 
-  const headline = record
-    ? `${record.deviceName} で撮影`
-    : null;
+  const capturedDate = record ? formatDate(record.capturedAt) : null;
 
   return (
     <div className={styles.container}>
@@ -66,7 +72,9 @@ export default function ContentPage({ page }: Props) {
       <div className={styles.infoSection}>
         {record ? (
           <>
-            <h1 className={styles.headline}>{headline}</h1>
+            <h1 className={styles.headline}>
+              Shot on {record.deviceName}
+            </h1>
             <div className={styles.meta}>
               <span className={styles.appBadge}>RootLens</span>
               <span className={styles.separator} />
@@ -119,7 +127,7 @@ export default function ContentPage({ page }: Props) {
         <div className={styles.footerBrand}>
           <span className={styles.footerLogo}>RootLens</span>
           <span className={styles.footerTagline}>
-            撮影の事実を、そのままに
+            Prove it&apos;s real.
           </span>
         </div>
         <a
@@ -149,7 +157,7 @@ function VerificationSummary({
       <div className={styles.verifyCard}>
         <div className={styles.verifyLoading}>
           <LoadingDots />
-          <span>記録を照合しています</span>
+          <span>本物証明を照合しています</span>
         </div>
       </div>
     );
@@ -157,6 +165,7 @@ function VerificationSummary({
 
   const allVerified = verification.overall === "verified";
 
+  // §3.1.2: 技術用語をユーザー向け表現に
   return (
     <div
       className={`${styles.verifyCard} ${allVerified ? styles.verifyCardOk : styles.verifyCardWarn}`}
@@ -165,27 +174,26 @@ function VerificationSummary({
         <StatusIcon status={verification.overall} />
         <span className={styles.verifyTitle}>
           {allVerified
-            ? "オンチェーン記録と一致"
+            ? "本物証明が確認されました"
             : record
-              ? "記録の照合に問題があります"
-              : "オンチェーン記録が見つかりません"}
+              ? "証明の照合に問題があります"
+              : "証明の記録が見つかりません"}
         </span>
       </div>
 
       <div className={styles.verifyItems}>
         <VerifyItem
           status={verification.c2paChainVerified}
-          label="C2PA署名"
-          detail={record ? `${record.signingAlgorithm}` : undefined}
+          label="撮影証明"
+          detail={record ? record.signingAlgorithm : undefined}
         />
         <VerifyItem
           status={verification.collectionVerified}
-          label="Title Protocol"
-          detail="正規コレクション"
+          label="記録の正当性"
         />
         <VerifyItem
           status={verification.teeSignatureVerified}
-          label="TEE署名"
+          label="デバイス署名"
           detail={record?.teeType}
         />
         <VerifyItem
@@ -193,7 +201,7 @@ function VerificationSummary({
           label="コンテンツ同一性"
           detail={
             verification.phashDistance !== undefined
-              ? `pHash距離: ${verification.phashDistance}`
+              ? `距離: ${verification.phashDistance}`
               : undefined
           }
         />
@@ -201,9 +209,9 @@ function VerificationSummary({
 
       {allVerified && record?.tsaProvider && (
         <div className={styles.tsaNote}>
-          タイムスタンプ: {record.tsaProvider} TSA により
-          {record.tsaTimestamp ? ` ${formatDateShort(record.tsaTimestamp)} に` : ""}
-          記録
+          {record.tsaTimestamp
+            ? `${formatDateShort(record.tsaTimestamp)} に記録`
+            : "タイムスタンプ記録済み"}
         </div>
       )}
     </div>
@@ -256,7 +264,7 @@ function TechnicalDetails({
           />
           <DetailRow
             label="元の解像度"
-            value={`${record.sourceDimensions.width} x ${record.sourceDimensions.height}`}
+            value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`}
           />
           {record.editOperations.length > 0 && (
             <DetailRow
@@ -419,7 +427,7 @@ function formatDate(iso: string): string {
   const day = d.getDate();
   const hours = d.getHours().toString().padStart(2, "0");
   const minutes = d.getMinutes().toString().padStart(2, "0");
-  return `${year}年${month}月${day}日 ${hours}:${minutes}`;
+  return `${year}/${month}/${day} ${hours}:${minutes}`;
 }
 
 function formatDateShort(iso: string): string {

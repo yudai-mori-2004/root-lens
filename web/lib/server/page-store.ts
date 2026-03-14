@@ -35,6 +35,7 @@ export interface CreatePageInput {
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+  address?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,10 +61,21 @@ function generateShortId(): string {
 export async function createPage(input: CreatePageInput): Promise<PageRecord> {
   const shortId = generateShortId();
 
+  // address → user_id 解決
+  let userId: string | null = null;
+  if (input.address) {
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("address", input.address)
+      .single();
+    userId = user?.id ?? null;
+  }
+
   // pages テーブルにレコード作成
   const { data: page, error: pageError } = await supabase
     .from("pages")
-    .insert({ short_id: shortId })
+    .insert({ short_id: shortId, ...(userId ? { user_id: userId } : {}) })
     .select("id, short_id, created_at")
     .single();
 

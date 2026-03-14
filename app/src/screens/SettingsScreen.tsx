@@ -80,7 +80,7 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.divider} />
         <View style={styles.inputRow}>
-          <Text style={styles.inputLabel}>Solana</Text>
+          <Text style={styles.inputLabel}>Solana アドレス</Text>
           <Text style={styles.addressValue} numberOfLines={1}>
             {profile.address ? shortenAddress(profile.address) : '—'}
           </Text>
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     ...typography.body,
     color: colors.textPrimary,
-    width: 100,
+    flexShrink: 0,
   },
   input: {
     flex: 1,

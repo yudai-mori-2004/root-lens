@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>RootLens</h1>
-      <p className={styles.tagline}>撮影の事実を、そのままに</p>
+      <p className={styles.tagline}>Prove it&apos;s real.</p>
     </div>
   );
 }

@@ -54,8 +54,8 @@
   align-items: center;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-badge);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
   padding: 3px 8px;
   border-radius: 4px;
   letter-spacing: 0.02em;
@@ -309,7 +309,7 @@
 .footerLogo {
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--color-accent);
   letter-spacing: 0.5px;
 }
 

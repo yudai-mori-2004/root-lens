@@ -15,7 +15,7 @@ import { createPage } from "@/lib/server/page-store";
 
 export async function POST(req: NextRequest) {
   try {
-    const { contentHash, thumbnailUrl, ogpImageUrl } = await req.json();
+    const { contentHash, thumbnailUrl, ogpImageUrl, address } = await req.json();
 
     if (!contentHash || !thumbnailUrl) {
       return NextResponse.json(
@@ -24,12 +24,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Supabase ページ作成（contentHash/assetId はアプリからのPATCHで後から設定）
+    // Supabase ページ作成
     const record = await createPage({
       contentHash,
       assetId: "",
       thumbnailUrl,
       ogpImageUrl: ogpImageUrl || thumbnailUrl,
+      address: address || undefined,
     });
 
     const baseUrl = process.env.PUBLIC_PAGE_URL || "https://www.rootlens.io";

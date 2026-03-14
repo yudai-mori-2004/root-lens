@@ -21,6 +21,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
 import { config } from '../config';
 import { registerOnTitleProtocol } from '../services/titleProtocol';
+import { loadProfile } from '../store/profileStore';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
 
@@ -147,6 +148,7 @@ export default function PublishingScreen() {
 
       // 両パイプライン完了後、TP の content_hash + R2 URL でページ作成
       // content_hash が公開ページからオンチェーンデータへの唯一のキー
+      const profile = await loadProfile();
       const publishRes = await fetch(config.publishUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,6 +156,7 @@ export default function PublishingScreen() {
           contentHash: tpResult.contentHash,
           thumbnailUrl: r2Urls.displayPublicUrl,
           ogpImageUrl: r2Urls.ogpPublicUrl,
+          address: profile.address || undefined,
         }),
       });
 

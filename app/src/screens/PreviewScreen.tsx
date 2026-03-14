@@ -1,24 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  Image,
   TouchableOpacity,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { loadContents, type ContentItem } from '../store/contentStore';
+import { config } from '../config';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
 
 // 仕様書 §3.7 公開ページプレビュー
-// 公開済みギャラリーから選択した際に表示
+// 公開済みギャラリーから選択した際に、公開ページをWebViewで表示
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Preview'>;
@@ -26,34 +28,17 @@ type Route = RouteProp<RootStackParamList, 'Preview'>;
 export default function PreviewScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { contentIds } = route.params;
-  const [content, setContent] = useState<ContentItem | null>(null);
-
-  useEffect(() => {
-    loadContents().then((contents) => {
-      const found = contents.find((c) => c.id === contentIds[0]);
-      setContent(found || null);
-    });
-  }, [contentIds]);
-
-  if (!content) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
-      </View>
-    );
-  }
-
-  const mockUrl = `https://rootlens.io/p/${content.id}`;
+  const shortId = route.params.contentIds[0];
+  const pageUrl = `${config.serverUrl}/p/${shortId}`;
 
   const handleShare = async () => {
     try {
-      await Share.share({ message: mockUrl });
+      await Share.share({ message: pageUrl });
     } catch (_) {}
   };
 
   const handleCopyLink = () => {
-    // TODO: Clipboard copy
+    Clipboard.setStringAsync(pageUrl);
   };
 
   return (
@@ -70,20 +55,19 @@ export default function PreviewScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      {/* 画像 */}
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: content.uri }} style={styles.image} />
-      </View>
-
-      {/* 証明ステータス（§3.1.3 本物証明の表示基準） */}
-      <View style={styles.proofBar}>
-        <Text style={styles.proofText}>Shot on RootLens</Text>
-        {content.editedAt && (
-          <Text style={styles.proofSub}> · Edited</Text>
+      {/* 公開ページ WebView */}
+      <WebView
+        source={{ uri: pageUrl }}
+        style={styles.webview}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={styles.webviewLoading}>
+            <ActivityIndicator size="small" color={colors.textHint} />
+          </View>
         )}
-      </View>
+      />
 
-      {/* 共有アクション（大きなCTA） */}
+      {/* 共有アクション */}
       <View style={styles.actions}>
         <TouchableOpacity style={styles.sharePrimaryButton} onPress={handleShare}>
           <Ionicons name="share-outline" size={20} color={colors.white} />
@@ -102,12 +86,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textHint,
-    textAlign: 'center',
-    marginTop: 100,
   },
   header: {
     flexDirection: 'row',
@@ -128,31 +106,17 @@ const styles = StyleSheet.create({
     ...typography.title,
     color: colors.textPrimary,
   },
-  imageContainer: {
+  webview: {
     flex: 1,
-    backgroundColor: colors.surface,
   },
-  image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  // 証明ステータス
-  proofBar: {
-    flexDirection: 'row',
+  webviewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'baseline',
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  proofText: {
-    ...typography.captionMedium,
-    color: colors.textPrimary,
-  },
-  proofSub: {
-    ...typography.caption,
-    color: colors.textHint,
   },
   // 共有アクション
   actions: {

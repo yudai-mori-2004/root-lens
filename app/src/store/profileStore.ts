@@ -5,6 +5,7 @@ import { config } from '../config';
 const KEY = 'rootlens:profile';
 
 export interface Profile {
+  userId: string;       // Supabase users.id（サーバーから取得）
   displayName: string;
   address: string;      // Solanaアドレス
   bio: string;          // 自己紹介・SNSリンク等
@@ -14,6 +15,7 @@ export interface Profile {
 }
 
 const defaults: Profile = {
+  userId: '',
   displayName: '',
   address: '',
   bio: '',
@@ -63,7 +65,8 @@ export async function saveProfile(profile: Profile): Promise<void> {
         }),
       });
       if (res.ok) {
-        cached = { ...profile, synced: true };
+        const data = await res.json();
+        cached = { ...profile, userId: data.id || profile.userId, synced: true };
         await AsyncStorage.setItem(KEY, JSON.stringify(cached));
       }
     } catch (e) {

@@ -24,19 +24,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // §7.3 OGP: SNS共有時のプレビュー
   return {
-    title: "RootLens で撮影されたコンテンツ",
-    description: "撮影デバイスと撮影時刻が記録されたコンテンツです",
+    title: "Shot on RootLens",
+    description: "Verified authentic content with tamper-proof provenance",
     openGraph: {
-      title: "RootLens で撮影されたコンテンツ",
-      description: "撮影デバイスと撮影時刻が記録されたコンテンツです",
+      title: "Shot on RootLens",
+      description: "Verified authentic content with tamper-proof provenance",
       images: [{ url: page.ogpImageUrl, width: 1200, height: 630 }],
       type: "article",
       siteName: "RootLens",
     },
     twitter: {
       card: "summary_large_image",
-      title: "RootLens で撮影されたコンテンツ",
-      description: "撮影デバイスと撮影時刻が記録されたコンテンツです",
+      title: "Shot on RootLens",
+      description: "Verified authentic content with tamper-proof provenance",
       images: [page.ogpImageUrl],
     },
   };
@@ -66,10 +66,10 @@ function NotFound() {
       }}
     >
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>
-        コンテンツが見つかりません
+        Content not found
       </h1>
       <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-        このリンクは無効か、コンテンツが削除された可能性があります
+        This link may be invalid or the content may have been removed.
       </p>
     </div>
   );
