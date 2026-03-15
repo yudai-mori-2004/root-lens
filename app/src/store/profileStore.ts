@@ -48,12 +48,10 @@ export async function loadProfile(): Promise<Profile> {
 export async function saveProfile(profile: Profile): Promise<void> {
   cached = { ...profile, synced: false };
   await AsyncStorage.setItem(KEY, JSON.stringify(cached));
-  console.log('[profileStore] saved locally:', cached);
 
   // Supabase に非同期で同期（アドレスがある場合のみ）
   if (profile.address) {
     try {
-      console.log('[profileStore] syncing to server...');
       const res = await fetch(`${config.serverUrl}/api/v1/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

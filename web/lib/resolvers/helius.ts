@@ -3,6 +3,11 @@
  *
  * DAS (Digital Asset Standard) API を使った ContentResolver 実装。
  * Helius / Triton 等の DAS 準拠プロバイダで動作する。
+ *
+ * Title Protocolでは1つのコンテンツに対して:
+ *   - core collection に core cNFT (C2PA署名, TEE署名)
+ *   - ext collection に extension cNFT (pHash等) が別々にミントされる
+ * 両方を content_hash で検索し、統合して返す。
  */
 
 import type { SignedJson } from "@title-protocol/sdk";
@@ -32,11 +37,6 @@ interface DasAsset {
     owner: string;
   };
   grouping: { group_key: string; group_value: string }[];
-}
-
-interface DasGetAssetResponse {
-  jsonrpc: string;
-  result: DasAsset;
 }
 
 interface DasSearchAssetsResponse {
@@ -120,40 +120,8 @@ async function searchAssetsByCollection(
 }
 
 // ---------------------------------------------------------------------------
-// cNFT → ResolvedContent
+// Arweave signed_json 判定
 // ---------------------------------------------------------------------------
-
-async function resolveFromAsset(asset: DasAsset): Promise<ResolvedContent> {
-  const arweaveUri = asset.content.json_uri;
-  const attributes = asset.content.metadata.attributes ?? [];
-
-  let coreSignedJson: SignedJson | null = null;
-  const extensionSignedJsons: SignedJson[] = [];
-
-  try {
-    const offchain = await fetchArweaveJson(arweaveUri);
-    if (isSignedJson(offchain)) {
-      const payload = offchain.payload;
-      if ("nodes" in payload) {
-        coreSignedJson = offchain;
-      } else {
-        extensionSignedJsons.push(offchain);
-      }
-    }
-  } catch {
-    // Arweave 取得失敗は検証結果に反映（null のまま返す）
-  }
-
-  return {
-    assetId: asset.id,
-    collectionAddress: getCollectionAddress(asset),
-    arweaveUri,
-    attributes,
-    coreSignedJson,
-    extensionSignedJsons,
-    ownerWallet: asset.ownership.owner,
-  };
-}
 
 function isSignedJson(obj: unknown): obj is SignedJson {
   if (typeof obj !== "object" || obj === null) return false;
@@ -166,6 +134,22 @@ function isSignedJson(obj: unknown): obj is SignedJson {
   );
 }
 
+function isCorePayload(payload: unknown): boolean {
+  return typeof payload === "object" && payload !== null && "nodes" in payload;
+}
+
+// ---------------------------------------------------------------------------
+// cNFT → signed_json の取得
+// ---------------------------------------------------------------------------
+
+async function fetchSignedJsonFromAsset(asset: DasAsset): Promise<SignedJson | null> {
+  try {
+    const offchain = await fetchArweaveJson(asset.content.json_uri);
+    if (isSignedJson(offchain)) return offchain;
+  } catch {}
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // DasContentResolver
 // ---------------------------------------------------------------------------
@@ -176,14 +160,45 @@ export class DasContentResolver implements ContentResolver {
   ): Promise<ResolvedContent | null> {
     try {
       const collections = await getCollectionMints();
-      const result = await searchAssetsByCollection(collections.core);
-      const match = result.items.find(
+
+      // core と ext の両方を並列検索
+      const [coreResult, extResult] = await Promise.all([
+        searchAssetsByCollection(collections.core),
+        searchAssetsByCollection(collections.ext),
+      ]);
+
+      // core collection から content_hash 一致を探す
+      const coreAsset = coreResult.items.find(
         (item) => getAttribute(item, "content_hash") === contentHash
       );
 
-      if (!match) return null;
-      return resolveFromAsset(match);
-    } catch {
+      if (!coreAsset) return null;
+
+      // ext collection から同じ content_hash のものを全て取得
+      const extAssets = extResult.items.filter(
+        (item) => getAttribute(item, "content_hash") === contentHash
+      );
+
+      // Arweave signed_json を並列取得
+      const [coreSj, ...extSjs] = await Promise.all([
+        fetchSignedJsonFromAsset(coreAsset),
+        ...extAssets.map(fetchSignedJsonFromAsset),
+      ]);
+
+      const coreSignedJson = coreSj && isCorePayload(coreSj.payload) ? coreSj : null;
+      const extensionSignedJsons = extSjs.filter((sj): sj is SignedJson => sj !== null);
+
+      return {
+        assetId: coreAsset.id,
+        collectionAddress: getCollectionAddress(coreAsset),
+        arweaveUri: coreAsset.content.json_uri,
+        attributes: coreAsset.content.metadata.attributes ?? [],
+        coreSignedJson,
+        extensionSignedJsons,
+        ownerWallet: coreAsset.ownership.owner,
+      };
+    } catch (e) {
+      console.error("[DasContentResolver] resolveByContentHash failed:", e);
       return null;
     }
   }

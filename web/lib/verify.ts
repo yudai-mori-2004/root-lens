@@ -151,13 +151,8 @@ async function verifyTeeSignature(
   try {
     const { tee_pubkey, tee_signature, payload, protocol, tee_type, attributes } = signedJson;
 
-    // 署名対象データを再構築: payload + attributes を正規化した JSON
-    const signatureTarget = JSON.stringify({
-      protocol,
-      tee_type,
-      payload,
-      attributes,
-    });
+    // 署名対象データを再構築: payload + attributes の正規化 JSON
+    const signatureTarget = JSON.stringify({ payload, attributes });
     const data = new TextEncoder().encode(signatureTarget);
 
     // Ed25519 公開鍵 (Base58 → bytes)
@@ -209,34 +204,30 @@ async function verifyPHash(
   resolved: ResolvedContent,
   thumbnailUrl: string
 ): Promise<PHashResult> {
-  // Extension signed_json から phash-image の結果を探す
+  // Extension signed_json から phash-v1 の結果を探す
   const phashExtension = resolved.extensionSignedJsons.find((sj) => {
     const p = sj.payload as ExtensionPayload;
-    return p.extension_id === "phash-image";
+    return p.extension_id === "phash-v1";
   });
 
-  if (!phashExtension) {
-    // Core signed_json の attributes からも探す
-    const phashAttr = resolved.attributes.find(
-      (a) => a.trait_type === "phash"
-    );
-    if (!phashAttr) {
-      return { status: "skipped", reason: "No pHash data in on-chain record" };
+  if (phashExtension) {
+    // phash-v1 extension: payload.phash に直接ハッシュ値が入っている
+    const payload = phashExtension.payload as ExtensionPayload & { phash?: string };
+    const onchainHash = payload.phash;
+    if (onchainHash) {
+      return verifyPHashWithImage(onchainHash, thumbnailUrl);
     }
-    // attribute から直接取得
-    const onchainHash = phashAttr.value;
-    return verifyPHashWithImage(onchainHash, thumbnailUrl);
   }
 
-  const payload = phashExtension.payload as ExtensionPayload & {
-    result?: { hash?: string };
-  };
-  const onchainHash = payload.result?.hash;
-  if (!onchainHash) {
-    return { status: "skipped", reason: "No pHash hash in extension data" };
+  // フォールバック: attributes から探す
+  const phashAttr = resolved.attributes.find(
+    (a) => a.trait_type === "phash"
+  );
+  if (phashAttr) {
+    return verifyPHashWithImage(phashAttr.value, thumbnailUrl);
   }
 
-  return verifyPHashWithImage(onchainHash, thumbnailUrl);
+  return { status: "skipped", reason: "No pHash data in on-chain record" };
 }
 
 async function verifyPHashWithImage(
