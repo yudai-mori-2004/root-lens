@@ -257,20 +257,20 @@ async function verifyPHashWithImage(
 
 /**
  * 画像から DCT 64-bit pHash を計算する。
+ * Title Protocol phash-v1 WASM と完全に同一のアルゴリズム。
  *
- * 1. 32x32 にリサイズ
- * 2. グレースケール変換
- * 3. DCT 適用
- * 4. 左上 8x8 の低周波係数 → 中央値で閾値処理 → 64ビットハッシュ
+ * 1. 32x32 にリサイズ + グレースケール（u8精度）
+ * 2. 分離型 2D DCT（scale = sqrt(2/N), DC成分 cu/cv = 1/sqrt(2)）
+ * 3. 左上 8x8 低周波ブロック抽出
+ * 4. DC成分(values[0])を除く 63値の平均と比較
+ * 5. values[i] > mean なら bit i = 1（LSBファースト）
  */
 export async function computePHash(imageUrl: string): Promise<string> {
   const SIZE = 32;
-  const HASH_SIZE = 8;
+  const LOW_FREQ = 8;
 
-  // 画像をロード
   const img = await loadImage(imageUrl);
 
-  // Canvas で 32x32 にリサイズ + グレースケール化
   const canvas = document.createElement("canvas");
   canvas.width = SIZE;
   canvas.height = SIZE;
@@ -280,75 +280,79 @@ export async function computePHash(imageUrl: string): Promise<string> {
   const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
   const pixels = imageData.data;
 
-  // グレースケール変換
-  const grey = new Float64Array(SIZE * SIZE);
+  // グレースケール変換（u8精度 — WASM側はホストがu8で返す）
+  const gray = new Uint8Array(SIZE * SIZE);
   for (let i = 0; i < SIZE * SIZE; i++) {
     const r = pixels[i * 4];
     const g = pixels[i * 4 + 1];
     const b = pixels[i * 4 + 2];
-    grey[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+    gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
   }
 
-  // 2D DCT (Type-II)
-  const dctMatrix = dct2d(grey, SIZE);
-
-  // 左上 8x8 の低周波係数を取り出す
-  const lowFreq: number[] = [];
-  for (let y = 0; y < HASH_SIZE; y++) {
-    for (let x = 0; x < HASH_SIZE; x++) {
-      lowFreq.push(dctMatrix[y * SIZE + x]);
+  // f32 matrix
+  const matrix: number[][] = [];
+  for (let y = 0; y < SIZE; y++) {
+    matrix[y] = [];
+    for (let x = 0; x < SIZE; x++) {
+      matrix[y][x] = gray[y * SIZE + x];
     }
   }
 
-  // 中央値を算出
-  const sorted = [...lowFreq].sort((a, b) => a - b);
-  const median =
-    sorted.length % 2 === 0
-      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-      : sorted[Math.floor(sorted.length / 2)];
+  // 分離型 2D DCT（phash-v1 WASM と同一）
+  const n = SIZE;
+  const scale = Math.sqrt(2.0 / n);
+  const invSqrt2 = 1.0 / Math.sqrt(2.0);
 
-  // 各係数が中央値以上なら 1、未満なら 0 → 64ビットハッシュ
-  let hash = "";
-  for (const coeff of lowFreq) {
-    hash += coeff >= median ? "1" : "0";
-  }
-
-  // バイナリ文字列を 16 進数に変換
-  return binaryToHex(hash);
-}
-
-/** 2D DCT Type-II */
-function dct2d(input: Float64Array, size: number): Float64Array {
-  const temp = new Float64Array(size * size);
-  const output = new Float64Array(size * size);
-
-  // 行方向の DCT
-  for (let y = 0; y < size; y++) {
-    for (let u = 0; u < size; u++) {
+  // 行方向 DCT
+  const rowDct: number[][] = [];
+  for (let y = 0; y < n; y++) {
+    rowDct[y] = [];
+    for (let u = 0; u < n; u++) {
+      const cu = u === 0 ? invSqrt2 : 1.0;
       let sum = 0;
-      for (let x = 0; x < size; x++) {
-        sum +=
-          input[y * size + x] *
-          Math.cos(((2 * x + 1) * u * Math.PI) / (2 * size));
+      for (let x = 0; x < n; x++) {
+        sum += matrix[y][x] * Math.cos(Math.PI * (2 * x + 1) * u / (2 * n));
       }
-      temp[y * size + u] = sum;
+      rowDct[y][u] = sum * cu * scale;
     }
   }
 
-  // 列方向の DCT
-  for (let u = 0; u < size; u++) {
-    for (let v = 0; v < size; v++) {
+  // 列方向 DCT
+  const dct: number[][] = [];
+  for (let v = 0; v < n; v++) {
+    dct[v] = [];
+    for (let u = 0; u < n; u++) {
+      const cv = v === 0 ? invSqrt2 : 1.0;
       let sum = 0;
-      for (let y = 0; y < size; y++) {
-        sum +=
-          temp[y * size + u] *
-          Math.cos(((2 * y + 1) * v * Math.PI) / (2 * size));
+      for (let y = 0; y < n; y++) {
+        sum += rowDct[y][u] * Math.cos(Math.PI * (2 * y + 1) * v / (2 * n));
       }
-      output[v * size + u] = sum;
+      dct[v][u] = sum * cv * scale;
     }
   }
 
-  return output;
+  // 左上 8x8 抽出
+  const values: number[] = [];
+  for (let v = 0; v < LOW_FREQ; v++) {
+    for (let u = 0; u < LOW_FREQ; u++) {
+      values.push(dct[v][u]);
+    }
+  }
+
+  // DC成分(values[0])を除く 63値の平均
+  let sum = 0;
+  for (let i = 1; i < 64; i++) sum += values[i];
+  const mean = sum / 63;
+
+  // LSBファースト: bit i = (values[i] > mean ? 1 : 0) << i
+  let hashBigInt = BigInt(0);
+  for (let i = 0; i < 64; i++) {
+    if (values[i] > mean) {
+      hashBigInt |= BigInt(1) << BigInt(i);
+    }
+  }
+
+  return hashBigInt.toString(16).padStart(16, "0");
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -369,37 +373,19 @@ function loadImage(url: string): Promise<HTMLImageElement> {
  * 16進数文字列の pHash 間のハミング距離を算出する。
  */
 export function hammingDistance(a: string, b: string): number {
-  const binA = hexToBinary(a);
-  const binB = hexToBinary(b);
-  let distance = 0;
-  const len = Math.max(binA.length, binB.length);
-  for (let i = 0; i < len; i++) {
-    if ((binA[i] || "0") !== (binB[i] || "0")) {
-      distance++;
-    }
+  const x = BigInt("0x" + a) ^ BigInt("0x" + b);
+  let dist = 0;
+  let bits = x;
+  while (bits > 0n) {
+    dist += Number(bits & 1n);
+    bits >>= 1n;
   }
-  return distance;
+  return dist;
 }
 
 // ---------------------------------------------------------------------------
 // エンコーディングユーティリティ
 // ---------------------------------------------------------------------------
-
-function binaryToHex(binary: string): string {
-  let hex = "";
-  for (let i = 0; i < binary.length; i += 4) {
-    hex += parseInt(binary.slice(i, i + 4), 2).toString(16);
-  }
-  return hex;
-}
-
-function hexToBinary(hex: string): string {
-  let binary = "";
-  for (const c of hex) {
-    binary += parseInt(c, 16).toString(2).padStart(4, "0");
-  }
-  return binary;
-}
 
 const BASE58_ALPHABET =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
