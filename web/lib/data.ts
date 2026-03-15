@@ -71,9 +71,9 @@ function toContentRecord(resolved: ResolvedContent): ContentRecord {
     contentType.startsWith("video/") || contentType === "video";
 
   return {
-    deviceName: getAttr("device_name") || "Unknown Device",
+    deviceName: getAttr("device_name") || "",
     appName: getAttr("app_name") || "RootLens",
-    appVersion: getAttr("app_version") || "0.1.0",
+    appVersion: getAttr("app_version") || "",
     capturedAt:
       getAttr("captured_at") ||
       (payload && "tsa_timestamp" in payload && (payload as CorePayload).tsa_timestamp

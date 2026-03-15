@@ -100,15 +100,16 @@ export async function verifyContentOnChain(
     console.log(`  → pHash: ${phashResult.reason || "skipped"}`);
   }
 
-  // 全体判定
+  // 全体判定 — skipped は除外して判定（データがない検証項目は合否に影響しない）
   const steps = [
     result.collectionVerified,
     result.teeSignatureVerified,
     result.c2paChainVerified,
     result.phashMatched,
   ];
-  const allVerified = steps.every((s) => s === "verified");
-  const anyFailed = steps.some((s) => s === "failed");
+  const activeSteps = steps.filter((s) => s !== "skipped");
+  const allVerified = activeSteps.length > 0 && activeSteps.every((s) => s === "verified");
+  const anyFailed = activeSteps.some((s) => s === "failed");
   result.overall = allVerified
     ? "verified"
     : anyFailed

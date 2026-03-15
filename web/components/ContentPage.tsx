@@ -73,7 +73,7 @@ export default function ContentPage({ page }: Props) {
         {record ? (
           <>
             <h1 className={styles.headline}>
-              Shot on {record.deviceName}
+              Shot on {record.deviceName || 'RootLens'}
             </h1>
             <div className={styles.meta}>
               <span className={styles.appBadge}>RootLens</span>
@@ -262,10 +262,12 @@ function TechnicalDetails({
             label="Assurance Level"
             value={`Level ${record.assuranceLevel}`}
           />
-          <DetailRow
-            label="元の解像度"
-            value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`}
-          />
+          {record.sourceDimensions.width > 0 && (
+            <DetailRow
+              label="元の解像度"
+              value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`}
+            />
+          )}
           {record.editOperations.length > 0 && (
             <DetailRow
               label="編集操作"
