@@ -1,25 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   Image,
   TouchableOpacity,
-  FlatList,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { usePrivy } from '@privy-io/expo';
+import { useLogin } from '@privy-io/expo/ui';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { colors, typography, spacing, radii, shadows } from '../theme';
+import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
+import { setAuthState } from '../hooks/useAuth';
 
 // 仕様書 §3.7 登録準備画面
-// §3.1.2: 技術用語をUIに表示しない
-// デザイン方針: 写真が主役。テキストは添え物。
+// §2.4: 公開時にのみログインを求める
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Registration'>;
@@ -31,9 +33,37 @@ export default function RegistrationScreen() {
   const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
   const { signedUris } = route.params;
+  const { isAuthenticated } = usePrivy();
+  const { login } = useLogin();
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  const handleRegister = () => {
-    // 仕様書 §2.4: 公開パイプライン実行
+  const handleRegister = async () => {
+    // 仕様書 §2.4: 未ログインならここでログインを求める
+    if (!isAuthenticated) {
+      setLoggingIn(true);
+      try {
+        const session = await login({ loginMethods: ['google', 'email'] });
+        if (session?.user) {
+          const solanaAccount = session.user.linkedAccounts?.find(
+            (a: any) => a.type === 'wallet' && a.chainType === 'solana'
+          );
+          if (solanaAccount?.address) {
+            setAuthState(solanaAccount.address);
+          }
+        }
+      } catch (e: any) {
+        // 「already logged in」はエラーではなく、既にログイン済み→先に進む
+        const msg = e?.message || String(e);
+        if (msg.toLowerCase().includes('already logged in') || msg.toLowerCase().includes('already_logged_in')) {
+          console.log('[Registration] already logged in, proceeding');
+        } else {
+          console.error('[Registration] login failed:', e);
+          setLoggingIn(false);
+          return;
+        }
+      }
+      setLoggingIn(false);
+    }
     navigation.navigate('Publishing', { signedUris });
   };
 
@@ -41,21 +71,18 @@ export default function RegistrationScreen() {
     navigation.goBack();
   };
 
-  // 写真プレビューのサイズ計算
   const previewPad = spacing.xl;
   const previewWidth = SCREEN_WIDTH - previewPad * 2;
   const multiThumbSize = (previewWidth - spacing.sm * 2) / 3;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* ヘッダー — 最小限 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      {/* 写真を大きく見せる */}
       <View style={styles.content}>
         {signedUris.length === 1 ? (
           <Image
@@ -74,7 +101,6 @@ export default function RegistrationScreen() {
           </View>
         )}
 
-        {/* テキストは写真の下に控えめに */}
         <Text style={styles.caption}>
           {t('registration.summaryTitle', { count: signedUris.length })}
         </Text>
@@ -83,10 +109,17 @@ export default function RegistrationScreen() {
         </Text>
       </View>
 
-      {/* 公開ボタン */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.publishButton} onPress={handleRegister}>
-          <Text style={styles.publishButtonText}>{t('registration.button')}</Text>
+        <TouchableOpacity
+          style={[styles.publishButton, loggingIn && styles.publishButtonDisabled]}
+          onPress={handleRegister}
+          disabled={loggingIn}
+        >
+          {loggingIn ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.publishButtonText}>{t('registration.button')}</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -117,12 +150,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // 1枚: 大きなプレビュー
   heroImage: {
     borderRadius: radii.md,
     backgroundColor: colors.surfaceAlt,
   },
-  // 複数枚: グリッド
   multiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -132,7 +163,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     backgroundColor: colors.surfaceAlt,
   },
-  // テキストは控えめ
   caption: {
     ...typography.bodyMedium,
     color: colors.textPrimary,
@@ -145,7 +175,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
-  // フッター
   footer: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
@@ -156,6 +185,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     paddingVertical: 16,
     borderRadius: radii.md,
+  },
+  publishButtonDisabled: {
+    opacity: 0.6,
   },
   publishButtonText: {
     color: colors.white,

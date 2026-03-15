@@ -125,6 +125,12 @@ const ja: TranslationDict = {
   'settings.title': '設定',
   'settings.placeholder': '設定（準備中）',
 
+  // ── ログイン ──
+  'login.button': 'はじめる',
+  'login.note': 'アカウント作成は無料です',
+  'settings.logout': 'ログアウト',
+  'settings.account': 'アカウント',
+
   // ── カメラ設定 ──
   'camera.grid': 'グリッド',
   'camera.timer': 'タイマー',
@@ -257,6 +263,12 @@ const en: TranslationDict = {
   // ── Settings ──
   'settings.title': 'Settings',
   'settings.placeholder': 'Settings (coming soon)',
+
+  // ── Login ──
+  'login.button': 'Get started',
+  'login.note': 'Free to create an account',
+  'settings.logout': 'Log out',
+  'settings.account': 'Account',
 
   // ── Camera settings ──
   'camera.grid': 'Grid',

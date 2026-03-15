@@ -15,8 +15,7 @@ import type { SignedJson, CorePayload, ExtensionPayload } from "@title-protocol/
 import type { ResolvedContent } from "./content-resolver";
 import type { VerificationResult, VerifyStepStatus } from "./types";
 import {
-  CORE_COLLECTION_MINT,
-  EXT_COLLECTION_MINT,
+  getCollectionMints,
   PHASH_THRESHOLD,
 } from "./config";
 
@@ -42,12 +41,13 @@ export async function verifyContentOnChain(
 
   // Step 1: コレクション検証
   console.log("Step 1: Verifying collection membership...");
-  result.collectionVerified = verifyCollection(resolved);
+  const collections = await getCollectionMints();
+  result.collectionVerified = verifyCollectionWith(resolved, collections);
   console.log(
     `  → Collection: ${resolved.collectionAddress}`
   );
   console.log(
-    `  → Expected: ${CORE_COLLECTION_MINT}`
+    `  → Expected core: ${collections.core}`
   );
   console.log(
     `  → Result: ${result.collectionVerified === "verified" ? "verified ✓" : "FAILED ✗"}`
@@ -130,9 +130,12 @@ export async function verifyContentOnChain(
 // Step 1: コレクション検証
 // ---------------------------------------------------------------------------
 
-function verifyCollection(resolved: ResolvedContent): VerifyStepStatus {
+function verifyCollectionWith(
+  resolved: ResolvedContent,
+  collections: { core: string; ext: string },
+): VerifyStepStatus {
   const addr = resolved.collectionAddress;
-  if (addr === CORE_COLLECTION_MINT || addr === EXT_COLLECTION_MINT) {
+  if (addr === collections.core || addr === collections.ext) {
     return "verified";
   }
   return "failed";

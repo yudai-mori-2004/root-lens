@@ -21,7 +21,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "io.rootlens.app"
+      "package": "io.rootlens.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "plugins": [
       "expo-dev-client",
@@ -40,7 +46,13 @@
           "savePhotosPermission": "撮影した写真を保存するために使用します"
         }
       ],
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b5defe64-e954-40de-9c64-abdc5e80b9d2"
+      }
+    }
   }
 }

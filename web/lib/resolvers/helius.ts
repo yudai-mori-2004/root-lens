@@ -7,7 +7,7 @@
 
 import type { SignedJson } from "@title-protocol/sdk";
 import type { ContentResolver, ResolvedContent } from "../content-resolver";
-import { DAS_RPC_URL, CORE_COLLECTION_MINT } from "../config";
+import { DAS_RPC_URL, getCollectionMints } from "../config";
 
 // ---------------------------------------------------------------------------
 // DAS レスポンス型 (必要なフィールドのみ)
@@ -175,7 +175,8 @@ export class DasContentResolver implements ContentResolver {
     contentHash: string
   ): Promise<ResolvedContent | null> {
     try {
-      const result = await searchAssetsByCollection(CORE_COLLECTION_MINT);
+      const collections = await getCollectionMints();
+      const result = await searchAssetsByCollection(collections.core);
       const match = result.items.find(
         (item) => getAttribute(item, "content_hash") === contentHash
       );

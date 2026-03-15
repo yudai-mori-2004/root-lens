@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useAuth } from '../hooks/useAuth';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
@@ -20,6 +21,7 @@ import { loadProfile, saveProfile, shortenAddress, type Profile } from '../store
 // 仕様書 §3.8 設定画面
 
 export default function SettingsScreen() {
+  const { logout, solanaAddress } = useAuth();
   const [camSettings, setCamSettings] = useState<CameraSettings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileDirty, setProfileDirty] = useState(false);
@@ -82,14 +84,14 @@ export default function SettingsScreen() {
         <View style={styles.inputRow}>
           <Text style={styles.inputLabel}>Solana アドレス</Text>
           <Text style={styles.addressValue} numberOfLines={1}>
-            {profile.address ? shortenAddress(profile.address) : '—'}
+            {(solanaAddress || profile.address) ? shortenAddress(solanaAddress || profile.address) : '—'}
           </Text>
           <TouchableOpacity
             style={styles.copyBtn}
-            onPress={() => { if (profile.address) Clipboard.setStringAsync(profile.address); }}
-            disabled={!profile.address}
+            onPress={() => { const addr = solanaAddress || profile.address; if (addr) Clipboard.setStringAsync(addr); }}
+            disabled={!(solanaAddress || profile.address)}
           >
-            <Ionicons name="copy-outline" size={16} color={profile.address ? colors.textSecondary : colors.textDisabled} />
+            <Ionicons name="copy-outline" size={16} color={(solanaAddress || profile.address) ? colors.textSecondary : colors.textDisabled} />
           </TouchableOpacity>
         </View>
         <View style={styles.divider} />
@@ -150,6 +152,11 @@ export default function SettingsScreen() {
           <Text style={styles.rowValue}>{profile.deviceName}</Text>
         </View>
       </View>
+
+      {/* ログアウト */}
+      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+      </TouchableOpacity>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -281,6 +288,16 @@ const styles = StyleSheet.create({
   copyBtn: {
     padding: spacing.xs,
     marginLeft: spacing.xs,
+  },
+  logoutButton: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xxl,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  logoutText: {
+    ...typography.body,
+    color: colors.error,
   },
   saveButton: {
     marginHorizontal: spacing.lg,

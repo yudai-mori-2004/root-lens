@@ -1,8 +1,20 @@
+// Polyfills — must be first
+import 'react-native-get-random-values';
+import 'fast-text-encoding';
+import '@ethersproject/shims';
+
 import React from 'react';
 import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
+import { PrivyProvider } from '@privy-io/expo';
+import { PrivyElements } from '@privy-io/expo/ui';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,10 +36,10 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
   });
-
-  // 仕様書 §4.4: アプリ起動時に証明書プロビジョニング
-  const cert = useCertificateProvisioning();
 
   if (!fontsLoaded) {
     return (
@@ -37,7 +49,33 @@ export default function App() {
     );
   }
 
-  // 証明書の初回取得中はスプラッシュ表示
+  // PrivyProvider + PrivyElements をルートに1回だけマウント
+  // 仕様書 §2.1: ログイン不問でアプリにアクセス可能
+  // PrivyProviderは軽量なcontext providerなのでパフォーマンスに影響しない
+  // ログインUIの起動は RegistrationScreen 内で useLogin を呼んだ時だけ
+  return (
+    <PrivyProvider
+      appId={process.env.EXPO_PUBLIC_PRIVY_APP_ID || ''}
+      clientId={process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID || ''}
+      config={{
+        embedded: {
+          solana: {
+            createOnLogin: 'users-without-wallets',
+          },
+        },
+      }}
+    >
+      <SafeAreaProvider>
+        <AppContent />
+        <PrivyElements />
+      </SafeAreaProvider>
+    </PrivyProvider>
+  );
+}
+
+function AppContent() {
+  const cert = useCertificateProvisioning();
+
   if (cert.status === 'checking' || cert.status === 'provisioning') {
     return (
       <View style={styles.center}>
@@ -50,7 +88,6 @@ export default function App() {
     );
   }
 
-  // エラー時はリトライUI
   if (cert.status === 'error') {
     return (
       <View style={styles.center}>
@@ -64,9 +101,7 @@ export default function App() {
     );
   }
 
-  // ready / renewing — アプリ利用可能
   return (
-    <SafeAreaProvider>
     <NavigationContainer>
       <RootStack.Navigator>
         <RootStack.Screen
@@ -123,7 +158,6 @@ export default function App() {
       </RootStack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>
-    </SafeAreaProvider>
   );
 }
 
