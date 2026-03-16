@@ -13,9 +13,10 @@ import { Connection } from '@solana/web3.js';
 export const DAS_RPC_URL = process.env.NEXT_PUBLIC_DAS_RPC_URL!;
 
 /** pHash照合の閾値 (ハミング距離)
- * 公開ページのthumbnailはリサイズ+再圧縮されているため、元画像との距離が出る。
- * DCT 64bitで10以下なら十分に同一コンテンツと判断できる。 */
-export const PHASH_THRESHOLD = 10;
+ * DCT計算はTEEと同一のWASMバイナリで実行。
+ * リサイズのみブラウザCanvas（bilinear）で行うため、
+ * Rust image crate Triangle との微小な補間差が出る可能性がある。 */
+export const PHASH_THRESHOLD = 5;
 
 /** Title Protocol コレクションアドレスをオンチェーンから取得 */
 export async function getCollectionMints(): Promise<{ core: string; ext: string }> {

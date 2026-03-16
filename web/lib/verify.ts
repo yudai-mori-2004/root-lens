@@ -18,6 +18,7 @@ import {
   getCollectionMints,
   PHASH_THRESHOLD,
 } from "./config";
+import { computePHashWasm } from "./phash-wasm";
 
 // ---------------------------------------------------------------------------
 // メインの検証関数
@@ -236,7 +237,7 @@ async function verifyPHashWithImage(
   thumbnailUrl: string
 ): Promise<PHashResult> {
   try {
-    const computedHash = await computePHash(thumbnailUrl);
+    const computedHash = await computePHashWasm(thumbnailUrl);
     const distance = hammingDistance(onchainHash, computedHash);
 
     return {
@@ -255,115 +256,6 @@ async function verifyPHashWithImage(
 // pHash 計算 (DCT 64-bit) — 仕様書 §6.3.1
 // ---------------------------------------------------------------------------
 
-/**
- * 画像から DCT 64-bit pHash を計算する。
- * Title Protocol phash-v1 WASM と完全に同一のアルゴリズム。
- *
- * 1. 32x32 にリサイズ + グレースケール（u8精度）
- * 2. 分離型 2D DCT（scale = sqrt(2/N), DC成分 cu/cv = 1/sqrt(2)）
- * 3. 左上 8x8 低周波ブロック抽出
- * 4. DC成分(values[0])を除く 63値の平均と比較
- * 5. values[i] > mean なら bit i = 1（LSBファースト）
- */
-export async function computePHash(imageUrl: string): Promise<string> {
-  const SIZE = 32;
-  const LOW_FREQ = 8;
-
-  const img = await loadImage(imageUrl);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = SIZE;
-  canvas.height = SIZE;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, SIZE, SIZE);
-
-  const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
-  const pixels = imageData.data;
-
-  // グレースケール変換（u8精度 — WASM側はホストがu8で返す）
-  const gray = new Uint8Array(SIZE * SIZE);
-  for (let i = 0; i < SIZE * SIZE; i++) {
-    const r = pixels[i * 4];
-    const g = pixels[i * 4 + 1];
-    const b = pixels[i * 4 + 2];
-    gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-  }
-
-  // f32 matrix
-  const matrix: number[][] = [];
-  for (let y = 0; y < SIZE; y++) {
-    matrix[y] = [];
-    for (let x = 0; x < SIZE; x++) {
-      matrix[y][x] = gray[y * SIZE + x];
-    }
-  }
-
-  // 分離型 2D DCT（phash-v1 WASM と同一）
-  const n = SIZE;
-  const scale = Math.sqrt(2.0 / n);
-  const invSqrt2 = 1.0 / Math.sqrt(2.0);
-
-  // 行方向 DCT
-  const rowDct: number[][] = [];
-  for (let y = 0; y < n; y++) {
-    rowDct[y] = [];
-    for (let u = 0; u < n; u++) {
-      const cu = u === 0 ? invSqrt2 : 1.0;
-      let sum = 0;
-      for (let x = 0; x < n; x++) {
-        sum += matrix[y][x] * Math.cos(Math.PI * (2 * x + 1) * u / (2 * n));
-      }
-      rowDct[y][u] = sum * cu * scale;
-    }
-  }
-
-  // 列方向 DCT
-  const dct: number[][] = [];
-  for (let v = 0; v < n; v++) {
-    dct[v] = [];
-    for (let u = 0; u < n; u++) {
-      const cv = v === 0 ? invSqrt2 : 1.0;
-      let sum = 0;
-      for (let y = 0; y < n; y++) {
-        sum += rowDct[y][u] * Math.cos(Math.PI * (2 * y + 1) * v / (2 * n));
-      }
-      dct[v][u] = sum * cv * scale;
-    }
-  }
-
-  // 左上 8x8 抽出
-  const values: number[] = [];
-  for (let v = 0; v < LOW_FREQ; v++) {
-    for (let u = 0; u < LOW_FREQ; u++) {
-      values.push(dct[v][u]);
-    }
-  }
-
-  // DC成分(values[0])を除く 63値の平均
-  let sum = 0;
-  for (let i = 1; i < 64; i++) sum += values[i];
-  const mean = sum / 63;
-
-  // LSBファースト: bit i = (values[i] > mean ? 1 : 0) << i
-  let hashBigInt = BigInt(0);
-  for (let i = 0; i < 64; i++) {
-    if (values[i] > mean) {
-      hashBigInt |= BigInt(1) << BigInt(i);
-    }
-  }
-
-  return hashBigInt.toString(16).padStart(16, "0");
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-    img.src = url;
-  });
-}
 
 // ---------------------------------------------------------------------------
 // ハミング距離
