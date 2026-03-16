@@ -24,43 +24,59 @@ async function loadWasm(): Promise<ArrayBuffer> {
 }
 
 /**
- * 画像URLからpHashを計算する（phash-v1.wasm使用）。
- * TEEと完全に同一のバイナリでDCTを実行するため、距離0が保証される。
+ * 画像URLから4回転(0/90/180/270度)のpHashを全て計算する（phash-v1.wasm使用）。
+ * TEEと完全に同一のバイナリでDCTを実行。
+ * 回転考慮により:
+ * - EXIF orientation差異を吸収
+ * - 回転耐性の向上（pHashの弱点補強）
  */
-export async function computePHashWasm(imageUrl: string): Promise<string> {
-  const [wasmBuf, gray32] = await Promise.all([
+export async function computePHashRotations(imageUrl: string): Promise<string[]> {
+  const [wasmBuf, gray32_0] = await Promise.all([
     loadWasm(),
     loadAndResizeImage(imageUrl),
   ]);
 
-  // WASMインスタンス化（ホスト関数をJSで提供）
+  // 0/90/180/270度の32x32グレースケールを生成
+  const rotations = [
+    gray32_0,
+    rotate90(gray32_0, 32),
+    rotate180(gray32_0, 32),
+    rotate270(gray32_0, 32),
+  ];
+
+  const hashes: string[] = [];
+  for (const gray of rotations) {
+    const hash = await runWasmPHash(wasmBuf, gray);
+    hashes.push(hash);
+  }
+  return hashes;
+}
+
+/** 単一のpHash計算（後方互換） */
+export async function computePHashWasm(imageUrl: string): Promise<string> {
+  const hashes = await computePHashRotations(imageUrl);
+  return hashes[0];
+}
+
+/** WASMでpHashを1回計算 */
+async function runWasmPHash(wasmBuf: ArrayBuffer, gray32: Uint8Array): Promise<string> {
   let memory: WebAssembly.Memory;
-  let decodedGray: Uint8Array = gray32;
-  let decodeMetadataPtr = 0;
-  let featureOutputPtr = 0;
+  const decodedGray = gray32;
 
   const importObject = {
     env: {
-      // decode_content: 画像デコード（JS側で既にデコード済み）
-      // metadata: [width:u32 LE, height:u32 LE, channels:u32 LE]
-      decode_content: (paramsPtr: number, paramsLen: number, metadataPtr: number): number => {
-        decodeMetadataPtr = metadataPtr;
+      decode_content: (_paramsPtr: number, _paramsLen: number, metadataPtr: number): number => {
         const view = new DataView(memory.buffer);
-        view.setUint32(metadataPtr, 32, true);     // width
-        view.setUint32(metadataPtr + 4, 32, true);  // height
-        view.setUint32(metadataPtr + 8, 1, true);   // channels (grayscale)
-        return 0; // success
+        view.setUint32(metadataPtr, 32, true);
+        view.setUint32(metadataPtr + 4, 32, true);
+        view.setUint32(metadataPtr + 8, 1, true);
+        return 0;
       },
-
-      // get_decoded_feature: grayscale_resize → 1024バイトのグレースケールデータを返す
-      get_decoded_feature: (specPtr: number, specLen: number, outputPtr: number): number => {
-        featureOutputPtr = outputPtr;
+      get_decoded_feature: (_specPtr: number, _specLen: number, outputPtr: number): number => {
         const dst = new Uint8Array(memory.buffer, outputPtr, 1024);
         dst.set(decodedGray);
         return 1024;
       },
-
-      // 以下は phash-v1 では使われないが宣言は必要
       read_content_chunk: (_offset: number, _length: number, _bufPtr: number): number => 0,
       get_content_length: (): number => 0,
       get_extension_input: (_bufPtr: number, _bufLen: number): number => 0,
@@ -70,21 +86,43 @@ export async function computePHashWasm(imageUrl: string): Promise<string> {
   const { instance } = await WebAssembly.instantiate(wasmBuf, importObject);
   memory = instance.exports.memory as WebAssembly.Memory;
 
-  // process() を呼ぶ → 結果ポインタが返る
   const process = instance.exports.process as () => number;
   const resultPtr = process();
-
   if (resultPtr === 0) throw new Error("phash WASM returned null");
 
-  // 結果を読む: [len:u32 LE][json bytes]
   const view = new DataView(memory.buffer);
   const jsonLen = view.getUint32(resultPtr, true);
   const jsonBytes = new Uint8Array(memory.buffer, resultPtr + 4, jsonLen);
-  const jsonStr = new TextDecoder().decode(jsonBytes);
-  const result = JSON.parse(jsonStr);
+  const result = JSON.parse(new TextDecoder().decode(jsonBytes));
 
   if (result.error) throw new Error(`phash WASM error: ${result.error}`);
   return result.phash;
+}
+
+// --- 32x32 回転ユーティリティ ---
+
+function rotate90(src: Uint8Array, size: number): Uint8Array {
+  const dst = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++)
+      dst[x * size + (size - 1 - y)] = src[y * size + x];
+  return dst;
+}
+
+function rotate180(src: Uint8Array, size: number): Uint8Array {
+  const dst = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++)
+      dst[(size - 1 - y) * size + (size - 1 - x)] = src[y * size + x];
+  return dst;
+}
+
+function rotate270(src: Uint8Array, size: number): Uint8Array {
+  const dst = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++)
+      dst[(size - 1 - x) * size + y] = src[y * size + x];
+  return dst;
 }
 
 /**

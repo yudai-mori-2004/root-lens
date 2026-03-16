@@ -18,7 +18,7 @@ import {
   getCollectionMints,
   PHASH_THRESHOLD,
 } from "./config";
-import { computePHashWasm } from "./phash-wasm";
+import { computePHashRotations } from "./phash-wasm";
 
 // ---------------------------------------------------------------------------
 // メインの検証関数
@@ -237,14 +237,24 @@ async function verifyPHashWithImage(
   thumbnailUrl: string
 ): Promise<PHashResult> {
   try {
-    const computedHash = await computePHashWasm(thumbnailUrl);
-    const distance = hammingDistance(onchainHash, computedHash);
+    // 0/90/180/270度の4回転でpHashを計算し、最小距離を採用
+    const hashes = await computePHashRotations(thumbnailUrl);
+    let bestDistance = Infinity;
+    let bestHash = hashes[0];
+
+    for (const h of hashes) {
+      const d = hammingDistance(onchainHash, h);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestHash = h;
+      }
+    }
 
     return {
-      status: distance <= PHASH_THRESHOLD ? "verified" : "failed",
-      distance,
+      status: bestDistance <= PHASH_THRESHOLD ? "verified" : "failed",
+      distance: bestDistance,
       onchainHash,
-      computedHash,
+      computedHash: bestHash,
     };
   } catch (e) {
     console.warn("  → pHash computation error:", e);
