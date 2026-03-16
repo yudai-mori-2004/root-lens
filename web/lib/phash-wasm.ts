@@ -88,13 +88,13 @@ export async function computePHashWasm(imageUrl: string): Promise<string> {
 }
 
 /**
- * 画像をロードして32x32グレースケールに変換（Canvas使用）。
- * ここが唯一ブラウザ依存だが、リサイズ後のDCTはWASMが行うため、
- * Canvas補間の微小な差は最終的なpHashに影響しにくい。
+ * 画像をロード → グレースケール変換 → Triangle(bilinear)補間で32x32リサイズ。
+ * Rust image crate の to_luma8() + resize(Triangle) と同一の処理順序・アルゴリズム。
  *
- * 注: 厳密にはRust image crateのTriangle(bilinear)補間と
- * CanvasのdrawImageの補間は微妙に異なるが、
- * DCTの低周波成分(8x8)のみ使用するためロバスト。
+ * 処理順序が重要:
+ * 1. まずフルサイズでグレースケール変換（Rust: to_luma8()）
+ * 2. グレースケール画像を32x32にTriangle補間でリサイズ
+ * Canvas.drawImage は RGB でリサイズしてからグレースケールにするため結果が異なる。
  */
 async function loadAndResizeImage(url: string): Promise<Uint8Array> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -105,23 +105,81 @@ async function loadAndResizeImage(url: string): Promise<Uint8Array> {
     el.src = url;
   });
 
+  // 1. フルサイズでピクセルデータ取得
   const canvas = document.createElement("canvas");
-  canvas.width = 32;
-  canvas.height = 32;
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, 32, 32);
+  ctx.drawImage(img, 0, 0);
+  const fullData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
+  const pixels = fullData.data;
+  const srcW = img.naturalWidth;
+  const srcH = img.naturalHeight;
 
-  const imageData = ctx.getImageData(0, 0, 32, 32);
-  const pixels = imageData.data;
-
-  // RGB → grayscale (u8)
-  const gray = new Uint8Array(1024);
-  for (let i = 0; i < 1024; i++) {
+  // 2. フルサイズでグレースケール変換（Rust image crate to_luma8 と同等: Rec.601）
+  const grayFull = new Float64Array(srcW * srcH);
+  for (let i = 0; i < srcW * srcH; i++) {
     const r = pixels[i * 4];
     const g = pixels[i * 4 + 1];
     const b = pixels[i * 4 + 2];
-    gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    grayFull[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
-  return gray;
+  // 3. Triangle (bilinear) 補間で 32x32 にリサイズ
+  const gray32 = triangleResize(grayFull, srcW, srcH, 32, 32);
+  return gray32;
+}
+
+/**
+ * Triangle (bilinear) 補間リサイズ。
+ * Rust image crate の FilterType::Triangle と同等。
+ * 分離型（水平→垂直）で実装。
+ */
+function triangleResize(
+  src: Float64Array, srcW: number, srcH: number,
+  dstW: number, dstH: number,
+): Uint8Array {
+  // 水平リサイズ
+  const tmp = new Float64Array(dstW * srcH);
+  const xRatio = srcW / dstW;
+  for (let y = 0; y < srcH; y++) {
+    for (let x = 0; x < dstW; x++) {
+      const center = (x + 0.5) * xRatio - 0.5;
+      const left = Math.floor(center - xRatio);
+      const right = Math.ceil(center + xRatio);
+      let sum = 0, weightSum = 0;
+      for (let sx = Math.max(0, left); sx <= Math.min(srcW - 1, right); sx++) {
+        const dist = Math.abs(sx - center);
+        const w = Math.max(0, 1 - dist / xRatio);
+        if (w > 0) {
+          sum += src[y * srcW + sx] * w;
+          weightSum += w;
+        }
+      }
+      tmp[y * dstW + x] = weightSum > 0 ? sum / weightSum : 0;
+    }
+  }
+
+  // 垂直リサイズ
+  const result = new Uint8Array(dstW * dstH);
+  const yRatio = srcH / dstH;
+  for (let x = 0; x < dstW; x++) {
+    for (let y = 0; y < dstH; y++) {
+      const center = (y + 0.5) * yRatio - 0.5;
+      const top = Math.floor(center - yRatio);
+      const bottom = Math.ceil(center + yRatio);
+      let sum = 0, weightSum = 0;
+      for (let sy = Math.max(0, top); sy <= Math.min(srcH - 1, bottom); sy++) {
+        const dist = Math.abs(sy - center);
+        const w = Math.max(0, 1 - dist / yRatio);
+        if (w > 0) {
+          sum += tmp[sy * dstW + x] * w;
+          weightSum += w;
+        }
+      }
+      result[y * dstW + x] = Math.max(0, Math.min(255, Math.round(weightSum > 0 ? sum / weightSum : 0)));
+    }
+  }
+
+  return result;
 }
