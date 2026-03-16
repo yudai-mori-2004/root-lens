@@ -126,14 +126,15 @@ function rotate270(src: Uint8Array, size: number): Uint8Array {
 }
 
 /**
- * 画像をロード → グレースケール変換 → Triangle(bilinear)補間で32x32リサイズ。
- * Rust image crate の to_luma8() + resize(Triangle) と同一の処理順序・アルゴリズム。
+ * 画像をロード → 中間サイズにCanvas縮小 → グレースケール → Triangle補間で32x32。
  *
- * 処理順序が重要:
- * 1. まずフルサイズでグレースケール変換（Rust: to_luma8()）
- * 2. グレースケール画像を32x32にTriangle補間でリサイズ
- * Canvas.drawImage は RGB でリサイズしてからグレースケールにするため結果が異なる。
+ * モバイルブラウザ対応:
+ * - フルサイズ展開を避け、メモリ消費を抑える（モバイルOOM対策）
+ * - Canvasで256x256に縮小（高速・省メモリ）→ グレースケール → Triangle 32x32
+ * - 中間256x256からの32x32 Triangle補間は十分な精度を持つ
  */
+const INTERMEDIATE_SIZE = 256;
+
 async function loadAndResizeImage(url: string): Promise<Uint8Array> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
@@ -143,28 +144,26 @@ async function loadAndResizeImage(url: string): Promise<Uint8Array> {
     el.src = url;
   });
 
-  // 1. フルサイズでピクセルデータ取得
+  // 1. Canvasで中間サイズ(256x256)に縮小
   const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0);
-  const fullData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
-  const pixels = fullData.data;
-  const srcW = img.naturalWidth;
-  const srcH = img.naturalHeight;
+  canvas.width = INTERMEDIATE_SIZE;
+  canvas.height = INTERMEDIATE_SIZE;
+  const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
+  ctx.drawImage(img, 0, 0, INTERMEDIATE_SIZE, INTERMEDIATE_SIZE);
+  const midData = ctx.getImageData(0, 0, INTERMEDIATE_SIZE, INTERMEDIATE_SIZE);
+  const pixels = midData.data;
 
-  // 2. フルサイズでグレースケール変換（Rust image crate to_luma8 と同等: Rec.601）
-  const grayFull = new Float64Array(srcW * srcH);
-  for (let i = 0; i < srcW * srcH; i++) {
+  // 2. グレースケール変換（Rec.709 — Rust image crate to_luma8 と同等）
+  const grayMid = new Float64Array(INTERMEDIATE_SIZE * INTERMEDIATE_SIZE);
+  for (let i = 0; i < INTERMEDIATE_SIZE * INTERMEDIATE_SIZE; i++) {
     const r = pixels[i * 4];
     const g = pixels[i * 4 + 1];
     const b = pixels[i * 4 + 2];
-    grayFull[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    grayMid[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
   // 3. Triangle (bilinear) 補間で 32x32 にリサイズ
-  const gray32 = triangleResize(grayFull, srcW, srcH, 32, 32);
+  const gray32 = triangleResize(grayMid, INTERMEDIATE_SIZE, INTERMEDIATE_SIZE, 32, 32);
   return gray32;
 }
 
