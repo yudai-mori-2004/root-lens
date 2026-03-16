@@ -14,11 +14,7 @@ export const DAS_RPC_URL = process.env.NEXT_PUBLIC_DAS_RPC_URL!;
 
 /** pHash照合の閾値 (ハミング距離)
  * DCT計算はTEEと同一のWASMバイナリで実行。
- * 検証時は0/90/180/270度回転のpHashを全て計算し、最小距離を採用する。
- * これによりEXIF orientation差異を吸収しつつ、回転耐性も向上する。
- *
- * TODO: Title Protocol issue — decode.rs で EXIF orientation を適用する
- * (TEE側修正後も回転考慮は pHash の検出精度向上として残す価値がある) */
+ * TEE側でEXIF orientation適用済み（Title Protocol修正済み）。 */
 export const PHASH_THRESHOLD = 5;
 
 /** Title Protocol コレクションアドレスをオンチェーンから取得 */

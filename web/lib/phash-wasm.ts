@@ -24,38 +24,15 @@ async function loadWasm(): Promise<ArrayBuffer> {
 }
 
 /**
- * 画像URLから4回転(0/90/180/270度)のpHashを全て計算する（phash-v1.wasm使用）。
- * TEEと完全に同一のバイナリでDCTを実行。
- * 回転考慮により:
- * - EXIF orientation差異を吸収
- * - 回転耐性の向上（pHashの弱点補強）
+ * 画像URLからpHashを計算する（phash-v1.wasm使用）。
+ * TEEと完全に同一のバイナリでDCTを実行するため、一致が保証される。
  */
-export async function computePHashRotations(imageUrl: string): Promise<string[]> {
-  const [wasmBuf, gray32_0] = await Promise.all([
+export async function computePHashWasm(imageUrl: string): Promise<string> {
+  const [wasmBuf, gray32] = await Promise.all([
     loadWasm(),
     loadAndResizeImage(imageUrl),
   ]);
-
-  // 0/90/180/270度の32x32グレースケールを生成
-  const rotations = [
-    gray32_0,
-    rotate90(gray32_0, 32),
-    rotate180(gray32_0, 32),
-    rotate270(gray32_0, 32),
-  ];
-
-  const hashes: string[] = [];
-  for (const gray of rotations) {
-    const hash = await runWasmPHash(wasmBuf, gray);
-    hashes.push(hash);
-  }
-  return hashes;
-}
-
-/** 単一のpHash計算（後方互換） */
-export async function computePHashWasm(imageUrl: string): Promise<string> {
-  const hashes = await computePHashRotations(imageUrl);
-  return hashes[0];
+  return runWasmPHash(wasmBuf, gray32);
 }
 
 /** WASMでpHashを1回計算 */
@@ -99,31 +76,6 @@ async function runWasmPHash(wasmBuf: ArrayBuffer, gray32: Uint8Array): Promise<s
   return result.phash;
 }
 
-// --- 32x32 回転ユーティリティ ---
-
-function rotate90(src: Uint8Array, size: number): Uint8Array {
-  const dst = new Uint8Array(size * size);
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++)
-      dst[x * size + (size - 1 - y)] = src[y * size + x];
-  return dst;
-}
-
-function rotate180(src: Uint8Array, size: number): Uint8Array {
-  const dst = new Uint8Array(size * size);
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++)
-      dst[(size - 1 - y) * size + (size - 1 - x)] = src[y * size + x];
-  return dst;
-}
-
-function rotate270(src: Uint8Array, size: number): Uint8Array {
-  const dst = new Uint8Array(size * size);
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++)
-      dst[(size - 1 - x) * size + y] = src[y * size + x];
-  return dst;
-}
 
 /**
  * 画像をロード → 中間サイズにCanvas縮小 → グレースケール → Triangle補間で32x32。
