@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
   Share,
+  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +40,27 @@ export default function PreviewScreen() {
 
   const handleCopyLink = () => {
     Clipboard.setStringAsync(pageUrl);
+  };
+
+  const handleMore = () => {
+    Alert.alert(
+      t('menu.deleteConfirm'),
+      t('menu.deleteConfirmMessage'),
+      [
+        { text: t('menu.cancel'), style: 'cancel' },
+        {
+          text: t('menu.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await fetch(`${config.serverUrl}/api/v1/pages/${shortId}`, { method: 'DELETE' });
+              Alert.alert(t('menu.deleted'));
+              navigation.goBack();
+            } catch {}
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -76,6 +98,13 @@ export default function PreviewScreen() {
         <TouchableOpacity style={styles.shareLinkButton} onPress={handleCopyLink}>
           <Ionicons name="link-outline" size={18} color={colors.accent} />
           <Text style={styles.shareLinkText}>{t('preview.copyLink')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.moreButton}
+          onPress={handleMore}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -154,5 +183,10 @@ const styles = StyleSheet.create({
   shareLinkText: {
     color: colors.accent,
     ...typography.captionMedium,
+  },
+  moreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
 });

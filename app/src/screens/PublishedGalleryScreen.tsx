@@ -211,25 +211,34 @@ export default function PublishedGalleryScreen() {
 
   const profileHeader = loggedIn && profile && (profile.displayName || address) ? (
     <View style={styles.profileSection}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {(profile.displayName || '?')[0].toUpperCase()}
-        </Text>
+      <View style={styles.profileTop}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {(profile.displayName || '?')[0].toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{contents.length}</Text>
+            <Text style={styles.statLabel}>{t('profile.posts')}</Text>
+          </View>
+        </View>
       </View>
-      <View style={styles.profileInfo}>
-        {profile.displayName ? (
-          <Text style={styles.profileName}>{profile.displayName}</Text>
-        ) : null}
-        {address ? (
-          <TouchableOpacity
-            style={styles.addressRow}
-            onPress={() => Clipboard.setStringAsync(address)}
-          >
-            <Text style={styles.profileAddress}>{shortenAddress(address)}</Text>
-            <Ionicons name="copy-outline" size={12} color={colors.textHint} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      {profile.displayName ? (
+        <Text style={styles.profileName}>{profile.displayName}</Text>
+      ) : null}
+      {profile.bio ? (
+        <Text style={styles.profileBio}>{profile.bio}</Text>
+      ) : null}
+      {address ? (
+        <TouchableOpacity
+          style={styles.addressRow}
+          onPress={() => Clipboard.setStringAsync(address)}
+        >
+          <Text style={styles.profileAddress}>{shortenAddress(address)}</Text>
+          <Ionicons name="copy-outline" size={12} color={colors.textHint} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   ) : null;
 
@@ -277,34 +286,53 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: 0.5,
   },
-  // プロフィール
+  // プロフィール (Instagram風)
   profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  profileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xl,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: colors.white,
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: '700',
   },
-  profileInfo: {
-    flex: 1,
-    gap: 2,
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.xl,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   profileName: {
     ...typography.bodyMedium,
     color: colors.textPrimary,
+  },
+  profileBio: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   addressRow: {
     flexDirection: 'row',

@@ -16,9 +16,10 @@ import { useAuth } from '../hooks/useAuth';
 import { useLogin } from '@privy-io/expo/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, radii } from '../theme';
-import { t } from '../i18n';
+import { t, getLocale, setLocale, type Locale } from '../i18n';
 import { loadCameraSettings, saveCameraSettings, type CameraSettings } from '../store/cameraSettings';
 import { loadProfile, saveProfile, shortenAddress, type Profile } from '../store/profileStore';
+import { hasDeviceCertificate, getDeviceCertificateExpiry } from '../native/c2paBridge';
 
 // 仕様書 §3.8 設定画面
 
@@ -40,13 +41,23 @@ export default function SettingsScreen() {
   const [camSettings, setCamSettings] = useState<CameraSettings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileDirty, setProfileDirty] = useState(false);
+  const [locale, setLocaleState] = useState<Locale>(getLocale());
+  const [hasCert, setHasCert] = useState<boolean | null>(null);
+  const [certExpiry, setCertExpiry] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadCameraSettings().then(setCamSettings);
       loadProfile().then(setProfile);
+      hasDeviceCertificate().then(setHasCert).catch(() => setHasCert(false));
+      getDeviceCertificateExpiry().then(setCertExpiry).catch(() => setCertExpiry(null));
     }, []),
   );
+
+  const handleLocaleChange = (newLocale: Locale) => {
+    setLocale(newLocale);
+    setLocaleState(newLocale);
+  };
 
   const updateCam = (key: keyof CameraSettings, value: boolean) => {
     if (!camSettings) return;
@@ -168,6 +179,50 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>{t('settings.deviceLabel')}</Text>
           <Text style={styles.rowValue}>{profile.deviceName}</Text>
         </View>
+      </View>
+
+      {/* 言語 */}
+      <Text style={styles.sectionTitle}>{t('settings.language')}</Text>
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => handleLocaleChange('ja')}
+        >
+          <Text style={styles.rowLabel}>{t('settings.languageJa')}</Text>
+          {locale === 'ja' && <Ionicons name="checkmark" size={20} color={colors.accent} />}
+        </TouchableOpacity>
+        <View style={styles.divider} />
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => handleLocaleChange('en')}
+        >
+          <Text style={styles.rowLabel}>{t('settings.languageEn')}</Text>
+          {locale === 'en' && <Ionicons name="checkmark" size={20} color={colors.accent} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* セキュリティ */}
+      <Text style={styles.sectionTitle}>{t('settings.security')}</Text>
+      <View style={styles.section}>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>{t('settings.teeStatus')}</Text>
+          <Text style={[styles.rowValue, hasCert ? { color: colors.success } : { color: colors.error }]}>
+            {hasCert === null ? '...' : hasCert ? t('settings.teeReady') : t('settings.teeNotReady')}
+          </Text>
+        </View>
+        {certExpiry && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('settings.certExpiry')}</Text>
+              <Text style={styles.rowValue}>
+                {new Date(certExpiry) > new Date()
+                  ? new Date(certExpiry).toLocaleDateString()
+                  : t('settings.certExpired')}
+              </Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* ログイン / ログアウト */}

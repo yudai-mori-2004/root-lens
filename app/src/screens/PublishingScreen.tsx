@@ -277,7 +277,7 @@ export default function PublishingScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 共有バー（大きなCTA） */}
+      {/* 共有バー */}
       <View style={styles.shareBar}>
         <TouchableOpacity style={styles.sharePrimaryButton} onPress={handleShare}>
           <Ionicons name="share-outline" size={20} color={colors.white} />
@@ -286,6 +286,32 @@ export default function PublishingScreen() {
         <TouchableOpacity style={styles.shareLinkButton} onPress={handleCopyLink}>
           <Ionicons name="link-outline" size={18} color={colors.accent} />
           <Text style={styles.shareLinkText}>{t('publishing.copyLink')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.moreButton}
+          onPress={() => {
+            Alert.alert(
+              t('menu.deleteConfirm'),
+              t('menu.deleteConfirmMessage'),
+              [
+                { text: t('menu.cancel'), style: 'cancel' },
+                {
+                  text: t('menu.delete'),
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await fetch(`${config.serverUrl}/api/v1/pages/${result!.shortId}`, { method: 'DELETE' });
+                      Alert.alert(t('menu.deleted'));
+                      handleDone();
+                    } catch {}
+                  },
+                },
+              ],
+            );
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -455,6 +481,11 @@ const styles = StyleSheet.create({
   shareLinkText: {
     color: colors.accent,
     ...typography.captionMedium,
+  },
+  moreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
   // WebView
   webview: {

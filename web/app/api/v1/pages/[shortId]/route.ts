@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { findByShortId, updatePageContent } from "@/lib/server/page-store";
+import { findByShortId, updatePageContent, softDeletePage } from "@/lib/server/page-store";
 
 export async function GET(
   _req: NextRequest,
@@ -45,6 +45,25 @@ export async function PATCH(
 
     await updatePageContent(shortId, contentHash, assetId || "");
 
+    return NextResponse.json({ ok: true });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/v1/pages/:shortId
+ *
+ * ページを非公開化（status → 'deleted'）
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ shortId: string }> }
+) {
+  try {
+    const { shortId } = await params;
+    await softDeletePage(shortId);
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Internal server error";

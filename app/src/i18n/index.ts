@@ -167,6 +167,29 @@ const ja: TranslationDict = {
   'app.provisionError': '証明書の取得に失敗しました',
   'app.retry': '再試行',
 
+  // ── 3点メニュー ──
+  'menu.delete': 'コンテンツを削除',
+  'menu.deleteConfirm': 'この公開ページを削除しますか？',
+  'menu.deleteConfirmMessage': '削除すると公開リンクが無効になります。ブロックチェーン上の記録は残ります。',
+  'menu.cancel': 'キャンセル',
+  'menu.deleted': '削除しました',
+
+  // ── 設定: 言語 ──
+  'settings.language': '言語',
+  'settings.languageJa': '日本語',
+  'settings.languageEn': 'English',
+
+  // ── 設定: 端末セキュリティ ──
+  'settings.security': 'セキュリティ',
+  'settings.teeStatus': 'TEE署名',
+  'settings.teeReady': '有効',
+  'settings.teeNotReady': '無効',
+  'settings.certExpiry': '証明書有効期限',
+  'settings.certExpired': '期限切れ',
+
+  // ── プロフィール ──
+  'profile.posts': '公開',
+
   // ── 共通 ──
   'common.error': 'エラー',
   'common.loading': '読み込み中...',
@@ -305,6 +328,29 @@ const en: TranslationDict = {
   'app.provisioning': 'Obtaining device certificate...',
   'app.provisionError': 'Failed to obtain certificate',
   'app.retry': 'Retry',
+
+  // ── 3-dot menu ──
+  'menu.delete': 'Delete content',
+  'menu.deleteConfirm': 'Delete this page?',
+  'menu.deleteConfirmMessage': 'The public link will become invalid. The blockchain record will remain.',
+  'menu.cancel': 'Cancel',
+  'menu.deleted': 'Deleted',
+
+  // ── Settings: language ──
+  'settings.language': 'Language',
+  'settings.languageJa': '日本語',
+  'settings.languageEn': 'English',
+
+  // ── Settings: device security ──
+  'settings.security': 'Security',
+  'settings.teeStatus': 'TEE signing',
+  'settings.teeReady': 'Active',
+  'settings.teeNotReady': 'Inactive',
+  'settings.certExpiry': 'Certificate expiry',
+  'settings.certExpired': 'Expired',
+
+  // ── Profile ──
+  'profile.posts': 'Published',
 
   // ── Common ──
   'common.error': 'Error',

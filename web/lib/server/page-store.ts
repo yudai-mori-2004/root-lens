@@ -170,6 +170,15 @@ export async function updatePageContent(
   if (error) throw new Error(`contents update failed: ${error.message}`);
 }
 
+export async function softDeletePage(shortId: string): Promise<void> {
+  const { error } = await supabase
+    .from("pages")
+    .update({ status: "deleted" })
+    .eq("short_id", shortId);
+
+  if (error) throw new Error(`delete failed: ${error.message}`);
+}
+
 export async function findByContentHash(
   contentHash: string
 ): Promise<PageRecord | null> {
