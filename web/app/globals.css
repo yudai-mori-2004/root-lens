@@ -8,7 +8,6 @@
   /* Backgrounds */
   --bg-primary: #ffffff;
   --bg-secondary: #f5f5f5;
-  --bg-badge: #f0f0f0;
   --bg-skeleton: #e8e8e8;
 
   /* Text */
@@ -19,13 +18,9 @@
   /* Borders */
   --border-light: #e5e5e5;
 
-  /* Verification */
-  --color-verified: #16a34a;
-  --verify-bg: #f0fdf4;
-  --verify-border: #bbf7d0;
-  --color-failed: #dc2626;
-  --warn-bg: #fef2f2;
-  --warn-border: #fecaca;
+  /* Verification — uses brand accent, not generic green */
+  --color-verified: #1E3A5F;
+  --color-failed: #B04A4A;
 
   /* Page */
   --page-bg: #f8f8f8;
@@ -38,7 +33,6 @@
 
     --bg-primary: #1a1a1a;
     --bg-secondary: #111111;
-    --bg-badge: #2a2a2a;
     --bg-skeleton: #333333;
 
     --text-primary: #ededed;
@@ -47,12 +41,8 @@
 
     --border-light: #2a2a2a;
 
-    --color-verified: #4ade80;
-    --verify-bg: #052e16;
-    --verify-border: #14532d;
-    --color-failed: #f87171;
-    --warn-bg: #450a0a;
-    --warn-border: #7f1d1d;
+    --color-verified: #7B9CC0;
+    --color-failed: #D08080;
 
     --page-bg: #0a0a0a;
   }

@@ -35,7 +35,6 @@ export async function registerOnTitleProtocol(
     processorIds: ['core-c2pa', 'image-phash'],
     delegateMint: true,
   });
-
   const contentHash = result.contents[0]?.contentHash || '';
   const txSignature = result.txSignatures?.[0] || '';
 

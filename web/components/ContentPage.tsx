@@ -94,28 +94,28 @@ export default function ContentPage({ page }: Props) {
             <div className={styles.skeletonLine} style={{ width: "40%", height: 14 }} />
           </div>
         )}
-      </div>
 
-      {/* Trust badge */}
-      <div className={styles.verificationSection}>
-        {verification.overall === "pending" ? (
-          <div className={styles.trustBadge}>
-            <LoadingDots />
-            <span className={styles.trustText}>{t("trust.verifying")}</span>
-          </div>
-        ) : verification.overall === "verified" ? (
-          <div className={`${styles.trustBadge} ${styles.trustOk}`}>
-            <ShieldIcon verified />
-            <span className={styles.trustText}>{t("trust.verified")}</span>
-            <span className={styles.trustScore}>{passed}/{total}</span>
-          </div>
-        ) : (
-          <div className={`${styles.trustBadge} ${styles.trustWarn}`}>
-            <ShieldIcon verified={false} />
-            <span className={styles.trustText}>{t("trust.failed")}</span>
-            <span className={styles.trustScore}>{passed}/{total}</span>
-          </div>
-        )}
+        {/* Trust status — inline row, no card */}
+        <div className={styles.trustRow}>
+          {verification.overall === "pending" ? (
+            <>
+              <LoadingDots />
+              <span className={styles.trustPending}>{t("trust.verifying")}</span>
+            </>
+          ) : verification.overall === "verified" ? (
+            <>
+              <ShieldIcon verified />
+              <span className={styles.trustVerified}>{t("trust.verified")}</span>
+              <span className={styles.trustScore}>{passed}/{total}</span>
+            </>
+          ) : (
+            <>
+              <ShieldIcon verified={false} />
+              <span className={styles.trustFailed}>{t("trust.failed")}</span>
+              <span className={styles.trustScore}>{passed}/{total}</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ===== 技術者向け詳細 ===== */}
@@ -481,41 +481,38 @@ function RefRow({ label, sub, value, mono, link, linkLabel }: {
   );
 }
 
-function StatusIcon({ status, size = 20 }: { status: VerifyStepStatus; size?: number }) {
+function StatusIcon({ status, size = 16 }: { status: VerifyStepStatus; size?: number }) {
   if (status === "pending") return (
-    <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconPending}>
-      <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="16 34">
-        <animateTransform attributeName="transform" type="rotate" from="0 10 10" to="360 10 10" dur="1s" repeatCount="indefinite" />
+    <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconPending}>
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="12 26">
+        <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="1s" repeatCount="indefinite" />
       </circle>
     </svg>
   );
   if (status === "verified") return (
-    <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconVerified}>
-      <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.12" />
-      <path d="M6 10.5l2.5 2.5 5.5-5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconVerified}>
+      <path d="M3.5 8.5l3 3 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
   if (status === "skipped") return (
-    <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconSkipped}>
-      <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.08" />
-      <path d="M7 10h6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconSkipped}>
+      <path d="M4 8h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconFailed}>
-      <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.12" />
-      <path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconFailed}>
+      <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
 function ShieldIcon({ verified }: { verified: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" className={verified ? styles.iconVerified : styles.iconFailed}>
-      <path d="M10 1.5l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9v-5l7-3z" fill="currentColor" opacity="0.12" stroke="currentColor" strokeWidth="1.2" />
+    <svg width="22" height="22" viewBox="0 0 22 22" className={verified ? styles.iconVerified : styles.iconFailed}>
+      <path d="M11 2l7.5 3.2v5.3c0 5-3.3 8.2-7.5 9.5-4.2-1.3-7.5-4.5-7.5-9.5V5.2L11 2z" fill="none" stroke="currentColor" strokeWidth="1.5" />
       {verified
-        ? <path d="M7 10.5l2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        : <path d="M7.5 7.5l5 5M12.5 7.5l-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        ? <path d="M7.5 11.5l2.5 2.5 4.5-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        : <path d="M8 8l6 6M14 8l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       }
     </svg>
   );

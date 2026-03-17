@@ -31,7 +31,8 @@
 /* --- Capture Info --- */
 
 .infoSection {
-  padding: 20px 20px 0;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .headline {
@@ -93,44 +94,39 @@
   50% { opacity: 0.7; }
 }
 
-/* --- 一般向け: Trust Badge --- */
+/* --- Trust Row (inline, no card) --- */
 
-.verificationSection {
-  padding: 0 20px 16px;
-}
-
-.trustBadge {
+.trustRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border-light);
-  background: var(--bg-primary);
+  gap: 8px;
+  margin-top: 14px;
 }
 
-.trustOk {
-  border-color: var(--verify-border);
-  background: var(--verify-bg);
+.trustPending {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
-.trustWarn {
-  border-color: var(--warn-border);
-  background: var(--warn-bg);
-}
-
-.trustText {
-  font-size: 15px;
+.trustVerified {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
-  flex: 1;
+  color: var(--color-verified);
+}
+
+.trustFailed {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-failed);
 }
 
 .trustScore {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-tertiary);
   font-variant: tabular-nums;
+  margin-left: auto;
 }
 
 /* --- Technical Details Toggle --- */
@@ -221,13 +217,15 @@
 .verifyList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .verifyItem {
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--bg-secondary);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.verifyItem:last-child {
+  border-bottom: none;
 }
 
 .verifyItemHeader {
@@ -253,12 +251,9 @@
 /* --- Data Block --- */
 
 .dataBlock {
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  margin-top: 8px;
 }
 
 .dataRow {
@@ -266,7 +261,12 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  padding: 3px 0;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.dataRow:last-child {
+  border-bottom: none;
 }
 
 .dataLabel {
@@ -294,10 +294,9 @@
 /* --- Extension Block --- */
 
 .extBlock {
-  margin-top: 14px;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-light);
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
 }
 
 .extTitle {
@@ -313,9 +312,6 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--text-tertiary);
-  background: var(--bg-badge);
-  padding: 4px 10px;
-  border-radius: 4px;
   margin-top: 8px;
 }
 
@@ -413,14 +409,11 @@
   font-weight: 500;
   color: var(--color-accent);
   text-decoration: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  background: var(--color-accent-light);
-  transition: opacity 0.15s;
+  transition: color 0.15s;
 }
 
 .ossLink:hover {
-  opacity: 0.8;
+  text-decoration: underline;
 }
 
 /* --- Status Icons --- */
