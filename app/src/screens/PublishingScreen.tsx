@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as Crypto from 'expo-crypto';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -44,6 +45,21 @@ const STEP_KEYS: { key: ProgressStep; i18nKey: string }[] = [
   { key: 'registering', i18nKey: 'publishing.step.registering' },
 ];
 
+/** ファイルパスからメディアタイプを推定 */
+function detectMediaType(uri: string): 'image' | 'video' | 'audio' {
+  const lower = uri.toLowerCase();
+  if (lower.match(/\.(mp4|mov|m4v|avi|webm|mkv)$/)) return 'video';
+  if (lower.match(/\.(mp3|wav|m4a|aac|ogg|flac)$/)) return 'audio';
+  return 'image';
+}
+
+/** メディアタイプに応じたMIMEタイプ */
+function mimeForUpload(mediaType: string, ext: string): string {
+  if (mediaType === 'video') return `video/${ext === 'mov' ? 'quicktime' : ext}`;
+  if (mediaType === 'audio') return `audio/${ext}`;
+  return 'image/jpeg';
+}
+
 export default function PublishingScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
@@ -55,9 +71,51 @@ export default function PublishingScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const publishingRef = useRef(false);
 
+  // サムネイル生成（メディアタイプ別）
+  const generateThumbnails = async (fileUri: string, mediaType: string) => {
+    if (mediaType === 'image') {
+      const [display, ogp] = await Promise.all([
+        ImageManipulator.manipulateAsync(
+          fileUri,
+          [{ resize: { width: DISPLAY_MAX_WIDTH } }],
+          { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+        ),
+        ImageManipulator.manipulateAsync(
+          fileUri,
+          [{ resize: { width: OGP_WIDTH } }],
+          { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
+        ),
+      ]);
+      return { displayUri: display.uri, ogpUri: ogp.uri };
+    }
+
+    if (mediaType === 'video') {
+      // 動画: 先頭フレームを抽出してサムネイルに使用
+      const thumb = await VideoThumbnails.getThumbnailAsync(fileUri, { time: 0 });
+      const [display, ogp] = await Promise.all([
+        ImageManipulator.manipulateAsync(
+          thumb.uri,
+          [{ resize: { width: DISPLAY_MAX_WIDTH } }],
+          { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+        ),
+        ImageManipulator.manipulateAsync(
+          thumb.uri,
+          [{ resize: { width: OGP_WIDTH } }],
+          { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
+        ),
+      ]);
+      return { displayUri: display.uri, ogpUri: ogp.uri };
+    }
+
+    // audio等: サムネイルなし（プレースホルダー）
+    return { displayUri: null, ogpUri: null };
+  };
+
   // 1件分のTP登録 + R2アップロードを実行
   const processOneContent = async (uri: string) => {
     const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+    const mediaType = detectMediaType(uri);
+    const ext = uri.match(/\.(\w+)$/)?.[1] || 'jpg';
 
     // バイナリ読み取り（Title Protocol SDK用）
     const fileBase64 = await FileSystem.readAsStringAsync(
@@ -77,55 +135,85 @@ export default function PublishingScreen() {
       registerOnTitleProtocol(content),
 
       (async () => {
-        const [displayResult, ogpResult] = await Promise.all([
-          ImageManipulator.manipulateAsync(
-            fileUri,
-            [{ resize: { width: DISPLAY_MAX_WIDTH } }],
-            { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
-          ),
-          ImageManipulator.manipulateAsync(
-            fileUri,
-            [{ resize: { width: OGP_WIDTH } }],
-            { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
-          ),
-        ]);
+        // サムネイル生成
+        const thumbs = await generateThumbnails(fileUri, mediaType);
 
-        const [displayUrlRes, ogpUrlRes] = await Promise.all([
-          fetch(config.uploadUrlEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'content' }),
-          }),
-          fetch(config.uploadUrlEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'ogp' }),
-          }),
-        ]);
+        // presigned URL取得: サムネイル + OGP + (動画の場合) 本体
+        const urlRequests: Promise<Response>[] = [];
 
-        if (!displayUrlRes.ok || !ogpUrlRes.ok) {
+        if (thumbs.displayUri) {
+          urlRequests.push(
+            fetch(config.uploadUrlEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'content' }),
+            }),
+            fetch(config.uploadUrlEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'ogp' }),
+            }),
+          );
+        }
+
+        // 動画・音声: 元ファイル本体もアップロード
+        if (mediaType !== 'image') {
+          urlRequests.push(
+            fetch(config.uploadUrlEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId, contentType: mimeForUpload(mediaType, ext), kind: 'media' }),
+            }),
+          );
+        }
+
+        const urlResponses = await Promise.all(urlRequests);
+        if (urlResponses.some(r => !r.ok)) {
           throw new Error('presigned URL の取得に失敗しました');
         }
 
-        const displayUrlData = await displayUrlRes.json();
-        const ogpUrlData = await ogpUrlRes.json();
+        const urlData = await Promise.all(urlResponses.map(r => r.json()));
 
-        await Promise.all([
-          FileSystem.uploadAsync(displayUrlData.uploadUrl, displayResult.uri, {
+        // アップロード実行
+        const uploads: Promise<any>[] = [];
+        let displayPublicUrl = '';
+        let ogpPublicUrl = '';
+        let mediaPublicUrl = '';
+        let idx = 0;
+
+        if (thumbs.displayUri && thumbs.ogpUri) {
+          displayPublicUrl = urlData[idx].publicUrl;
+          uploads.push(FileSystem.uploadAsync(urlData[idx].uploadUrl, thumbs.displayUri, {
             httpMethod: 'PUT',
             headers: { 'Content-Type': 'image/jpeg' },
             uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-          }),
-          FileSystem.uploadAsync(ogpUrlData.uploadUrl, ogpResult.uri, {
+          }));
+          idx++;
+
+          ogpPublicUrl = urlData[idx].publicUrl;
+          uploads.push(FileSystem.uploadAsync(urlData[idx].uploadUrl, thumbs.ogpUri, {
             httpMethod: 'PUT',
             headers: { 'Content-Type': 'image/jpeg' },
             uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-          }),
-        ]);
+          }));
+          idx++;
+        }
+
+        if (mediaType !== 'image') {
+          mediaPublicUrl = urlData[idx].publicUrl;
+          uploads.push(FileSystem.uploadAsync(urlData[idx].uploadUrl, fileUri, {
+            httpMethod: 'PUT',
+            headers: { 'Content-Type': mimeForUpload(mediaType, ext) },
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          }));
+        }
+
+        await Promise.all(uploads);
 
         return {
-          displayPublicUrl: displayUrlData.publicUrl as string,
-          ogpPublicUrl: ogpUrlData.publicUrl as string,
+          displayPublicUrl: displayPublicUrl || mediaPublicUrl,
+          ogpPublicUrl: ogpPublicUrl || displayPublicUrl || mediaPublicUrl,
+          mediaUrl: mediaPublicUrl || '',
         };
       })(),
     ]);
@@ -135,6 +223,8 @@ export default function PublishingScreen() {
       txSignature: tpResult.txSignature,
       thumbnailUrl: r2Urls.displayPublicUrl,
       ogpImageUrl: r2Urls.ogpPublicUrl,
+      mediaUrl: r2Urls.mediaUrl,
+      mediaType,
     };
   };
 
@@ -149,7 +239,7 @@ export default function PublishingScreen() {
       setCurrentStep('uploading');
 
       // 全コンテンツを順次処理（TEEノードの負荷を考慮）
-      const results: { contentHash: string; txSignature: string; thumbnailUrl: string; ogpImageUrl: string }[] = [];
+      const results: Awaited<ReturnType<typeof processOneContent>>[] = [];
       for (const uri of signedUris) {
         results.push(await processOneContent(uri));
       }
@@ -165,6 +255,8 @@ export default function PublishingScreen() {
             contentHash: r.contentHash,
             thumbnailUrl: r.thumbnailUrl,
             ogpImageUrl: r.ogpImageUrl,
+            mediaUrl: r.mediaUrl,
+            mediaType: r.mediaType,
           })),
           address: address || undefined,
         }),

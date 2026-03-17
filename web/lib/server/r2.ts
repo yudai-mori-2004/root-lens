@@ -97,3 +97,11 @@ export function contentKey(fileId: string, ext: string = "jpg"): string {
 export function ogpKey(fileId: string): string {
   return `ogp/${fileId}.jpg`;
 }
+
+/**
+ * メディア本体（動画・音声等）のR2キーを生成する。
+ * 形式: media/{fileId}.{ext}
+ */
+export function mediaKey(fileId: string, ext: string): string {
+  return `media/${fileId}.${ext}`;
+}

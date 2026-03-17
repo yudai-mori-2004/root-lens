@@ -26,6 +26,8 @@ export interface PageContentRecord {
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+  mediaUrl: string;
+  mediaType: string;
 }
 
 export interface PageRecord {
@@ -39,6 +41,8 @@ export interface ContentInput {
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+  mediaUrl?: string;
+  mediaType?: string;
 }
 
 export interface CreatePageInput {
@@ -46,8 +50,9 @@ export interface CreatePageInput {
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+  mediaUrl?: string;
+  mediaType?: string;
   address?: string;
-  /** 追加コンテンツ（2枚目以降）。省略時は単一コンテンツ */
   additionalContents?: ContentInput[];
 }
 
@@ -102,6 +107,8 @@ export async function createPage(input: CreatePageInput): Promise<PageRecord> {
       title_protocol_asset_id: input.assetId,
       thumbnail_url: input.thumbnailUrl,
       ogp_image_url: input.ogpImageUrl,
+      media_url: input.mediaUrl || '',
+      content_type: input.mediaType || 'image',
     },
     ...(input.additionalContents ?? []).map((c) => ({
       page_id: page.id,
@@ -109,6 +116,8 @@ export async function createPage(input: CreatePageInput): Promise<PageRecord> {
       title_protocol_asset_id: c.assetId,
       thumbnail_url: c.thumbnailUrl,
       ogp_image_url: c.ogpImageUrl,
+      media_url: c.mediaUrl || '',
+      content_type: c.mediaType || 'image',
     })),
   ];
 
@@ -126,6 +135,8 @@ export async function createPage(input: CreatePageInput): Promise<PageRecord> {
       assetId: c.title_protocol_asset_id,
       thumbnailUrl: c.thumbnail_url,
       ogpImageUrl: c.ogp_image_url,
+      mediaUrl: c.media_url,
+      mediaType: c.content_type,
     })),
     createdAt: page.created_at,
   };
@@ -144,7 +155,9 @@ export async function findByShortId(
         content_hash,
         title_protocol_asset_id,
         thumbnail_url,
-        ogp_image_url
+        ogp_image_url,
+        media_url,
+        content_type
       )
     `
     )
@@ -159,6 +172,8 @@ export async function findByShortId(
     title_protocol_asset_id: string;
     thumbnail_url: string;
     ogp_image_url: string;
+    media_url: string;
+    content_type: string;
   }>) ?? [];
 
   if (rawContents.length === 0) return null;
@@ -170,6 +185,8 @@ export async function findByShortId(
       assetId: c.title_protocol_asset_id,
       thumbnailUrl: c.thumbnail_url,
       ogpImageUrl: c.ogp_image_url,
+      mediaUrl: c.media_url || '',
+      mediaType: c.content_type || 'image',
     })),
     createdAt: data.created_at,
   };

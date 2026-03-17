@@ -12,6 +12,10 @@ export interface ContentMeta {
   contentHash: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+  /** 動画・音声等の元ファイルURL。画像の場合は空文字 */
+  mediaUrl: string;
+  /** image / video / audio */
+  mediaType: string;
 }
 
 /** サーバーが shortId から解決するページ情報 */

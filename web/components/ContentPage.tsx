@@ -88,7 +88,17 @@ export default function ContentPage({ page }: Props) {
     <div className={styles.container}>
       {/* Hero */}
       <div className={styles.imageWrapper}>
-        <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} />
+        {currentContent?.mediaType === 'video' && currentContent.mediaUrl ? (
+          <video
+            src={currentContent.mediaUrl}
+            poster={currentContent.thumbnailUrl}
+            controls
+            playsInline
+            className={styles.heroImage}
+          />
+        ) : (
+          <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} />
+        )}
         {page.contents.length > 1 && (
           <>
             <button

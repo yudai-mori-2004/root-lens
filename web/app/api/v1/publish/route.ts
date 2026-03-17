@@ -38,11 +38,15 @@ export async function POST(req: NextRequest) {
       thumbnailUrl: first.thumbnailUrl,
       ogpImageUrl: first.ogpImageUrl || first.thumbnailUrl,
       address: address || undefined,
+      mediaUrl: first.mediaUrl || "",
+      mediaType: first.mediaType || "image",
       additionalContents: contents.slice(1).map((c: any) => ({
         contentHash: c.contentHash,
         assetId: "",
         thumbnailUrl: c.thumbnailUrl,
         ogpImageUrl: c.ogpImageUrl || c.thumbnailUrl,
+        mediaUrl: c.mediaUrl || "",
+        mediaType: c.mediaType || "image",
       })),
     });
 

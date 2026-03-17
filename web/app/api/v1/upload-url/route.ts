@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createPresignedPutUrl, contentKey, ogpKey } from "@/lib/server/r2";
+import { createPresignedPutUrl, contentKey, ogpKey, mediaKey } from "@/lib/server/r2";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
 
     // R2キーは fileId ベース（content_hash とは独立）
     // content_hash は TEE が算出するため、アップロード時点では未知
-    const key = kind === "ogp" ? ogpKey(fileId) : contentKey(fileId);
+    const ext = contentType.split("/")[1] || "bin";
+    const key =
+      kind === "ogp" ? ogpKey(fileId) :
+      kind === "media" ? mediaKey(fileId, ext === "quicktime" ? "mov" : ext) :
+      contentKey(fileId);
     const uploadUrl = await createPresignedPutUrl(key, contentType);
     const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 

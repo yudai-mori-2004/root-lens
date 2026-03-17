@@ -30,7 +30,9 @@ export async function resolvePageMeta(
       contents (
         content_hash,
         thumbnail_url,
-        ogp_image_url
+        ogp_image_url,
+        media_url,
+        content_type
       )
     `
     )
@@ -44,6 +46,8 @@ export async function resolvePageMeta(
     content_hash: string;
     thumbnail_url: string;
     ogp_image_url: string;
+    media_url: string;
+    content_type: string;
   }>) ?? [];
 
   if (rawContents.length === 0) return null;
@@ -54,6 +58,8 @@ export async function resolvePageMeta(
       contentHash: c.content_hash,
       thumbnailUrl: c.thumbnail_url || "",
       ogpImageUrl: c.ogp_image_url || "",
+      mediaUrl: c.media_url || "",
+      mediaType: c.content_type || "image",
     })),
   };
 }
