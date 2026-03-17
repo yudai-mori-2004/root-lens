@@ -19,7 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, MediaItem } from '../navigation/types';
 import { signContent, applyMasks as nativeApplyMasks, processVideo } from '../native/c2paBridge';
-import { saveToRootLensAlbum } from '../utils/saveMedia';
+import { saveToGallery } from '../utils/saveMedia';
 import { saveDraft, clearDraft } from '../store/draftStore';
 import CropTool from '../components/edit/CropTool';
 import MaskTool from '../components/edit/MaskTool';
@@ -447,7 +447,7 @@ export default function EditScreen() {
       const finalUri = await generateFinalMedia(currentEdit, mediaItems[pageIndex]);
       const signedPath = await signContent(finalUri);
       const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
-      await saveToRootLensAlbum(signedUri);
+      await saveToGallery(signedUri);
       Alert.alert(t('edit.saveSuccessTitle'), t('edit.saveSuccess'));
     } catch (e: any) {
       Alert.alert(t('common.error'), t('common.saveFailed', { message: e?.message || String(e) }));

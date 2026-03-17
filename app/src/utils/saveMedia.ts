@@ -1,16 +1,11 @@
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 
-const ALBUM_NAME = 'RootLens';
-
 /**
- * メディアをRootLensアルバムに保存する。
+ * C2PA署名済みメディアをギャラリーに保存する。
  * ファイル名: RL_YYYYMMDD_HHmmss_NNN.ext
- *
- * DCIM/RootLens/ に整理される（Android）。
- * iOSではアルバムとして表示される。
  */
-export async function saveToRootLensAlbum(uri: string): Promise<MediaLibrary.Asset> {
+export async function saveToGallery(uri: string): Promise<MediaLibrary.Asset> {
   // ファイル名を生成
   const now = new Date();
   const ts = [
@@ -30,16 +25,7 @@ export async function saveToRootLensAlbum(uri: string): Promise<MediaLibrary.Ass
   const destUri = `${FileSystem.cacheDirectory}${filename}`;
   await FileSystem.copyAsync({ from: uri, to: destUri });
 
-  // アセット作成
   const asset = await MediaLibrary.createAssetAsync(destUri);
-
-  // RootLensアルバムに追加（なければ作成）
-  let album = await MediaLibrary.getAlbumAsync(ALBUM_NAME);
-  if (album) {
-    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-  } else {
-    album = await MediaLibrary.createAlbumAsync(ALBUM_NAME, asset, false);
-  }
 
   // 一時ファイル削除
   await FileSystem.deleteAsync(destUri, { idempotent: true });

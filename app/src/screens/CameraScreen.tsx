@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { signContent } from '../native/c2paBridge';
-import { saveToRootLensAlbum } from '../utils/saveMedia';
+import { saveToGallery } from '../utils/saveMedia';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
 import { loadCameraSettings, type CameraSettings } from '../store/cameraSettings';
@@ -123,7 +123,7 @@ export default function CameraScreen() {
     try {
       const signedPath = await signContent(photoUri);
       const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
-      await saveToRootLensAlbum(signedUri);
+      await saveToGallery(signedUri);
       fetchLastAsset();
     } catch (e) {
       console.warn('本物証明エラー:', e);
