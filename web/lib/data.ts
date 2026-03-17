@@ -78,7 +78,7 @@ function toContentRecord(resolved: ResolvedContent): ContentRecord {
       getAttr("captured_at") ||
       (payload && "tsa_timestamp" in payload && (payload as CorePayload).tsa_timestamp
         ? new Date((payload as CorePayload).tsa_timestamp! * 1000).toISOString()
-        : new Date().toISOString()),
+        : null),
     mediaType: isVideo ? "video" : "image",
     sourceDimensions: parseDimensions(getAttr("source_dimensions")),
     assuranceLevel: parseAssuranceLevel(getAttr("assurance_level")),

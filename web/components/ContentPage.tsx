@@ -48,11 +48,11 @@ export default function ContentPage({ page }: Props) {
   const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
   const coreSj = resolved?.coreSignedJson;
 
-  // 日付ソース: TSA認証時刻 > captured_at属性 > 登録時刻
+  // 日付ソース: TSA認証時刻があればそれを使う。なければrecord.capturedAt（nullの可能性あり）
   const hasTsa = corePayload?.tsa_timestamp != null;
   const capturedDate = hasTsa
     ? formatTimestamp(corePayload!.tsa_timestamp!)
-    : record ? formatDate(record.capturedAt) : null;
+    : record?.capturedAt ? formatDate(record.capturedAt) : null;
 
   // スコア — core + 全extensionのTEE署名を含む
   const coreSteps = [
@@ -86,11 +86,13 @@ export default function ContentPage({ page }: Props) {
                 ? t("shotOn", { device: record.deviceName })
                 : t("shotOnDefault")}
             </h1>
-            <div className={styles.meta}>
-              <time className={styles.timestamp} dateTime={record.capturedAt}>{capturedDate}</time>
-              <span className={styles.separator} />
-              <span className={styles.dateSource}>{hasTsa ? t("dateTsa") : t("dateRegistration")}</span>
-            </div>
+            {capturedDate && (
+              <div className={styles.meta}>
+                <time className={styles.timestamp} dateTime={record.capturedAt || undefined}>{capturedDate}</time>
+                <span className={styles.separator} />
+                <span className={styles.dateSource}>{hasTsa ? t("dateTsa") : t("dateRegistration")}</span>
+              </div>
+            )}
           </>
         ) : (
           <div className={styles.infoSkeleton}>

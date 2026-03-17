@@ -31,8 +31,8 @@ export interface ContentRecord {
   appName: string;
   /** アプリバージョン */
   appVersion: string;
-  /** 撮影日時 (ISO 8601) */
-  capturedAt: string;
+  /** 撮影日時 (ISO 8601)。TSAまたはcaptured_at属性から取得。不明な場合はnull */
+  capturedAt: string | null;
   /** メディアタイプ */
   mediaType: "image" | "video";
   /** 元の解像度 */
