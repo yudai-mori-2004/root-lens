@@ -19,6 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, MediaItem } from '../navigation/types';
 import { signContent, applyMasks as nativeApplyMasks, processVideo } from '../native/c2paBridge';
+import { saveToRootLensAlbum } from '../utils/saveMedia';
 import { saveDraft, clearDraft } from '../store/draftStore';
 import CropTool from '../components/edit/CropTool';
 import MaskTool from '../components/edit/MaskTool';
@@ -26,8 +27,10 @@ import ResizeTool from '../components/edit/ResizeTool';
 import TrimTool from '../components/edit/TrimTool';
 import type { EditAction, EditState } from '../types/editActions';
 import { computePreviewTransform, getEffectiveSize } from '../types/editActions';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
+import VideoSeekBar from '../components/VideoSeekBar';
 
 // 仕様書 §3.6 編集画面
 // - 編集操作はアクション履歴として保持
@@ -252,6 +255,9 @@ export default function EditScreen() {
   // ---- 動画再生制御 ----
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [videoPosMs, setVideoPosMs] = useState(0);
+  const [videoDurMs, setVideoDurMs] = useState(0);
+  const videoSeekingRef = useRef(false);
   const existingTrimRef = useRef(existingTrim);
   existingTrimRef.current = existingTrim;
 
@@ -287,9 +293,11 @@ export default function EditScreen() {
     }
   }, [isPlaying]);
 
-  // 動画再生位置の監視（トリム範囲の制約）
+  // 動画再生位置の監視（トリム範囲の制約 + シークバー用）
   const onVideoPlaybackUpdate = useCallback((status: AVPlaybackStatus) => {
     if (!status.isLoaded) return;
+    if (!videoSeekingRef.current) setVideoPosMs(status.positionMillis);
+    if (status.durationMillis) setVideoDurMs(status.durationMillis);
     const trim = existingTrimRef.current;
     if (trim && status.isPlaying && status.positionMillis >= trim.endMs) {
       videoRef.current?.pauseAsync();
@@ -439,7 +447,7 @@ export default function EditScreen() {
       const finalUri = await generateFinalMedia(currentEdit, mediaItems[pageIndex]);
       const signedPath = await signContent(finalUri);
       const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
-      await MediaLibrary.saveToLibraryAsync(signedUri);
+      await saveToRootLensAlbum(signedUri);
       Alert.alert(t('edit.saveSuccessTitle'), t('edit.saveSuccess'));
     } catch (e: any) {
       Alert.alert(t('common.error'), t('common.saveFailed', { message: e?.message || String(e) }));
@@ -576,13 +584,13 @@ export default function EditScreen() {
                 onReadyForDisplay={onVideoReadyForDisplay}
               />
             </View>
-            {/* 再生/一時停止オーバーレイ */}
+            {/* タップで再生/一時停止 */}
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               activeOpacity={1}
               onPress={togglePlayPause}
             >
-              {!isPlaying && (
+              {!isPlaying && videoPosMs === 0 && (
                 <View style={styles.playOverlay}>
                   <View style={styles.playCircle}>
                     <Ionicons name="play" size={28} color={colors.darkText} />
@@ -590,6 +598,18 @@ export default function EditScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            {/* シークバー */}
+            {videoDurMs > 0 && (
+              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+                <VideoSeekBar
+                  posMs={videoPosMs} durMs={videoDurMs} playing={isPlaying}
+                  onTogglePlay={togglePlayPause}
+                  onSeek={(ms) => { videoRef.current?.setPositionAsync(ms); setVideoPosMs(ms); }}
+                  onSeekStart={() => { videoSeekingRef.current = true; }}
+                  onSeekEnd={() => { videoSeekingRef.current = false; }}
+                />
+              </View>
+            )}
           </View>
           {sizeChanged && effectiveSize && (
             <View style={styles.resolutionBadge} pointerEvents="none">
@@ -674,7 +694,7 @@ export default function EditScreen() {
 
   // ---- Normal view ----
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
@@ -784,7 +804,7 @@ export default function EditScreen() {
           <Text style={styles.toolLabel}>{t('edit.save')}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

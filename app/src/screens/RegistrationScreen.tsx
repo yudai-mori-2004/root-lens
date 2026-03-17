@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,18 +7,19 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePrivy } from '@privy-io/expo';
+import { usePrivy, useEmbeddedSolanaWallet } from '@privy-io/expo';
 import { useLogin } from '@privy-io/expo/ui';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
-import { setAuthState } from '../hooks/useAuth';
+import { loadProfile, syncUserToSupabase } from '../store/profileStore';
 
 // 仕様書 §3.7 登録準備画面
 // §2.4: 公開時にのみログインを求める
@@ -28,48 +29,109 @@ type Route = RouteProp<RootStackParamList, 'Registration'>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+type FlowPhase = 'idle' | 'logging-in' | 'waiting-wallet' | 'syncing';
+
 export default function RegistrationScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
   const { signedUris } = route.params;
-  const { isAuthenticated } = usePrivy();
+
+  const { isReady, user, logout } = usePrivy();
+  const isAuthenticated = !!user;
   const { login } = useLogin();
-  const [loggingIn, setLoggingIn] = useState(false);
+  const wallet = useEmbeddedSolanaWallet();
+  const walletAddress = wallet?.wallets?.[0]?.address ?? null;
+
+  const [phase, setPhase] = useState<FlowPhase>('idle');
+  const [pendingPublish, setPendingPublish] = useState(false);
+
+  // ウォレットアドレスが取得できたら自動で次のステップに進む
+  useEffect(() => {
+    if (pendingPublish && walletAddress && phase === 'waiting-wallet') {
+      proceedToPublish(walletAddress);
+    }
+  }, [pendingPublish, walletAddress, phase]);
+
+  const proceedToPublish = useCallback(async (address: string) => {
+    setPhase('syncing');
+    try {
+      const profile = await loadProfile();
+      const userId = await syncUserToSupabase(address, profile);
+      navigation.navigate('Publishing', { signedUris, address, userId });
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || String(e));
+    } finally {
+      setPhase('idle');
+      setPendingPublish(false);
+    }
+  }, [navigation, signedUris]);
 
   const handleRegister = async () => {
-    // 仕様書 §2.4: 未ログインならここでログインを求める
+    console.log('[Reg] isReady:', isReady, 'isAuthenticated:', isAuthenticated, 'walletAddress:', walletAddress);
+
+    // Privy初期化を待つ
+    if (!isReady) {
+      setPhase('waiting-wallet');
+      return;
+    }
+
+
+    // 既にログイン済み + ウォレットあり → 即publish
+    if (isAuthenticated && walletAddress) {
+      setPhase('syncing');
+      await proceedToPublish(walletAddress);
+      return;
+    }
+
+    // 未ログイン → ログイン開始
     if (!isAuthenticated) {
-      setLoggingIn(true);
+      setPhase('logging-in');
       try {
-        const session = await login({ loginMethods: ['google', 'email'] });
-        if (session?.user) {
-          const solanaAccount = session.user.linkedAccounts?.find(
-            (a: any) => a.type === 'wallet' && a.chainType === 'solana'
-          );
-          if (solanaAccount?.address) {
-            setAuthState(solanaAccount.address);
-          }
-        }
+        await login({ loginMethods: ['google', 'email'] });
       } catch (e: any) {
-        // 「already logged in」はエラーではなく、既にログイン済み→先に進む
         const msg = e?.message || String(e);
-        if (msg.toLowerCase().includes('already logged in') || msg.toLowerCase().includes('already_logged_in')) {
-          console.log('[Registration] already logged in, proceeding');
-        } else {
-          console.error('[Registration] login failed:', e);
-          setLoggingIn(false);
+        if (!msg.toLowerCase().includes('already logged in') && !msg.toLowerCase().includes('already_logged_in')) {
+          setPhase('idle');
           return;
         }
       }
-      setLoggingIn(false);
     }
-    navigation.navigate('Publishing', { signedUris });
+
+    // ログイン完了 → ウォレットを待つ
+    if (walletAddress) {
+      // 既にある
+      await proceedToPublish(walletAddress);
+    } else {
+      // ウォレット生成を待つ（useEffectが検知して自動で進む）
+      setPhase('waiting-wallet');
+      setPendingPublish(true);
+      // 10秒タイムアウト
+      setTimeout(() => {
+        setPendingPublish((current) => {
+          if (current) {
+            Alert.alert(t('common.error'), 'Wallet creation timed out');
+            setPhase('idle');
+          }
+          return false;
+        });
+      }, 10000);
+    }
   };
 
   const handleBack = () => {
+    if (phase !== 'idle') return;
     navigation.goBack();
   };
+
+  const busy = phase !== 'idle';
+
+  const statusLabel = {
+    'idle': '',
+    'logging-in': t('login.button'),
+    'waiting-wallet': t('app.checking'),
+    'syncing': t('publishing.step.registering'),
+  }[phase];
 
   const previewPad = spacing.xl;
   const previewWidth = SCREEN_WIDTH - previewPad * 2;
@@ -78,7 +140,7 @@ export default function RegistrationScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={busy}>
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
@@ -110,12 +172,18 @@ export default function RegistrationScreen() {
       </View>
 
       <View style={styles.footer}>
+        {busy && statusLabel ? (
+          <View style={styles.statusRow}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
+          </View>
+        ) : null}
         <TouchableOpacity
-          style={[styles.publishButton, loggingIn && styles.publishButtonDisabled]}
+          style={[styles.publishButton, busy && styles.publishButtonDisabled]}
           onPress={handleRegister}
-          disabled={loggingIn}
+          disabled={busy}
         >
-          {loggingIn ? (
+          {busy ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
             <Text style={styles.publishButtonText}>{t('registration.button')}</Text>
@@ -127,70 +195,19 @@ export default function RegistrationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    height: 52,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroImage: {
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceAlt,
-  },
-  multiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  multiThumb: {
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceAlt,
-  },
-  caption: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginTop: spacing.xl,
-  },
-  subCaption: {
-    ...typography.caption,
-    color: colors.textHint,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-  },
-  publishButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: radii.md,
-  },
-  publishButtonDisabled: {
-    opacity: 0.6,
-  },
-  publishButtonText: {
-    color: colors.white,
-    ...typography.title,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, height: 52 },
+  backButton: { width: 40, height: 40, borderRadius: radii.xl, alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, paddingHorizontal: spacing.xl, justifyContent: 'center', alignItems: 'center' },
+  heroImage: { borderRadius: radii.md, backgroundColor: colors.surfaceAlt },
+  multiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  multiThumb: { borderRadius: radii.sm, backgroundColor: colors.surfaceAlt },
+  caption: { ...typography.bodyMedium, color: colors.textPrimary, textAlign: 'center', marginTop: spacing.xl },
+  subCaption: { ...typography.caption, color: colors.textHint, textAlign: 'center', marginTop: spacing.xs },
+  footer: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.sm },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  statusText: { ...typography.caption, color: colors.textSecondary },
+  publishButton: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, paddingVertical: 16, borderRadius: radii.md },
+  publishButtonDisabled: { opacity: 0.6 },
+  publishButtonText: { color: colors.white, ...typography.title },
 });

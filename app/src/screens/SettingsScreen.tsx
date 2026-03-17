@@ -8,10 +8,12 @@ import {
   TextInput,
   TouchableOpacity,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../hooks/useAuth';
+import { useLogin } from '@privy-io/expo/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
@@ -21,7 +23,20 @@ import { loadProfile, saveProfile, shortenAddress, type Profile } from '../store
 // 仕様書 §3.8 設定画面
 
 export default function SettingsScreen() {
-  const { logout, solanaAddress } = useAuth();
+  const { address: solanaAddress, logout, isAuthenticated } = useAuth();
+  const { login } = useLogin();
+  const loggedIn = isAuthenticated === true;
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch (e) {
+      console.warn('[Settings] logout error:', e);
+    }
+    setLoggingOut(false);
+  };
   const [camSettings, setCamSettings] = useState<CameraSettings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileDirty, setProfileDirty] = useState(false);
@@ -66,7 +81,8 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      {/* プロフィール */}
+      {/* プロフィール（ログイン時のみ） */}
+      {loggedIn && <>
       <Text style={styles.sectionTitle}>{t('settings.profile')}</Text>
       <View style={styles.section}>
         <View style={styles.inputRow}>
@@ -84,14 +100,14 @@ export default function SettingsScreen() {
         <View style={styles.inputRow}>
           <Text style={styles.inputLabel}>Solana アドレス</Text>
           <Text style={styles.addressValue} numberOfLines={1}>
-            {(solanaAddress || profile.address) ? shortenAddress(solanaAddress || profile.address) : '—'}
+            {solanaAddress ? shortenAddress(solanaAddress) : '—'}
           </Text>
           <TouchableOpacity
             style={styles.copyBtn}
-            onPress={() => { const addr = solanaAddress || profile.address; if (addr) Clipboard.setStringAsync(addr); }}
-            disabled={!(solanaAddress || profile.address)}
+            onPress={() => { if (solanaAddress) Clipboard.setStringAsync(solanaAddress); }}
+            disabled={!solanaAddress}
           >
-            <Ionicons name="copy-outline" size={16} color={(solanaAddress || profile.address) ? colors.textSecondary : colors.textDisabled} />
+            <Ionicons name="copy-outline" size={16} color={solanaAddress ? colors.textSecondary : colors.textDisabled} />
           </TouchableOpacity>
         </View>
         <View style={styles.divider} />
@@ -121,6 +137,7 @@ export default function SettingsScreen() {
           <Text style={styles.saveButtonText}>{t('settings.profileSave')}</Text>
         </TouchableOpacity>
       )}
+      </>}
 
       {/* カメラ */}
       <Text style={styles.sectionTitle}>{t('settings.camera')}</Text>
@@ -153,10 +170,30 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ログアウト */}
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-      </TouchableOpacity>
+      {/* ログイン / ログアウト */}
+      {(loggedIn || solanaAddress) ? (
+        <TouchableOpacity
+          style={[styles.logoutButton, loggingOut && { opacity: 0.5 }]}
+          onPress={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+          )}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={() => {
+            // RegistrationScreenと同じPrivy loginを呼ぶ
+            login({ loginMethods: ['google', 'email'] }).catch(() => {});
+          }}
+        >
+          <Text style={styles.loginButtonText}>{t('login.button')}</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -288,6 +325,18 @@ const styles = StyleSheet.create({
   copyBtn: {
     padding: spacing.xs,
     marginLeft: spacing.xs,
+  },
+  loginButton: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xxl,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+  },
+  loginButtonText: {
+    ...typography.bodyMedium,
+    color: colors.white,
   },
   logoutButton: {
     marginHorizontal: spacing.lg,

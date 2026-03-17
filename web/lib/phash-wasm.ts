@@ -1,5 +1,5 @@
 /**
- * phash-v1.wasm をブラウザで実行するランナー。
+ * image-phash.wasm をブラウザで実行するランナー。
  *
  * TEEのWasmRunnerと同じホスト関数をJS/Canvasで実装し、
  * DCT計算はWASM（TEEと同一バイナリ）が行う。
@@ -10,8 +10,8 @@
  */
 
 // WASM バイナリのURL（public/wasm/ に配置）
-// TODO: GlobalConfig.trusted_wasm_modules[].wasm_source から動的取得に変更
-const PHASH_WASM_URL = "/wasm/phash-v1.wasm";
+// TODO: GlobalConfig.trusted_wasm_ids から動的取得に変更
+const PHASH_WASM_URL = "/wasm/image-phash.wasm";
 
 let wasmCache: ArrayBuffer | null = null;
 
@@ -24,7 +24,7 @@ async function loadWasm(): Promise<ArrayBuffer> {
 }
 
 /**
- * 画像URLからpHashを計算する（phash-v1.wasm使用）。
+ * 画像URLからpHashを計算する（image-phash.wasm使用）。
  * TEEと完全に同一のバイナリでDCTを実行するため、一致が保証される。
  */
 export async function computePHashWasm(imageUrl: string): Promise<string> {

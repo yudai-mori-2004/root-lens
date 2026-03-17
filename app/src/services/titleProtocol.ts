@@ -32,7 +32,7 @@ export async function registerOnTitleProtocol(
   const result = await client.register({
     content,
     ownerWallet: OWNER_WALLET,
-    processorIds: ['core-c2pa', 'phash-v1'],
+    processorIds: ['core-c2pa', 'image-phash'],
     delegateMint: true,
   });
 

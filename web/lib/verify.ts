@@ -206,14 +206,14 @@ async function verifyPHash(
   resolved: ResolvedContent,
   thumbnailUrl: string
 ): Promise<PHashResult> {
-  // Extension signed_json から phash-v1 の結果を探す
+  // Extension signed_json から image-phash の結果を探す
   const phashExtension = resolved.extensionSignedJsons.find((sj) => {
     const p = sj.payload as ExtensionPayload;
-    return p.extension_id === "phash-v1";
+    return p.extension_id === "image-phash";
   });
 
   if (phashExtension) {
-    // phash-v1 extension: payload.phash に直接ハッシュ値が入っている
+    // image-phash extension: payload.phash に直接ハッシュ値が入っている
     const payload = phashExtension.payload as ExtensionPayload & { phash?: string };
     const onchainHash = payload.phash;
     if (onchainHash) {

@@ -20,7 +20,7 @@ export type RootStackParamList = {
   Camera: undefined;
   CameraGallery: undefined;
   Edit: { mediaItems: MediaItem[] };
-  Publishing: { signedUris: string[] };
+  Publishing: { signedUris: string[]; address: string; userId: string };
   Preview: { contentIds: string[] };
   Registration: { signedUris: string[] };
 };

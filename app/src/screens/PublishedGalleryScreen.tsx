@@ -15,8 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
-import { loadProfile, shortenAddress, type Profile } from '../store/profileStore';
+import { loadProfile, shortenAddress, syncUserToSupabase, type Profile } from '../store/profileStore';
 import { config } from '../config';
+import { useAuth } from '../hooks/useAuth';
 import type { RootStackParamList, GalleryStackParamList } from '../navigation/types';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
@@ -125,20 +126,42 @@ async function fetchMyPages(userId: string): Promise<PublishedItem[]> {
 
 export default function PublishedGalleryScreen() {
   const navigation = useNavigation<Nav>();
+  const { isAuthenticated, address } = useAuth();
   const [contents, setContents] = useState<PublishedItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const loggedIn = isAuthenticated === true && !!address;
 
+
+  // フォーカスごとに毎回再取得（依存配列なし）
+  // Privy hookの値はレンダー時に更新されるが、useFocusEffectの依存配列では
+  // React Navigationのスタック間で再レンダーがトリガーされないことがある。
+  // 毎回実行して最新状態を反映する。
   useFocusEffect(
     useCallback(() => {
+      console.log('[Home] isAuthenticated:', isAuthenticated, 'address:', address);
+      loadProfile().then(setProfile);
+
+      if (!isAuthenticated || !address) {
+        setContents([]);
+        return;
+      }
+
       loadProfile().then((p) => {
-        setProfile(p);
-        if (p.userId) {
-          fetchMyPages(p.userId).then(setContents);
-        } else {
-          setContents([]);
-        }
+        syncUserToSupabase(address, p)
+          .then((userId) => {
+            console.log('[Home] userId:', userId);
+            return fetchMyPages(userId);
+          })
+          .then((items) => {
+            console.log('[Home] pages:', items.length);
+            setContents(items);
+          })
+          .catch((e) => {
+            console.error('[Home] fetch error:', e);
+            setContents([]);
+          });
       });
-    }, []),
+    }, [isAuthenticated, address]),
   );
 
   if (contents.length === 0) {
@@ -186,7 +209,7 @@ export default function PublishedGalleryScreen() {
     navigation.navigate('Preview', { contentIds: [item.shortId] });
   };
 
-  const profileHeader = profile && (profile.displayName || profile.address) ? (
+  const profileHeader = loggedIn && profile && (profile.displayName || address) ? (
     <View style={styles.profileSection}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>
@@ -197,12 +220,12 @@ export default function PublishedGalleryScreen() {
         {profile.displayName ? (
           <Text style={styles.profileName}>{profile.displayName}</Text>
         ) : null}
-        {profile.address ? (
+        {address ? (
           <TouchableOpacity
             style={styles.addressRow}
-            onPress={() => Clipboard.setStringAsync(profile.address)}
+            onPress={() => Clipboard.setStringAsync(address)}
           >
-            <Text style={styles.profileAddress}>{shortenAddress(profile.address)}</Text>
+            <Text style={styles.profileAddress}>{shortenAddress(address)}</Text>
             <Ionicons name="copy-outline" size={12} color={colors.textHint} />
           </TouchableOpacity>
         ) : null}
