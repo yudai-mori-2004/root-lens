@@ -39,14 +39,18 @@ export default function ContentPage({ page }: Props) {
 
   const capturedDate = record ? formatDate(record.capturedAt) : null;
 
-  // スコア
-  const allSteps = [
+  // スコア — core + 全extensionのTEE署名を含む
+  const coreSteps = [
     verification.collectionVerified,
     verification.teeSignatureVerified,
     verification.c2paChainVerified,
+  ];
+  const extSteps = [
     verification.phashMatched,
     verification.hardwareVerified,
+    ...verification.extensions.map(e => e.teeSignatureVerified),
   ];
+  const allSteps = [...coreSteps, ...extSteps];
   const active = allSteps.filter(s => s !== "skipped" && s !== "pending");
   const passed = active.filter(s => s === "verified").length;
   const total = active.length;
@@ -127,20 +131,41 @@ export default function ContentPage({ page }: Props) {
             {/* Extensions */}
             <div className={styles.techSection}>
               <h3 className={styles.techTitle}>{t("tech.extensions")}</h3>
-              <TechRow
-                status={verification.phashMatched}
-                label={t("tech.phash")}
-                detail={verification.phashDistance !== undefined ? t("tech.hammingDist", { distance: verification.phashDistance }) : undefined}
-              />
-              <TechRow
-                status={verification.hardwareVerified}
-                label={t("tech.hardware")}
-                detail={
-                  verification.hardwareVerified === "skipped"
-                    ? t("tech.hardwareNone")
-                    : verification.extensions.find(e => e.extensionId.startsWith("hardware-"))?.extensionId
-                }
-              />
+              {verification.extensions.map((ext, i) => {
+                const isPhash = ext.extensionId === "image-phash";
+                const isHardware = ext.extensionId.startsWith("hardware-");
+                return (
+                  <TechRow
+                    key={i}
+                    status={isPhash ? verification.phashMatched : isHardware ? verification.hardwareVerified : ext.teeSignatureVerified}
+                    label={
+                      isPhash ? t("tech.phash")
+                      : isHardware ? t("tech.hardware")
+                      : ext.extensionId
+                    }
+                    detail={
+                      isPhash && verification.phashDistance !== undefined
+                        ? t("tech.hammingDist", { distance: verification.phashDistance })
+                        : ext.detail
+                    }
+                  />
+                );
+              })}
+              {/* extensionが0件、またはhardwareが未検出の場合 */}
+              {!verification.extensions.some(e => e.extensionId.startsWith("hardware-")) && (
+                <TechRow
+                  status={verification.hardwareVerified}
+                  label={t("tech.hardware")}
+                  detail={t("tech.hardwareNone")}
+                />
+              )}
+              {!verification.extensions.some(e => e.extensionId === "image-phash") && verification.phashMatched !== "pending" && (
+                <TechRow
+                  status={verification.phashMatched}
+                  label={t("tech.phash")}
+                  detail={verification.phashDistance !== undefined ? t("tech.hammingDist", { distance: verification.phashDistance }) : undefined}
+                />
+              )}
             </div>
 
             {/* On-chain */}
