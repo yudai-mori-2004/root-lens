@@ -44,6 +44,10 @@ export default function ContentPage({ page }: Props) {
     });
   }, [page.contentHash, page.thumbnailUrl]);
 
+  // Core payload
+  const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
+  const coreSj = resolved?.coreSignedJson;
+
   // 日付ソース: TSA認証時刻 > captured_at属性 > 登録時刻
   const hasTsa = corePayload?.tsa_timestamp != null;
   const capturedDate = hasTsa
@@ -65,10 +69,6 @@ export default function ContentPage({ page }: Props) {
   const active = allSteps.filter(s => s !== "skipped" && s !== "pending");
   const passed = active.filter(s => s === "verified").length;
   const total = active.length;
-
-  // Core payload
-  const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
-  const coreSj = resolved?.coreSignedJson;
 
   return (
     <div className={styles.container}>
