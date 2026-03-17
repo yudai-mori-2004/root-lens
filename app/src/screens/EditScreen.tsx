@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, MediaItem } from '../navigation/types';
-import { signContent, applyMasks as nativeApplyMasks, processVideo } from '../native/c2paBridge';
+import { signContent, signContentWithParent, applyMasks as nativeApplyMasks, processVideo } from '../native/c2paBridge';
 import { saveToGallery } from '../utils/saveMedia';
 import { saveDraft, clearDraft } from '../store/draftStore';
 import CropTool from '../components/edit/CropTool';
@@ -444,9 +444,21 @@ export default function EditScreen() {
     }
     setSigning(true);
     try {
-      const finalUri = await generateFinalMedia(currentEdit, mediaItems[pageIndex]);
-      const signedPath = await signContent(finalUri);
-      const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
+      const state = currentEdit;
+      const item = mediaItems[pageIndex];
+      const activeActions = state.actions.slice(0, state.currentIndex + 1);
+      let signedUri: string;
+
+      if (activeActions.length === 0) {
+        // 編集なし → 元のC2PA署名をそのまま保存
+        signedUri = state.originalUri;
+      } else {
+        // 編集あり → 元ファイルをingredientとして再署名
+        const finalUri = await generateFinalMedia(state, item);
+        const signedPath = await signContentWithParent(finalUri, state.originalUri);
+        signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
+      }
+
       await saveToGallery(signedUri);
       Alert.alert(t('edit.saveSuccessTitle'), t('edit.saveSuccess'));
     } catch (e: any) {
@@ -463,12 +475,22 @@ export default function EditScreen() {
       for (let i = 0; i < editStates.length; i++) {
         const item = mediaItems[i];
         const state = editStates[i];
-        const finalUri = await generateFinalMedia(state, item);
-        const signedPath = await signContent(finalUri);
-        const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
+        const activeActions = state.actions.slice(0, state.currentIndex + 1);
+
+        let resultUri: string;
+        if (activeActions.length === 0) {
+          // 編集なし → 撮影時のC2PA署名をそのまま保持（再署名しない）
+          resultUri = state.originalUri;
+        } else {
+          // 編集あり → 編集結果を生成し、元ファイルをingredientとして再署名
+          const finalUri = await generateFinalMedia(state, item);
+          const signedPath = await signContentWithParent(finalUri, state.originalUri);
+          resultUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
+        }
+
         const ext = item.type === 'video' ? 'mov' : 'jpg';
         const tempDest = `${FileSystem.cacheDirectory}registration_${Date.now()}_${i}.${ext}`;
-        await FileSystem.copyAsync({ from: signedUri, to: tempDest });
+        await FileSystem.copyAsync({ from: resultUri, to: tempDest });
         signedUris.push(tempDest);
       }
       await clearDraft();

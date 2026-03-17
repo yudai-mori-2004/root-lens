@@ -31,6 +31,18 @@ extern int32_t c2pa_sign_image_tee(
     const char *tsa_url
 );
 
+extern int32_t c2pa_sign_image_tee_with_parent(
+    const char *input_path,
+    const char *output_path,
+    const uint8_t *certs_der,
+    const uint32_t *cert_sizes,
+    uint32_t cert_count,
+    c2pa_sign_fn sign_fn,
+    void *sign_ctx,
+    const char *tsa_url,
+    const char *parent_path
+);
+
 extern char *c2pa_read_manifest(const char *input_path);
 extern char *c2pa_get_version(void);
 extern void c2pa_free_string(char *s);
@@ -142,6 +154,67 @@ Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTee(
     free(u_sizes);
     (*env)->ReleaseIntArrayElements(env, cert_sizes, sizes, JNI_ABORT);
     (*env)->ReleaseByteArrayElements(env, certs_der, certs_bytes, JNI_ABORT);
+    if (tsa != NULL) {
+        (*env)->ReleaseStringUTFChars(env, tsa_url, tsa);
+    }
+    (*env)->ReleaseStringUTFChars(env, output_path, output);
+    (*env)->ReleaseStringUTFChars(env, input_path, input);
+
+    return result;
+}
+
+// --- JNI: TEEコールバック署名（親マニフェスト参照あり） ---
+
+JNIEXPORT jint JNICALL
+Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTeeWithParent(
+    JNIEnv *env,
+    jobject thiz,
+    jstring input_path,
+    jstring output_path,
+    jbyteArray certs_der,
+    jintArray cert_sizes,
+    jint cert_count,
+    jstring tsa_url,
+    jstring parent_path
+) {
+    const char *input = (*env)->GetStringUTFChars(env, input_path, NULL);
+    const char *output = (*env)->GetStringUTFChars(env, output_path, NULL);
+
+    const char *tsa = NULL;
+    if (tsa_url != NULL) {
+        tsa = (*env)->GetStringUTFChars(env, tsa_url, NULL);
+    }
+
+    const char *parent = NULL;
+    if (parent_path != NULL) {
+        parent = (*env)->GetStringUTFChars(env, parent_path, NULL);
+    }
+
+    jbyte *certs_bytes = (*env)->GetByteArrayElements(env, certs_der, NULL);
+    jint *sizes = (*env)->GetIntArrayElements(env, cert_sizes, NULL);
+
+    uint32_t *u_sizes = (uint32_t *)malloc(cert_count * sizeof(uint32_t));
+    for (int i = 0; i < cert_count; i++) {
+        u_sizes[i] = (uint32_t)sizes[i];
+    }
+
+    TeeSignContext ctx;
+    ctx.env = env;
+    ctx.module_ref = thiz;
+
+    int32_t result = c2pa_sign_image_tee_with_parent(
+        input, output,
+        (const uint8_t *)certs_bytes, u_sizes, (uint32_t)cert_count,
+        tee_sign_callback, &ctx,
+        tsa, parent
+    );
+
+    free(u_sizes);
+    (*env)->ReleaseIntArrayElements(env, cert_sizes, sizes, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, certs_der, certs_bytes, JNI_ABORT);
+    if (parent != NULL) {
+        (*env)->ReleaseStringUTFChars(env, parent_path, parent);
+    }
     if (tsa != NULL) {
         (*env)->ReleaseStringUTFChars(env, tsa_url, tsa);
     }

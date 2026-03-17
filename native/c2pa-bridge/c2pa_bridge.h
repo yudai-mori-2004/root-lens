@@ -52,6 +52,26 @@ int32_t c2pa_sign_image_tee(
 );
 
 /**
+ * TEEコールバックを使用したC2PA編集署名（親マニフェスト参照あり）
+ *
+ * 元ファイル（parent_path）のC2PAマニフェストをingredientとして来歴グラフに組み込み、
+ * c2pa.edited アクションで再署名する。
+ *
+ * @param parent_path   元ファイル（ingredient）のパス。NULLの場合はc2pa_sign_image_teeと同等
+ */
+int32_t c2pa_sign_image_tee_with_parent(
+    const char *input_path,
+    const char *output_path,
+    const uint8_t *certs_der,
+    const uint32_t *cert_sizes,
+    uint32_t cert_count,
+    c2pa_sign_fn sign_fn,
+    void *sign_ctx,
+    const char *tsa_url,
+    const char *parent_path
+);
+
+/**
  * C2PA署名を実行する（レガシー: PEMベースのソフトウェア署名）
  *
  * @param input_path   入力JPEG/PNGのパス (null-terminated UTF-8)

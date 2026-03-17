@@ -69,6 +69,17 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
         tsaUrl: String?
     ): Int
 
+    // JNI宣言 (TEEコールバック + 親マニフェスト参照)
+    private external fun nativeSignImageTeeWithParent(
+        inputPath: String,
+        outputPath: String,
+        certsDer: ByteArray,
+        certSizes: IntArray,
+        certCount: Int,
+        tsaUrl: String?,
+        parentPath: String?
+    ): Int
+
     private external fun nativeReadManifest(inputPath: String): String
 
     private external fun nativeGetVersion(): String
@@ -330,6 +341,57 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             }
         } catch (e: Exception) {
             Log.e(TAG, "Exception in signContent", e)
+            promise.reject("EXCEPTION", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun signContentWithParent(imagePath: String, parentPath: String, promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val inputFile = resolveToFile(imagePath)
+            val parentFile = resolveToFile(parentPath)
+            if (inputFile == null || !inputFile.exists()) {
+                promise.reject("FILE_ERROR", "入力ファイルが見つかりません: $imagePath")
+                return
+            }
+            if (parentFile == null || !parentFile.exists()) {
+                promise.reject("FILE_ERROR", "親ファイルが見つかりません: $parentPath")
+                return
+            }
+
+            val ext = inputFile.extension.ifEmpty { "jpg" }
+            val outputFile = File(context.cacheDir, "c2pa_edited_${System.currentTimeMillis()}.$ext")
+
+            val prefs = context.getSharedPreferences("rootlens_certs", 0)
+            val deviceCertBase64 = prefs.getString("device_cert_der", null)
+                ?: run { promise.reject("CERT_ERROR", "Device Certificate未取得"); return }
+            val rootCaBase64 = prefs.getString("root_ca_cert_der", null)
+                ?: run { promise.reject("CERT_ERROR", "Root CA未取得"); return }
+
+            val deviceCertDer = android.util.Base64.decode(deviceCertBase64, android.util.Base64.NO_WRAP)
+            val rootCaDer = android.util.Base64.decode(rootCaBase64, android.util.Base64.NO_WRAP)
+            val certsDer = deviceCertDer + rootCaDer
+            val certSizes = intArrayOf(deviceCertDer.size, rootCaDer.size)
+            val tsaUrl = "http://timestamp.digicert.com"
+
+            val result = nativeSignImageTeeWithParent(
+                inputFile.absolutePath,
+                outputFile.absolutePath,
+                certsDer,
+                certSizes,
+                2,
+                tsaUrl,
+                parentFile.absolutePath
+            )
+
+            when (result) {
+                0 -> promise.resolve(outputFile.absolutePath)
+                -1 -> promise.reject("ARG_ERROR", "引数エラー")
+                -2 -> promise.reject("SIGN_ERROR", "署名エラー (code: $result)")
+                else -> promise.reject("UNKNOWN_ERROR", "不明なエラー: $result")
+            }
+        } catch (e: Exception) {
             promise.reject("EXCEPTION", e.message, e)
         }
     }

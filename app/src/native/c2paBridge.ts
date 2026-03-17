@@ -83,6 +83,25 @@ export async function signContent(imagePath: string): Promise<string> {
 }
 
 /**
+ * 編集済みコンテンツにC2PA署名を付与する（親マニフェスト参照あり）
+ *
+ * 元ファイルのC2PAマニフェストをingredientとして来歴グラフに組み込み、
+ * c2pa.edited アクションで再署名する。
+ *
+ * @param imagePath 編集後のファイルパス
+ * @param parentPath 元ファイル（撮影時のC2PA署名付き）のパス
+ * @returns 署名済みファイルのパス
+ */
+export async function signContentWithParent(imagePath: string, parentPath: string): Promise<string> {
+  if (!C2paBridge) {
+    throw new Error(
+      `C2paBridge native module is not available on ${Platform.OS}`,
+    );
+  }
+  return C2paBridge.signContentWithParent(imagePath, parentPath);
+}
+
+/**
  * C2PAマニフェストを読み取る
  * 仕様書 §4.5 C2PAマニフェスト読み取り
  * @param imagePath 入力画像のパス

@@ -264,35 +264,69 @@ fn do_sign_tee(
     sign_ctx: *mut std::ffi::c_void,
     tsa_url: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    do_sign_tee_with_parent(input_path, output_path, certs, sign_fn, sign_ctx, tsa_url, None)
+}
+
+/// C2PA署名の実行（parent_path対応）
+///
+/// parent_path が Some の場合:
+///   - 元ファイルを ingredient として来歴グラフに組み込む
+///   - アクションは c2pa.edited
+///   - 来歴チェーン: 撮影時マニフェスト → 編集マニフェスト
+///
+/// parent_path が None の場合:
+///   - 新規マニフェストを作成（c2pa.created）
+///   - 撮影時の署名用
+fn do_sign_tee_with_parent(
+    input_path: &str,
+    output_path: &str,
+    certs: Vec<Vec<u8>>,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: Option<String>,
+    parent_path: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
     use c2pa::Builder;
 
-    // 仕様書 §4.5 C2PAマニフェスト
-    let manifest_json = r#"{
+    let action = if parent_path.is_some() { "c2pa.edited" } else { "c2pa.created" };
+
+    let manifest_json = format!(r#"{{
         "claim_generator_info": [
-            {
+            {{
                 "name": "RootLens",
                 "version": "0.1.0"
-            }
+            }}
         ],
         "assertions": [
-            {
+            {{
                 "label": "c2pa.actions",
-                "data": {
+                "data": {{
                     "actions": [
-                        {
-                            "action": "c2pa.created",
-                            "softwareAgent": {
+                        {{
+                            "action": "{}",
+                            "softwareAgent": {{
                                 "name": "RootLens",
                                 "version": "0.1.0"
-                            }
-                        }
+                            }}
+                        }}
                     ]
-                }
-            }
+                }}
+            }}
         ]
-    }"#;
+    }}"#, action);
 
-    let mut builder = Builder::from_json(manifest_json)?;
+    let mut builder = Builder::from_json(&manifest_json)?;
+
+    // 親マニフェストがある場合、ingredient として追加
+    if let Some(parent) = parent_path {
+        let parent_mime = mime_from_path(parent);
+        let mut parent_stream = fs::File::open(parent)?;
+        builder.add_ingredient_from_stream(
+            r#"{"relationship": "parentOf"}"#,
+            parent_mime,
+            &mut parent_stream,
+        )?;
+    }
 
     let signer = CallbackSigner {
         certs,
@@ -313,6 +347,46 @@ fn do_sign_tee(
     builder.sign(&signer, mime, &mut source, &mut dest)?;
 
     Ok(())
+}
+
+/// 編集署名用FFI（親マニフェスト参照あり）
+#[no_mangle]
+pub extern "C" fn c2pa_sign_image_tee_with_parent(
+    input_path: *const c_char,
+    output_path: *const c_char,
+    certs_der: *const u8,
+    cert_sizes: *const u32,
+    cert_count: u32,
+    sign_fn: CSignFn,
+    sign_ctx: *mut std::ffi::c_void,
+    tsa_url: *const c_char,
+    parent_path: *const c_char,
+) -> i32 {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let input = match unsafe_cstr_to_str(input_path) { Some(s) => s, None => return -1 };
+        let output = match unsafe_cstr_to_str(output_path) { Some(s) => s, None => return -1 };
+        let parent = unsafe_cstr_to_str(parent_path);
+
+        if certs_der.is_null() || cert_sizes.is_null() || cert_count == 0 { return -1; }
+
+        let mut certs: Vec<Vec<u8>> = Vec::new();
+        let sizes = unsafe { std::slice::from_raw_parts(cert_sizes, cert_count as usize) };
+        let mut offset: usize = 0;
+        for &size in sizes {
+            let s = size as usize;
+            let cert_data = unsafe { std::slice::from_raw_parts(certs_der.add(offset), s) };
+            certs.push(cert_data.to_vec());
+            offset += s;
+        }
+
+        let tsa = unsafe_cstr_to_str(tsa_url);
+
+        match do_sign_tee_with_parent(&input, &output, certs, sign_fn, sign_ctx, tsa, parent.as_deref()) {
+            Ok(()) => 0,
+            Err(e) => { eprintln!("c2pa_sign_image_tee_with_parent error: {e}"); -2 }
+        }
+    }));
+    match result { Ok(r) => r, Err(_) => -3 }
 }
 
 // --- レガシー署名（PEMベース、dev/テスト用） ---
