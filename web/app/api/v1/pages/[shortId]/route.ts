@@ -19,10 +19,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    contentHash: record.contentHash,
-    assetId: record.assetId,
-    thumbnailUrl: record.thumbnailUrl,
-    ogpImageUrl: record.ogpImageUrl,
+    contents: record.contents,
   });
 }
 

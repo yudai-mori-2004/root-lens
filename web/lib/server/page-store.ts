@@ -21,12 +21,16 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 // 型定義
 // ---------------------------------------------------------------------------
 
-export interface PageRecord {
-  shortId: string;
+export interface PageContentRecord {
   contentHash: string;
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
+}
+
+export interface PageRecord {
+  shortId: string;
+  contents: PageContentRecord[];
   createdAt: string;
 }
 
@@ -117,10 +121,12 @@ export async function createPage(input: CreatePageInput): Promise<PageRecord> {
 
   return {
     shortId: page.short_id,
-    contentHash: input.contentHash,
-    assetId: input.assetId,
-    thumbnailUrl: input.thumbnailUrl,
-    ogpImageUrl: input.ogpImageUrl,
+    contents: contentRows.map((c) => ({
+      contentHash: c.content_hash,
+      assetId: c.title_protocol_asset_id,
+      thumbnailUrl: c.thumbnail_url,
+      ogpImageUrl: c.ogp_image_url,
+    })),
     createdAt: page.created_at,
   };
 }
@@ -148,20 +154,23 @@ export async function findByShortId(
 
   if (error || !data) return null;
 
-  const content = (data.contents as unknown as Array<{
+  const rawContents = (data.contents as unknown as Array<{
     content_hash: string;
     title_protocol_asset_id: string;
     thumbnail_url: string;
     ogp_image_url: string;
-  }>)?.[0];
-  if (!content) return null;
+  }>) ?? [];
+
+  if (rawContents.length === 0) return null;
 
   return {
     shortId: data.short_id,
-    contentHash: content.content_hash,
-    assetId: content.title_protocol_asset_id,
-    thumbnailUrl: content.thumbnail_url,
-    ogpImageUrl: content.ogp_image_url,
+    contents: rawContents.map((c) => ({
+      contentHash: c.content_hash,
+      assetId: c.title_protocol_asset_id,
+      thumbnailUrl: c.thumbnail_url,
+      ogpImageUrl: c.ogp_image_url,
+    })),
     createdAt: data.created_at,
   };
 }
@@ -231,12 +240,6 @@ export async function findByContentHash(
   });
   if (page.status !== "published") return null;
 
-  return {
-    shortId: page.short_id,
-    contentHash: data.content_hash,
-    assetId: data.title_protocol_asset_id,
-    thumbnailUrl: data.thumbnail_url,
-    ogpImageUrl: data.ogp_image_url,
-    createdAt: page.created_at,
-  };
+  // contentHashで検索しているので、そのcontentを含むページの全contentsを返す
+  return findByShortId(page.short_id);
 }
