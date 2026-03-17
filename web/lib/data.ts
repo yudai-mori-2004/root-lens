@@ -146,8 +146,10 @@ export async function verifyContent(
     return {
       collectionVerified: "failed",
       teeSignatureVerified: "failed",
-      phashMatched: "skipped",
       c2paChainVerified: "failed",
+      phashMatched: "skipped",
+      hardwareVerified: "skipped",
+      extensions: [],
       overall: "failed",
     };
   }

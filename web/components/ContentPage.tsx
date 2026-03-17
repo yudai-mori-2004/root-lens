@@ -35,8 +35,10 @@ export default function ContentPage({ page }: Props) {
   const [verification, setVerification] = useState<VerificationResult>({
     collectionVerified: "pending",
     teeSignatureVerified: "pending",
-    phashMatched: "pending",
     c2paChainVerified: "pending",
+    phashMatched: "pending",
+    hardwareVerified: "skipped",
+    extensions: [],
     overall: "pending",
   });
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -203,6 +205,17 @@ function VerificationSummary({
             verification.phashDistance !== undefined
               ? `距離: ${verification.phashDistance}`
               : undefined
+          }
+        />
+        <VerifyItem
+          status={verification.hardwareVerified}
+          label="ハードウェア証明"
+          detail={
+            verification.hardwareVerified === "verified"
+              ? verification.extensions.find(e => e.extensionId.startsWith("hardware-"))?.detail
+              : verification.hardwareVerified === "skipped"
+                ? "ソフトウェア署名"
+                : undefined
           }
         />
       </div>

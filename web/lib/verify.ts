@@ -13,7 +13,7 @@
 
 import type { SignedJson, CorePayload, ExtensionPayload } from "@title-protocol/sdk";
 import type { ResolvedContent } from "./content-resolver";
-import type { VerificationResult, VerifyStepStatus } from "./types";
+import type { VerificationResult, VerifyStepStatus, ExtensionVerification } from "./types";
 import {
   getCollectionMints,
   PHASH_THRESHOLD,
@@ -31,8 +31,10 @@ export async function verifyContentOnChain(
   const result: VerificationResult = {
     collectionVerified: "pending",
     teeSignatureVerified: "pending",
-    phashMatched: "pending",
     c2paChainVerified: "pending",
+    phashMatched: "pending",
+    hardwareVerified: "skipped",
+    extensions: [],
     overall: "pending",
     assetId: resolved.assetId,
     arweaveUri: resolved.arweaveUri,
@@ -99,6 +101,46 @@ export async function verifyContentOnChain(
     );
   } else {
     console.log(`  → pHash: ${phashResult.reason || "skipped"}`);
+  }
+
+  // Step 5: Extension cNFT 個別検証
+  console.log("Step 5: Verifying extension cNFTs...");
+  for (const extSj of resolved.extensionSignedJsons) {
+    const extPayload = extSj.payload as ExtensionPayload;
+    const extId = extPayload.extension_id || "unknown";
+
+    const extVerif: ExtensionVerification = {
+      extensionId: extId,
+      collectionVerified: "pending",
+      teeSignatureVerified: "pending",
+      wasmHashVerified: "pending",
+    };
+
+    // 5a: ext_collection に属するか（ResolvedContentに情報がないのでskip — 将来対応）
+    // TODO: extAssetごとのcollectionAddressをResolvedContentに持たせる
+    extVerif.collectionVerified = "skipped";
+
+    // 5b: TEE署名検証
+    extVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
+    console.log(`  → Extension [${extId}] TEE sig: ${extVerif.teeSignatureVerified}`);
+
+    // 5c: wasm_hash が Global Config に含まれるか
+    // TODO: GlobalConfig.trusted_wasm_ids と照合（SDK 0.1.4では trusted_wasm_ids: string[]）
+    extVerif.wasmHashVerified = "skipped";
+
+    // 5d: ハードウェア署名検出
+    if (extId === "hardware-google" || extId.startsWith("hardware-")) {
+      result.hardwareVerified = extVerif.teeSignatureVerified;
+      extVerif.detail = `Hardware: ${extId}`;
+      console.log(`  → Hardware signing detected: ${extId} → ${result.hardwareVerified}`);
+    }
+
+    result.extensions.push(extVerif);
+  }
+
+  // ハードウェア署名 extension が見つからなかった場合
+  if (result.hardwareVerified === "skipped" && resolved.extensionSignedJsons.length > 0) {
+    console.log("  → No hardware signing extension (software-signed content)");
   }
 
   // 全体判定 — skipped は除外して判定（データがない検証項目は合否に影響しない）
