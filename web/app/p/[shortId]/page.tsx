@@ -1,12 +1,10 @@
 /**
  * 仕様書 §7.1 URL構造: rootlens.io/p/{shortId}
  * 仕様書 §7.3 OGP
- *
- * Server Component: shortId を解決し、OGP メタデータを設定する。
- * クライアントサイド検証は ContentPage (Client Component) で実行。
  */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { resolvePageMeta } from "@/lib/data";
 import ContentPage from "@/components/ContentPage";
 
@@ -22,7 +20,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Not Found" };
   }
 
-  // §7.3 OGP: SNS共有時のプレビュー
   return {
     title: "Shot on RootLens",
     description: "Verified authentic content with tamper-proof provenance",
@@ -53,7 +50,9 @@ export default async function ContentPageRoute({ params }: Props) {
   return <ContentPage page={page} />;
 }
 
-function NotFound() {
+async function NotFound() {
+  const t = await getTranslations("notfound");
+
   return (
     <div
       style={{
@@ -66,10 +65,10 @@ function NotFound() {
       }}
     >
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>
-        Content not found
+        {t("title")}
       </h1>
       <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-        This link may be invalid or the content may have been removed.
+        {t("description")}
       </p>
     </div>
   );

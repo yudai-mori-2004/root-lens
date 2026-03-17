@@ -1,0 +1,44 @@
+{
+  "content": {
+    "shotOn": "Shot on {device}",
+    "shotOnDefault": "Shot on RootLens",
+
+    "trust": {
+      "verifying": "Verifying...",
+      "verified": "Verified authentic content",
+      "failed": "Some checks could not be confirmed"
+    },
+
+    "tech": {
+      "toggle": "Technical Details",
+      "core": "Core cNFT (Provenance)",
+      "extensions": "Extension cNFTs (Attributes)",
+      "onchain": "On-chain Data",
+      "collection": "Collection Membership",
+      "teeSig": "TEE Signature (Ed25519)",
+      "c2pa": "C2PA Provenance Chain",
+      "phash": "image-phash (Perceptual Hash)",
+      "hardware": "Hardware Signing",
+      "hardwareNone": "Not present (software-signed)",
+      "hammingDist": "Hamming distance: {distance}"
+    },
+
+    "how": {
+      "title": "How this verification works",
+      "p1": "The provenance and authenticity of this content is recorded on the Solana blockchain via Title Protocol.",
+      "p2": "At capture time, a C2PA signature is generated inside the device's TEE (Trusted Execution Environment), and its hash is recorded on-chain. Even without the original C2PA data, authenticity can be verified trustlessly by checking the on-chain record and TEE signature.",
+      "p3": "The perceptual hash (pHash) is computed by a WASM module inside the TEE, and compared against a value recomputed from the displayed image. This verifies that the displayed image matches the on-chain record — without needing the original file.",
+      "p4": "All verification data is fetched directly from Solana RPC and Arweave. No RootLens server is involved in the verification process. You can confirm this in your browser's network inspector.",
+      "tsa": "The timestamp is recorded by an RFC 3161-compliant TSA (Time Stamping Authority), providing third-party assurance of the capture time."
+    }
+  },
+
+  "notfound": {
+    "title": "Content not found",
+    "description": "This link may be invalid or the content may have been removed."
+  },
+
+  "footer": {
+    "tagline": "Prove it's real."
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "content": {
+    "shotOn": "{device} で撮影",
+    "shotOnDefault": "RootLens で撮影",
+
+    "trust": {
+      "verifying": "検証中...",
+      "verified": "本物のコンテンツです",
+      "failed": "確認できない項目があります"
+    },
+
+    "tech": {
+      "toggle": "技術者向け詳細",
+      "core": "Core cNFT（来歴記録）",
+      "extensions": "Extension cNFT（属性検証）",
+      "onchain": "オンチェーンデータ",
+      "collection": "コレクション検証",
+      "teeSig": "TEE署名検証 (Ed25519)",
+      "c2pa": "C2PA来歴チェーン",
+      "phash": "image-phash（知覚ハッシュ）",
+      "hardware": "ハードウェア署名",
+      "hardwareNone": "未検出（ソフトウェア署名）",
+      "hammingDist": "ハミング距離: {distance}"
+    },
+
+    "how": {
+      "title": "この検証の仕組み",
+      "p1": "このコンテンツの来歴と真正性は、Title Protocolを通じてSolanaブロックチェーンに記録されています。",
+      "p2": "撮影時に端末のTEE（Trusted Execution Environment）内でC2PA署名が生成され、その署名のハッシュがオンチェーンに記録されます。元のC2PAデータを保持していなくても、オンチェーンの記録とTEE署名を検証することで、トラストレスに真正性を確認できます。",
+      "p3": "知覚ハッシュ（pHash）はTEE内のWASMモジュールで算出され、表示中の画像から再計算した値と比較されます。これにより、表示されている画像がオンチェーンに記録されたコンテンツと同一であることを、元データなしに検証できます。",
+      "p4": "すべての検証データはSolana RPCおよびArweaveから直接取得しており、RootLensサーバーは検証プロセスに一切関与していません。ブラウザの開発者ツールで通信先を確認できます。",
+      "tsa": "タイムスタンプはRFC 3161準拠のTSA（Time Stamping Authority）により記録されており、撮影日時の信頼性が第三者機関によって保証されています。"
+    }
+  },
+
+  "notfound": {
+    "title": "コンテンツが見つかりません",
+    "description": "このリンクは無効か、コンテンツが削除された可能性があります。"
+  },
+
+  "footer": {
+    "tagline": "Prove it's real."
+  }
+}
