@@ -125,7 +125,8 @@ export async function verifyContentOnChain(
     console.log(`  → Extension [${extId}] TEE sig: ${extVerif.teeSignatureVerified}`);
 
     // 5c: wasm_hash が Global Config に含まれるか
-    // TODO: GlobalConfig.trusted_wasm_ids と照合（SDK 0.1.4では trusted_wasm_ids: string[]）
+    // TODO: GlobalConfig.trusted_wasm_ids と照合（SDK 0.1.5: trusted_wasm_ids: string[]）
+    // NOTE: SDK 0.1.5ではWASMハッシュはWasmModuleAccount PDAに格納。完全な検証にはPDA読み取りが必要
     extVerif.wasmHashVerified = "skipped";
 
     // 5d: ハードウェア署名検出

@@ -10,7 +10,7 @@ import type {
   ExtensionVerification,
 } from "@/lib/types";
 import type { ResolvedContent } from "@/lib/content-resolver";
-import type { CorePayload, ExtensionPayload } from "@title-protocol/sdk";
+import type { CorePayload, ExtensionPayload, GraphNode } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
 import styles from "./ContentPage.module.css";
 
@@ -191,7 +191,7 @@ export default function ContentPage({ page }: Props) {
                     <>
                       <h4 className={styles.techSubTitle}>{t("tech.core.provenanceTitle")}</h4>
                       <div className={styles.dataBlock}>
-                        <DataField label={t("tech.core.nodes")} value={t("tech.core.nodesCount", { count: corePayload.nodes.length })} />
+                        <DataField label={t("tech.core.nodes")} value={t("tech.core.nodesCount", { count: corePayload.nodes.length }) + nodeBreakdown(corePayload.nodes)} />
                         <DataField
                           label={t("tech.core.links")}
                           value={corePayload.links && corePayload.links.length > 0
@@ -542,6 +542,13 @@ function LoadingDots() {
 }
 
 // --- Utilities ---
+
+function nodeBreakdown(nodes: GraphNode[]): string {
+  const finals = nodes.filter(n => n.type === "final").length;
+  const ingredients = nodes.filter(n => n.type === "ingredient").length;
+  if (nodes.length === 0) return "";
+  return ` (final: ${finals}, ingredient: ${ingredients})`;
+}
 
 function truncate(s: string, len = 8): string {
   if (s.length <= len * 2 + 3) return s;
