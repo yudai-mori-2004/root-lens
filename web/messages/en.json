@@ -10,26 +10,95 @@
     },
 
     "tech": {
-      "toggle": "Technical Details",
-      "core": "Core cNFT (Provenance)",
-      "extensions": "Extension cNFTs (Attributes)",
-      "onchain": "On-chain Data",
-      "collection": "Collection Membership",
-      "teeSig": "TEE Signature (Ed25519)",
-      "c2pa": "C2PA Provenance Chain",
-      "phash": "image-phash (Perceptual Hash)",
-      "hardware": "Hardware Signing",
-      "hardwareNone": "Not present (software-signed)",
-      "hammingDist": "Hamming distance: {distance}"
-    },
+      "toggle": "View verification details",
 
-    "how": {
-      "title": "How this verification works",
-      "p1": "The provenance and authenticity of this content is recorded on the Solana blockchain via Title Protocol.",
-      "p2": "At capture time, a C2PA signature is generated inside the device's TEE (Trusted Execution Environment), and its hash is recorded on-chain. Even without the original C2PA data, authenticity can be verified trustlessly by checking the on-chain record and TEE signature.",
-      "p3": "The perceptual hash (pHash) is computed by a WASM module inside the TEE, and compared against a value recomputed from the displayed image. This verifies that the displayed image matches the on-chain record — without needing the original file.",
-      "p4": "All verification data is fetched directly from Solana RPC and Arweave. No RootLens server is involved in the verification process. You can confirm this in your browser's network inspector.",
-      "tsa": "The timestamp is recorded by an RFC 3161-compliant TSA (Time Stamping Authority), providing third-party assurance of the capture time."
+      "intro": {
+        "title": "Verification via Title Protocol",
+        "desc": "Title Protocol is an open protocol that verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment) and records the results on the Solana blockchain. For each piece of content, a Core cNFT (provenance record) and any number of Extension cNFTs (attribute verification) are issued.",
+        "trustChain": "Trust is established through the following chain: Global Config on-chain (managed by DAO) defines the official collection address → confirm the cNFT belongs to the official collection → fetch off-chain data from the URI referenced by the cNFT → verify the TEE signature to confirm data integrity. Each step is independently executed in this browser."
+      },
+
+      "core": {
+        "title": "Core cNFT — Provenance Record",
+        "desc": "The Core cNFT records the result of verifying the C2PA signature chain embedded in the content, signed by the TEE and stored on the blockchain. The entire provenance — who captured it, when, and with what tool — is preserved in a tamper-proof form.",
+        "verifyTitle": "Verification Results",
+        "collection": "Collection Membership",
+        "collectionPass": "Confirmed membership in the official Title Protocol collection",
+        "collectionFail": "Could not confirm membership in the official collection",
+        "teeSig": "TEE Signature (Ed25519)",
+        "teeSigPass": "TEE-generated signature is valid — proves data has not been tampered with",
+        "teeSigFail": "TEE signature verification failed",
+        "c2pa": "C2PA Provenance Chain",
+        "c2paPass": "{count} provenance nodes recorded",
+        "c2paFail": "Could not confirm provenance chain record",
+        "offchainTitle": "Off-chain Data (signed_json)",
+        "offchainDesc": "The TEE signs the verification result and returns it to the client (SDK), which then permanently stores it in off-chain storage. The protocol does not mandate a specific storage provider, but Arweave is recommended for Core due to its permanence guarantees. The TEE is stateless by design and never accesses storage directly. You can see the actual storage URI in the \"On-chain References\" section below.",
+        "provenanceTitle": "Provenance Graph",
+        "nodes": "Provenance Nodes",
+        "nodesCount": "{count}",
+        "links": "Provenance Links",
+        "linksCount": "{count}",
+        "noLinks": "None (single content — no ingredient materials used)",
+        "ownerTitle": "Ownership",
+        "creator": "Registrant Wallet",
+        "currentOwner": "Current Owner",
+        "sameOwner": "(same — no transfer)"
+      },
+
+      "ext": {
+        "title": "Extension cNFTs — Attribute Verification",
+        "desc": "Extensions are objective attribute values computed by WASM modules inside the TEE from the raw content data. While Core handles the C2PA provenance chain (rights structure between content), Extensions handle properties of individual content (perceptual hash, hardware signing, etc.). There is no limit on the number of Extensions — new verification items can be freely added through new WASM modules.",
+        "verifyTitle": "Verification Results",
+        "teeSig": "TEE Signature",
+        "teeSigPass": "Extension-specific TEE signature is valid",
+        "teeSigFail": "TEE signature verification failed",
+        "dataTitle": "Data"
+      },
+
+      "phash": {
+        "title": "image-phash — Image Identity Verification",
+        "desc": "A perceptual hash (pHash) is a numerical fingerprint of an image's visual appearance. A WASM module inside the TEE computes it from the original image and records it on-chain. The viewer's browser recomputes the pHash from the displayed image using the identical WASM binary, then compares it with the on-chain value. If the Hamming distance (bit-level difference) is within the threshold, the images are deemed identical.",
+        "match": "pHash Match",
+        "matchPass": "Hamming distance: {distance} (threshold: {threshold} or less to pass)",
+        "matchFail": "Hamming distance: {distance} (exceeds threshold: {threshold})",
+        "matchSkip": "No pHash data found",
+        "onchain": "On-chain pHash",
+        "computed": "Recomputed pHash (browser)"
+      },
+
+      "hardware": {
+        "title": "{id} — Hardware Capture Proof",
+        "titleDefault": "Hardware Capture Proof",
+        "desc": "This Extension cryptographically proves that the content was physically captured by the device's secure hardware (e.g., Google Pixel's Titan M2 chip or iOS Secure Enclave). A WASM module verifies the hardware signature within the C2PA signature chain, providing third-party verifiable proof of physical capture.",
+        "wip": "Verification WASM module in preparation",
+        "notDetected": "No hardware signature detected (software-signed only)"
+      },
+
+      "refs": {
+        "title": "On-chain References",
+        "contentHash": "Content Hash",
+        "contentHashDesc": "SHA-256(Active Manifest Signature)",
+        "assetId": "cNFT Asset ID",
+        "offchainUri": "Off-chain Storage URI",
+        "teeType": "TEE Type",
+        "sigAlgo": "Signing Algorithm",
+        "dimensions": "Source Dimensions",
+        "tsa": "TSA",
+        "viewOnSolana": "Solana Explorer",
+        "viewOnStorage": "View"
+      },
+
+      "why": {
+        "title": "Why You Can Trust This Verification",
+        "trustless": "Why trustless verification is possible without the original C2PA data",
+        "trustlessDesc": "The C2PA verification — validating the signature chain and hash-matching against the content body — was already completed inside the TEE. The TEE signed the verification result with its private key (Ed25519), and the client permanently stored it in off-chain storage. Viewers only need to verify this TEE signature; there is no need to possess the original C2PA binary data. If the TEE signature is valid, it confirms that \"a trusted execution environment certified that C2PA verification passed.\"",
+        "tsa": "What the TSA timestamp means",
+        "tsaDesc": "An RFC 3161-compliant TSA (Time Stamping Authority) is a mechanism where a third-party authority cryptographically certifies the capture time. The TSA timestamp is embedded within the C2PA signature chain, and the TEE verified its validity before recording it. This ensures that no one — including RootLens — can falsify the capture time.",
+        "noServer": "No RootLens server is involved in verification",
+        "noServerDesc": "All data used in this verification is fetched directly from Solana RPC nodes and off-chain storage. The RootLens server serves the page and display images, but has no involvement in the verification process. You can confirm the network destinations in your browser's developer tools (Network tab).",
+        "oss": "All source code is publicly available",
+        "ossDesc": "The source code for both Title Protocol and RootLens is fully published on GitHub. The verification logic running on this page, the protocol specification and implementation, the code executed inside the TEE — you can inspect everything yourself and independently reproduce the verification."
+      }
     }
   },
 

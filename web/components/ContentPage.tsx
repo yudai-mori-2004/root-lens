@@ -7,9 +7,14 @@ import type {
   ContentRecord,
   VerificationResult,
   VerifyStepStatus,
+  ExtensionVerification,
 } from "@/lib/types";
+import type { ResolvedContent } from "@/lib/content-resolver";
+import type { CorePayload, ExtensionPayload } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
 import styles from "./ContentPage.module.css";
+
+const PHASH_THRESHOLD = 5;
 
 interface Props {
   page: PageMeta;
@@ -19,6 +24,7 @@ export default function ContentPage({ page }: Props) {
   const t = useTranslations("content");
   const tFooter = useTranslations("footer");
   const [record, setRecord] = useState<ContentRecord | null>(null);
+  const [resolved, setResolved] = useState<ResolvedContent | null>(null);
   const [verification, setVerification] = useState<VerificationResult>({
     collectionVerified: "pending",
     teeSignatureVerified: "pending",
@@ -31,9 +37,10 @@ export default function ContentPage({ page }: Props) {
   const [techOpen, setTechOpen] = useState(false);
 
   useEffect(() => {
-    fetchContentRecord(page.contentHash).then(({ record: r, resolved }) => {
+    fetchContentRecord(page.contentHash).then(({ record: r, resolved: res }) => {
       setRecord(r);
-      verifyContent(page.contentHash, page.thumbnailUrl, resolved).then(setVerification);
+      setResolved(res);
+      verifyContent(page.contentHash, page.thumbnailUrl, res).then(setVerification);
     });
   }, [page.contentHash, page.thumbnailUrl]);
 
@@ -54,6 +61,10 @@ export default function ContentPage({ page }: Props) {
   const active = allSteps.filter(s => s !== "skipped" && s !== "pending");
   const passed = active.filter(s => s === "verified").length;
   const total = active.length;
+
+  // Core payload
+  const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
+  const coreSj = resolved?.coreSignedJson;
 
   return (
     <div className={styles.container}>
@@ -94,13 +105,13 @@ export default function ContentPage({ page }: Props) {
           </div>
         ) : verification.overall === "verified" ? (
           <div className={`${styles.trustBadge} ${styles.trustOk}`}>
-            <StatusIcon status="verified" size={18} />
+            <ShieldIcon verified />
             <span className={styles.trustText}>{t("trust.verified")}</span>
             <span className={styles.trustScore}>{passed}/{total}</span>
           </div>
         ) : (
           <div className={`${styles.trustBadge} ${styles.trustWarn}`}>
-            <StatusIcon status="failed" size={18} />
+            <ShieldIcon verified={false} />
             <span className={styles.trustText}>{t("trust.failed")}</span>
             <span className={styles.trustScore}>{passed}/{total}</span>
           </div>
@@ -119,84 +130,199 @@ export default function ContentPage({ page }: Props) {
         </button>
 
         {techOpen && (
-          <div className={styles.details}>
-            {/* Core */}
-            <div className={styles.techSection}>
-              <h3 className={styles.techTitle}>{t("tech.core")}</h3>
-              <TechRow status={verification.collectionVerified} label={t("tech.collection")} detail="core_collection_mint" />
-              <TechRow status={verification.teeSignatureVerified} label={t("tech.teeSig")} detail={record?.teeType} />
-              <TechRow status={verification.c2paChainVerified} label={t("tech.c2pa")} detail={record?.signingAlgorithm} />
-            </div>
+          <div className={styles.techContent}>
+            {/* --- 1. Title Protocol 導入 --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{t("tech.intro.title")}</h3>
+              <p className={styles.techDesc}>{t("tech.intro.desc")}</p>
+              <p className={styles.techDesc}>{t("tech.intro.trustChain")}</p>
+            </section>
 
-            {/* Extensions */}
-            <div className={styles.techSection}>
-              <h3 className={styles.techTitle}>{t("tech.extensions")}</h3>
-              {verification.extensions.map((ext, i) => {
-                const isPhash = ext.extensionId === "image-phash";
-                const isHardware = ext.extensionId.startsWith("hardware-");
-                return (
-                  <TechRow
-                    key={i}
-                    status={isPhash ? verification.phashMatched : isHardware ? verification.hardwareVerified : ext.teeSignatureVerified}
-                    label={
-                      isPhash ? t("tech.phash")
-                      : isHardware ? t("tech.hardware")
-                      : ext.extensionId
-                    }
-                    detail={
-                      isPhash && verification.phashDistance !== undefined
-                        ? t("tech.hammingDist", { distance: verification.phashDistance })
-                        : ext.detail
-                    }
-                  />
-                );
-              })}
-              {/* extensionが0件、またはhardwareが未検出の場合 */}
-              {!verification.extensions.some(e => e.extensionId.startsWith("hardware-")) && (
-                <TechRow
-                  status={verification.hardwareVerified}
-                  label={t("tech.hardware")}
-                  detail={t("tech.hardwareNone")}
-                />
-              )}
-              {!verification.extensions.some(e => e.extensionId === "image-phash") && verification.phashMatched !== "pending" && (
-                <TechRow
-                  status={verification.phashMatched}
-                  label={t("tech.phash")}
-                  detail={verification.phashDistance !== undefined ? t("tech.hammingDist", { distance: verification.phashDistance }) : undefined}
-                />
-              )}
-            </div>
+            {/* --- 2. Core cNFT --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{t("tech.core.title")}</h3>
+              <p className={styles.techDesc}>{t("tech.core.desc")}</p>
 
-            {/* On-chain */}
-            <div className={styles.techSection}>
-              <h3 className={styles.techTitle}>{t("tech.onchain")}</h3>
-              <DataRow label="Content Hash" value={page.contentHash} mono />
-              {verification.assetId && <DataRow label="cNFT Asset ID" value={verification.assetId} mono />}
-              {verification.arweaveUri && <DataRow label="Arweave URI" value={verification.arweaveUri} mono link />}
-              {record && (
+              <h4 className={styles.techSubTitle}>{t("tech.core.verifyTitle")}</h4>
+              <div className={styles.verifyList}>
+                <VerifyItem
+                  status={verification.collectionVerified}
+                  label={t("tech.core.collection")}
+                  detail={verification.collectionVerified === "verified" ? t("tech.core.collectionPass") : t("tech.core.collectionFail")}
+                />
+                <VerifyItem
+                  status={verification.teeSignatureVerified}
+                  label={t("tech.core.teeSig")}
+                  detail={verification.teeSignatureVerified === "verified" ? t("tech.core.teeSigPass") : t("tech.core.teeSigFail")}
+                />
+                <VerifyItem
+                  status={verification.c2paChainVerified}
+                  label={t("tech.core.c2pa")}
+                  detail={
+                    verification.c2paChainVerified === "verified" && corePayload?.nodes
+                      ? t("tech.core.c2paPass", { count: corePayload.nodes.length })
+                      : t("tech.core.c2paFail")
+                  }
+                />
+              </div>
+
+              {/* Off-chain data structure */}
+              {coreSj && (
                 <>
-                  <DataRow label="TEE Type" value={record.teeType} />
-                  <DataRow label="Signing Algorithm" value={record.signingAlgorithm} />
-                  {record.sourceDimensions.width > 0 && (
-                    <DataRow label="Source Dimensions" value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
+                  <h4 className={styles.techSubTitle}>{t("tech.core.offchainTitle")}</h4>
+                  <p className={styles.techDescSmall}>{t("tech.core.offchainDesc")}</p>
+                  <div className={styles.dataBlock}>
+                    <DataField label="protocol" value={coreSj.protocol} />
+                    <DataField label="tee_type" value={coreSj.tee_type} />
+                    <DataField label="tee_pubkey" value={truncate(coreSj.tee_pubkey, 12)} full={coreSj.tee_pubkey} />
+                    {corePayload && (
+                      <>
+                        <DataField label="payload.content_hash" value={truncate(corePayload.content_hash, 12)} full={corePayload.content_hash} />
+                        <DataField label="payload.content_type" value={corePayload.content_type} />
+                        {corePayload.tsa_timestamp != null && (
+                          <DataField label="payload.tsa_timestamp" value={formatTimestamp(corePayload.tsa_timestamp)} />
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Provenance graph */}
+                  {corePayload?.nodes && (
+                    <>
+                      <h4 className={styles.techSubTitle}>{t("tech.core.provenanceTitle")}</h4>
+                      <div className={styles.dataBlock}>
+                        <DataField label={t("tech.core.nodes")} value={t("tech.core.nodesCount", { count: corePayload.nodes.length })} />
+                        <DataField
+                          label={t("tech.core.links")}
+                          value={corePayload.links && corePayload.links.length > 0
+                            ? t("tech.core.linksCount", { count: corePayload.links.length })
+                            : t("tech.core.noLinks")}
+                        />
+                      </div>
+                    </>
                   )}
-                  {record.tsaProvider && (
-                    <DataRow label="TSA" value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
-                  )}
+
+                  {/* Owner info */}
+                  <h4 className={styles.techSubTitle}>{t("tech.core.ownerTitle")}</h4>
+                  <div className={styles.dataBlock}>
+                    <DataField
+                      label={t("tech.core.creator")}
+                      value={corePayload?.creator_wallet ? truncate(corePayload.creator_wallet, 8) : "—"}
+                      full={corePayload?.creator_wallet}
+                    />
+                    <DataField
+                      label={t("tech.core.currentOwner")}
+                      value={
+                        resolved?.ownerWallet
+                          ? truncate(resolved.ownerWallet, 8) +
+                            (corePayload?.creator_wallet === resolved.ownerWallet ? ` ${t("tech.core.sameOwner")}` : "")
+                          : "—"
+                      }
+                      full={resolved?.ownerWallet}
+                    />
+                  </div>
                 </>
               )}
-            </div>
+            </section>
 
-            {/* 仕組み説明 */}
-            <div className={styles.howSection}>
-              <h3 className={styles.techTitle}>{t("how.title")}</h3>
-              <p className={styles.howText}>{t("how.p1")}</p>
-              <p className={styles.howText}>{t("how.p2")}</p>
-              <p className={styles.howText}>{t("how.p3")}</p>
-              {record?.tsaProvider && <p className={styles.howText}>{t("how.tsa")}</p>}
-              <p className={styles.howNote}>{t("how.p4")}</p>
-            </div>
+            {/* --- 3. Extensions --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{t("tech.ext.title")}</h3>
+              <p className={styles.techDesc}>{t("tech.ext.desc")}</p>
+
+              {/* 各 extension を動的にレンダリング */}
+              {verification.extensions.map((ext, i) => (
+                <ExtensionBlock
+                  key={ext.extensionId + i}
+                  ext={ext}
+                  verification={verification}
+                  resolved={resolved}
+                  t={t}
+                />
+              ))}
+
+              {/* hardware extension が1つも検出されなかった場合 */}
+              {!verification.extensions.some(e => e.extensionId.startsWith("hardware-")) && (
+                <div className={styles.extBlock}>
+                  <h5 className={styles.extTitle}>{t("tech.hardware.titleDefault")}</h5>
+                  <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
+                  <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
+                </div>
+              )}
+            </section>
+
+            {/* --- 4. オンチェーン参照 --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{t("tech.refs.title")}</h3>
+              <div className={styles.refsBlock}>
+                <RefRow label={t("tech.refs.contentHash")} sub={t("tech.refs.contentHashDesc")} value={page.contentHash} mono />
+                {verification.assetId && (
+                  <RefRow
+                    label={t("tech.refs.assetId")}
+                    value={verification.assetId}
+                    mono
+                    link={solanaExplorerUrl(verification.assetId)}
+                    linkLabel={t("tech.refs.viewOnSolana")}
+                  />
+                )}
+                {verification.arweaveUri && (
+                  <RefRow
+                    label={t("tech.refs.offchainUri")}
+                    value={verification.arweaveUri}
+                    mono
+                    link={arweaveHttpUrl(verification.arweaveUri)}
+                    linkLabel={t("tech.refs.viewOnStorage")}
+                  />
+                )}
+                {record && (
+                  <>
+                    <RefRow label={t("tech.refs.teeType")} value={record.teeType} />
+                    <RefRow label={t("tech.refs.sigAlgo")} value={record.signingAlgorithm} />
+                    {record.sourceDimensions.width > 0 && (
+                      <RefRow label={t("tech.refs.dimensions")} value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
+                    )}
+                    {record.tsaProvider && (
+                      <RefRow label={t("tech.refs.tsa")} value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* --- 5. なぜ信頼できるのか --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{t("tech.why.title")}</h3>
+
+              <div className={styles.whyItem}>
+                <h4 className={styles.whyItemTitle}>{t("tech.why.trustless")}</h4>
+                <p className={styles.techDesc}>{t("tech.why.trustlessDesc")}</p>
+              </div>
+
+              {record?.tsaProvider && (
+                <div className={styles.whyItem}>
+                  <h4 className={styles.whyItemTitle}>{t("tech.why.tsa")}</h4>
+                  <p className={styles.techDesc}>{t("tech.why.tsaDesc")}</p>
+                </div>
+              )}
+
+              <div className={styles.whyItem}>
+                <h4 className={styles.whyItemTitle}>{t("tech.why.noServer")}</h4>
+                <p className={styles.techDesc}>{t("tech.why.noServerDesc")}</p>
+              </div>
+
+              <div className={styles.whyItem}>
+                <h4 className={styles.whyItemTitle}>{t("tech.why.oss")}</h4>
+                <p className={styles.techDesc}>{t("tech.why.ossDesc")}</p>
+                <div className={styles.ossLinks}>
+                  <a href="https://github.com/yudai-mori-2004/title-protocol" target="_blank" rel="noopener noreferrer" className={styles.ossLink}>
+                    Title Protocol <ExternalIcon />
+                  </a>
+                  <a href="https://github.com/yudai-mori-2004/root-lens" target="_blank" rel="noopener noreferrer" className={styles.ossLink}>
+                    RootLens <ExternalIcon />
+                  </a>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </div>
@@ -215,25 +341,142 @@ export default function ContentPage({ page }: Props) {
   );
 }
 
-// --- Sub-components ---
+// --- Extension Block (動的レンダリング) ---
 
-function TechRow({ status, label, detail }: { status: VerifyStepStatus; label: string; detail?: string }) {
+function ExtensionBlock({
+  ext,
+  verification,
+  resolved,
+  t,
+}: {
+  ext: ExtensionVerification;
+  verification: VerificationResult;
+  resolved: ResolvedContent | null;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const isPhash = ext.extensionId === "image-phash";
+  const isHardware = ext.extensionId.startsWith("hardware-");
+
+  // 対応する signed_json を検索
+  const extSj = resolved?.extensionSignedJsons.find(sj => {
+    const p = sj.payload as ExtensionPayload;
+    return p.extension_id === ext.extensionId;
+  });
+  const extPayload = extSj?.payload as ExtensionPayload | undefined;
+
+  if (isPhash) {
+    return (
+      <div className={styles.extBlock}>
+        <h5 className={styles.extTitle}>{t("tech.phash.title")}</h5>
+        <p className={styles.techDescSmall}>{t("tech.phash.desc")}</p>
+
+        <div className={styles.verifyList}>
+          <VerifyItem
+            status={verification.phashMatched}
+            label={t("tech.phash.match")}
+            detail={
+              verification.phashMatched === "verified" && verification.phashDistance !== undefined
+                ? t("tech.phash.matchPass", { distance: verification.phashDistance, threshold: PHASH_THRESHOLD })
+                : verification.phashMatched === "failed" && verification.phashDistance !== undefined
+                  ? t("tech.phash.matchFail", { distance: verification.phashDistance, threshold: PHASH_THRESHOLD })
+                  : t("tech.phash.matchSkip")
+            }
+          />
+          <VerifyItem
+            status={ext.teeSignatureVerified}
+            label={t("tech.ext.teeSig")}
+            detail={ext.teeSignatureVerified === "verified" ? t("tech.ext.teeSigPass") : t("tech.ext.teeSigFail")}
+          />
+        </div>
+
+        {/* pHash data */}
+        {extPayload && (
+          <div className={styles.dataBlock}>
+            {(extPayload as ExtensionPayload & { phash?: string }).phash && (
+              <DataField label={t("tech.phash.onchain")} value={(extPayload as ExtensionPayload & { phash?: string }).phash!} mono />
+            )}
+            {extPayload.wasm_hash && (
+              <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (isHardware) {
+    return (
+      <div className={styles.extBlock}>
+        <h5 className={styles.extTitle}>{t("tech.hardware.title", { id: ext.extensionId })}</h5>
+        <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
+        <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
+      </div>
+    );
+  }
+
+  // Generic extension
   return (
-    <div className={styles.techRow}>
-      <StatusIcon status={status} size={14} />
-      <span className={styles.techLabel}>{label}</span>
-      {detail && <span className={styles.techDetail}>{detail}</span>}
+    <div className={styles.extBlock}>
+      <h5 className={styles.extTitle}>{ext.extensionId}</h5>
+      <div className={styles.verifyList}>
+        <VerifyItem
+          status={ext.teeSignatureVerified}
+          label={t("tech.ext.teeSig")}
+          detail={ext.teeSignatureVerified === "verified" ? t("tech.ext.teeSigPass") : t("tech.ext.teeSigFail")}
+        />
+      </div>
+      {extPayload && (
+        <div className={styles.dataBlock}>
+          <DataField label="extension_id" value={ext.extensionId} />
+          {extPayload.wasm_hash && (
+            <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function DataRow({ label, value, mono, link }: { label: string; value: string; mono?: boolean; link?: boolean }) {
+// --- Sub-components ---
+
+function VerifyItem({ status, label, detail }: { status: VerifyStepStatus; label: string; detail: string }) {
   return (
-    <div className={styles.detailRow}>
-      <dt className={styles.detailLabel}>{label}</dt>
-      <dd className={`${styles.detailValue} ${mono ? styles.mono : ""}`}>
-        {link ? <a href={value} target="_blank" rel="noopener noreferrer" className={styles.dataLink}>{value}</a> : value}
-      </dd>
+    <div className={styles.verifyItem}>
+      <div className={styles.verifyItemHeader}>
+        <StatusIcon status={status} size={16} />
+        <span className={styles.verifyItemLabel}>{label}</span>
+      </div>
+      <p className={styles.verifyItemDetail}>{detail}</p>
+    </div>
+  );
+}
+
+function DataField({ label, value, full, mono }: { label: string; value: string; full?: string; mono?: boolean }) {
+  return (
+    <div className={styles.dataRow}>
+      <span className={styles.dataLabel}>{label}</span>
+      <span className={`${styles.dataValue} ${mono ? styles.mono : ""}`} title={full || value}>{value}</span>
+    </div>
+  );
+}
+
+function RefRow({ label, sub, value, mono, link, linkLabel }: {
+  label: string; sub?: string; value: string; mono?: boolean; link?: string; linkLabel?: string;
+}) {
+  return (
+    <div className={styles.refRow}>
+      <div className={styles.refLabel}>
+        <span>{label}</span>
+        {sub && <span className={styles.refSub}>{sub}</span>}
+      </div>
+      <div className={styles.refValue}>
+        <span className={`${styles.refValueText} ${mono ? styles.mono : ""}`}>{value}</span>
+        {link && (
+          <a href={link} target="_blank" rel="noopener noreferrer" className={styles.refLink}>
+            {linkLabel} <ExternalIcon />
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -266,6 +509,18 @@ function StatusIcon({ status, size = 20 }: { status: VerifyStepStatus; size?: nu
   );
 }
 
+function ShieldIcon({ verified }: { verified: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" className={verified ? styles.iconVerified : styles.iconFailed}>
+      <path d="M10 1.5l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9v-5l7-3z" fill="currentColor" opacity="0.12" stroke="currentColor" strokeWidth="1.2" />
+      {verified
+        ? <path d="M7 10.5l2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        : <path d="M7.5 7.5l5 5M12.5 7.5l-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      }
+    </svg>
+  );
+}
+
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>
@@ -274,8 +529,32 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+function ExternalIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" style={{ display: "inline", verticalAlign: "middle", marginLeft: 2 }}>
+      <path d="M4 1h7v7M11 1L5 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function LoadingDots() {
   return <span className={styles.loadingDots}><span /><span /><span /></span>;
+}
+
+// --- Utilities ---
+
+function truncate(s: string, len = 8): string {
+  if (s.length <= len * 2 + 3) return s;
+  return `${s.slice(0, len)}...${s.slice(-len)}`;
+}
+
+function arweaveHttpUrl(uri: string): string {
+  if (uri.startsWith("ar://")) return `https://arweave.net/${uri.slice(5)}`;
+  return uri;
+}
+
+function solanaExplorerUrl(address: string): string {
+  return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
 function formatDate(iso: string): string {
@@ -286,4 +565,9 @@ function formatDate(iso: string): string {
 function formatDateShort(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function formatTimestamp(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")} (RFC 3161)`;
 }

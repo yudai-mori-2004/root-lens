@@ -10,26 +10,95 @@
     },
 
     "tech": {
-      "toggle": "技術者向け詳細",
-      "core": "Core cNFT（来歴記録）",
-      "extensions": "Extension cNFT（属性検証）",
-      "onchain": "オンチェーンデータ",
-      "collection": "コレクション検証",
-      "teeSig": "TEE署名検証 (Ed25519)",
-      "c2pa": "C2PA来歴チェーン",
-      "phash": "image-phash（知覚ハッシュ）",
-      "hardware": "ハードウェア署名",
-      "hardwareNone": "未検出（ソフトウェア署名）",
-      "hammingDist": "ハミング距離: {distance}"
-    },
+      "toggle": "検証の詳細を見る",
 
-    "how": {
-      "title": "この検証の仕組み",
-      "p1": "このコンテンツの来歴と真正性は、Title Protocolを通じてSolanaブロックチェーンに記録されています。",
-      "p2": "撮影時に端末のTEE（Trusted Execution Environment）内でC2PA署名が生成され、その署名のハッシュがオンチェーンに記録されます。元のC2PAデータを保持していなくても、オンチェーンの記録とTEE署名を検証することで、トラストレスに真正性を確認できます。",
-      "p3": "知覚ハッシュ（pHash）はTEE内のWASMモジュールで算出され、表示中の画像から再計算した値と比較されます。これにより、表示されている画像がオンチェーンに記録されたコンテンツと同一であることを、元データなしに検証できます。",
-      "p4": "すべての検証データはSolana RPCおよびArweaveから直接取得しており、RootLensサーバーは検証プロセスに一切関与していません。ブラウザの開発者ツールで通信先を確認できます。",
-      "tsa": "タイムスタンプはRFC 3161準拠のTSA（Time Stamping Authority）により記録されており、撮影日時の信頼性が第三者機関によって保証されています。"
+      "intro": {
+        "title": "Title Protocolによる検証",
+        "desc": "Title Protocolは、C2PA署名付きコンテンツの来歴と真正性を、TEE（Trusted Execution Environment: 信頼された実行環境）内で検証し、その結果をSolanaブロックチェーンに記録するオープンプロトコルです。1つのコンテンツに対して、Core cNFT（来歴の記録）と、任意の数のExtension cNFT（属性の検証）が発行されます。",
+        "trustChain": "検証の信頼は以下の連鎖で成立します: ブロックチェーン上のGlobal Config（DAOが管理）が公式コレクションアドレスを定義 → cNFTが公式コレクションに所属していることを確認 → cNFTが指すURIからオフチェーンデータを取得 → TEE署名を検証しデータの改ざんがないことを確認。各ステップはこのブラウザ内で独立に実行されています。"
+      },
+
+      "core": {
+        "title": "Core cNFT — 来歴の記録",
+        "desc": "Core cNFTは、コンテンツに埋め込まれたC2PA署名チェーンの検証結果を、TEE内部で署名しブロックチェーンに記録したものです。「誰が・いつ・何のツールで撮影・編集したか」という来歴全体が、改ざん不可能な形で保存されています。",
+        "verifyTitle": "検証結果",
+        "collection": "コレクション所属",
+        "collectionPass": "Title Protocol公式コレクションに所属を確認",
+        "collectionFail": "公式コレクションへの所属を確認できませんでした",
+        "teeSig": "TEE署名検証 (Ed25519)",
+        "teeSigPass": "TEEが生成した署名が有効 — データが改ざんされていないことを証明",
+        "teeSigFail": "TEE署名の検証に失敗しました",
+        "c2pa": "C2PA来歴チェーン",
+        "c2paPass": "来歴ノードが{count}件記録済み",
+        "c2paFail": "来歴チェーンの記録を確認できませんでした",
+        "offchainTitle": "オフチェーンデータ (signed_json)",
+        "offchainDesc": "TEEが検証結果を署名し、クライアント（SDK）がオフチェーンストレージに永続保存したデータです。保存先はプロトコルとして強制されませんが、Coreについては永続性が保証されるArweaveが推奨されています。TEEはステートレス設計のため自らストレージにアクセスせず、署名済みデータをクライアントに返却します。このコンテンツの保存先は下部の「オンチェーン参照」で確認できます。",
+        "provenanceTitle": "来歴グラフ",
+        "nodes": "来歴ノード",
+        "nodesCount": "{count}件",
+        "links": "来歴リンク",
+        "linksCount": "{count}件",
+        "noLinks": "なし（単一コンテンツ — 他の素材を使用していない）",
+        "ownerTitle": "所有者情報",
+        "creator": "登録者ウォレット",
+        "currentOwner": "現在の所有者",
+        "sameOwner": "（同一 — 譲渡なし）"
+      },
+
+      "ext": {
+        "title": "Extension cNFT — 属性の検証",
+        "desc": "Extensionは、コンテンツの生データからTEE内のWASMモジュールが算出した客観的な属性値です。CoreがC2PA来歴チェーン（コンテンツ間の権利構造）を扱うのに対し、Extensionは個々のコンテンツの性質（知覚ハッシュ、ハードウェア署名等）を扱います。Extensionの数に制限はなく、新たなWASMモジュールの追加により検証項目を自由に拡張できます。",
+        "verifyTitle": "検証結果",
+        "teeSig": "TEE署名",
+        "teeSigPass": "Extension固有のTEE署名が有効",
+        "teeSigFail": "TEE署名の検証に失敗",
+        "dataTitle": "データ"
+      },
+
+      "phash": {
+        "title": "image-phash — 画像の同一性検証",
+        "desc": "知覚ハッシュ（pHash）は画像の見た目を数値化した指紋です。TEE内のWASMモジュールが元画像から算出し、ブロックチェーンに記録します。閲覧者のブラウザは、表示中の画像からTEEと同一のWASMバイナリでpHashを再計算し、オンチェーンの値と比較します。両者のハミング距離（ビット単位の差異）が閾値以下なら、同一画像と判定されます。",
+        "match": "pHash照合",
+        "matchPass": "ハミング距離: {distance} (閾値: {threshold}以下で合格)",
+        "matchFail": "ハミング距離: {distance} (閾値: {threshold}を超過)",
+        "matchSkip": "pHashデータが見つかりませんでした",
+        "onchain": "オンチェーンpHash",
+        "computed": "再計算pHash (ブラウザ算出)"
+      },
+
+      "hardware": {
+        "title": "{id} — ハードウェア撮影証明",
+        "titleDefault": "ハードウェア撮影証明",
+        "desc": "端末のセキュアハードウェア（Google PixelのTitan M2チップやiOSのSecure Enclave等）が撮影行為そのものを暗号学的に証明するExtensionです。C2PA署名チェーン内のハードウェア署名を検証するWASMモジュールにより、物理デバイスで実際に撮影されたことが第三者検証可能な形で記録されます。",
+        "wip": "検証WASMモジュール準備中",
+        "notDetected": "ハードウェア署名は検出されませんでした（ソフトウェア署名のみ）"
+      },
+
+      "refs": {
+        "title": "オンチェーン参照",
+        "contentHash": "Content Hash",
+        "contentHashDesc": "SHA-256(Active Manifest署名)",
+        "assetId": "cNFT Asset ID",
+        "offchainUri": "オフチェーンストレージURI",
+        "teeType": "TEE Type",
+        "sigAlgo": "署名アルゴリズム",
+        "dimensions": "撮影解像度",
+        "tsa": "TSA",
+        "viewOnSolana": "Solana Explorer",
+        "viewOnStorage": "表示"
+      },
+
+      "why": {
+        "title": "なぜこの検証を信頼できるのか",
+        "trustless": "元のC2PAデータなしにトラストレス検証できる理由",
+        "trustlessDesc": "C2PAの検証（署名チェーンの正当性確認やコンテンツ本体とのハッシュ照合）はすでにTEE内で完了しています。TEEはその検証結果を自身の秘密鍵（Ed25519）で署名し、クライアントがオフチェーンストレージに永続保存しました。閲覧者が確認すべきはこのTEE署名の有効性だけであり、元のC2PAバイナリデータを手元に持つ必要はありません。TEE署名が有効であれば、「信頼された実行環境がC2PA検証に合格したことを証明した」と確認できます。",
+        "tsa": "TSAタイムスタンプの意味",
+        "tsaDesc": "RFC 3161準拠のTSA（Time Stamping Authority）は、撮影日時を第三者機関が暗号学的に証明する仕組みです。TSAのタイムスタンプはC2PA署名チェーン内に含まれ、TEEがその正当性を検証した上で記録しています。これにより、RootLensを含む誰もが撮影時刻を偽ることができません。",
+        "noServer": "RootLensサーバーは検証に一切関与していない",
+        "noServerDesc": "この検証で使用するすべてのデータは、Solana RPCノードおよびオフチェーンストレージから直接取得しています。RootLensのサーバーはページの配信と表示用画像の提供を行いますが、検証プロセスには一切関与していません。ブラウザの開発者ツール（ネットワークタブ）で通信先を確認できます。",
+        "oss": "ソースコードはすべて公開されている",
+        "ossDesc": "Title ProtocolおよびRootLensのソースコードは全てGitHub上で公開されています。この公開ページの検証ロジック、プロトコルの仕様書と実装、TEE内で実行されるコード — すべてを自分の目で確認し、独立に検証を再現できます。"
+      }
     }
   },
 
