@@ -90,15 +90,25 @@ export default function ContentPage({ page }: Props) {
       <div className={styles.imageWrapper}>
         <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} />
         {page.contents.length > 1 && (
-          <div className={styles.pageIndicator}>
-            {page.contents.map((_, i) => (
-              <button
-                key={i}
-                className={`${styles.pageDot} ${i === activeIndex ? styles.pageDotActive : ""}`}
-                onClick={() => setActiveIndex(i)}
-              />
-            ))}
-          </div>
+          <>
+            <button
+              className={`${styles.navArrow} ${styles.navArrowLeft}`}
+              onClick={() => setActiveIndex((activeIndex - 1 + page.contents.length) % page.contents.length)}
+              aria-label="Previous"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <button
+              className={`${styles.navArrow} ${styles.navArrowRight}`}
+              onClick={() => setActiveIndex((activeIndex + 1) % page.contents.length)}
+              aria-label="Next"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20"><path d="M8 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <div className={styles.pageCounter}>
+              {activeIndex + 1} / {page.contents.length}
+            </div>
+          </>
         )}
       </div>
 

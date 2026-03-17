@@ -354,6 +354,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 4,
+    padding: 2,
   },
   grid: {
     padding: SPACING,

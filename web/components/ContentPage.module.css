@@ -28,28 +28,46 @@
   max-height: 70vh;
 }
 
-.pageIndicator {
+.navArrow {
   position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
-}
-
-.pageDot {
-  width: 7px;
-  height: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
-  padding: 0;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
   transition: background 0.15s;
 }
 
-.pageDotActive {
-  background: var(--color-accent);
+.navArrow:hover {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.navArrowLeft {
+  left: 8px;
+}
+
+.navArrowRight {
+  right: 8px;
+}
+
+.pageCounter {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
 }
 
 /* --- Capture Info --- */
