@@ -9,6 +9,7 @@ use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::c_char;
 
+
 /// ファイル拡張子からMIMEタイプを推定する
 /// c2pa-rsのBuilder::signに渡すフォーマット識別に使用
 fn mime_from_path(path: &str) -> &'static str {
@@ -205,6 +206,53 @@ impl c2pa::Signer for CallbackSigner {
     /// 仕様書 §4.5.3 RFC 3161タイムスタンプ
     fn time_authority_url(&self) -> Option<String> {
         self.tsa_url.clone()
+    }
+
+    /// TSAリクエストの自前実装
+    ///
+    /// c2pa-rs 0.78.0 のデフォルト `send_timestamp_request` は、内部の HTTP
+    /// リゾルバ (`SyncGenericResolver`) 経由で TSA にリクエストするが、
+    /// Android クロスコンパイル環境ではこのリゾルバが正常に動作しないことが
+    /// 判明した（HTTP 200 が返るにも関わらずタイムスタンプが COSE 署名に
+    /// 埋め込まれない）。
+    ///
+    /// 原因: c2pa-rs 内部の `Signer::send_timestamp_request` デフォルト実装と
+    /// c2pa-crypto の `TimeStampProvider::send_time_stamp_request` の間で
+    /// レスポンスが正しく伝搬されていない可能性がある。
+    ///
+    /// 対策: ureq を直接使用して RFC 3161 リクエストを送信し、生の
+    /// TimeStampResp バイト列を返す。c2pa-rs は返されたバイト列を
+    /// COSE unprotected header の sigTst2 に埋め込む。
+    fn send_timestamp_request(&self, message: &[u8]) -> Option<c2pa::Result<Vec<u8>>> {
+        let url = self.time_authority_url()?;
+        let body = self.timestamp_request_body(message).ok()?;
+
+        match ureq::post(&url)
+            .header("Content-Type", "application/timestamp-query")
+            .send(&body[..])
+        {
+            Ok(resp) => {
+                if resp.status() == 200 {
+                    match resp.into_body().read_to_vec() {
+                        Ok(buf) => Some(Ok(buf)),
+                        Err(e) => Some(Err(c2pa::Error::OtherError(Box::new(e)))),
+                    }
+                } else {
+                    Some(Err(c2pa::Error::OtherError(Box::new(
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("TSA HTTP {}", resp.status()),
+                        ),
+                    ))))
+                }
+            }
+            Err(e) => Some(Err(c2pa::Error::OtherError(Box::new(
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("TSA request failed: {e}"),
+                ),
+            )))),
+        }
     }
 }
 

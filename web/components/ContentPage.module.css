@@ -50,16 +50,10 @@
   margin-top: 8px;
 }
 
-.appBadge {
-  display: inline-flex;
-  align-items: center;
+.dateSource {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-accent-light);
-  padding: 3px 8px;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  color: var(--text-tertiary);
 }
 
 .separator {

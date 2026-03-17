@@ -3,7 +3,6 @@
 :root {
   /* Brand */
   --color-accent: #1E3A5F;
-  --color-accent-light: #E8EEF4;
 
   /* Backgrounds */
   --bg-primary: #ffffff;
@@ -29,7 +28,6 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --color-accent: #7B9CC0;
-    --color-accent-light: #1a2a3f;
 
     --bg-primary: #1a1a1a;
     --bg-secondary: #111111;

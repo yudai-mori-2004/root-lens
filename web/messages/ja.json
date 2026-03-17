@@ -2,6 +2,8 @@
   "content": {
     "shotOn": "{device} で撮影",
     "shotOnDefault": "RootLens で撮影",
+    "dateTsa": "TSA認証時刻",
+    "dateRegistration": "登録時刻",
 
     "trust": {
       "verifying": "検証中...",

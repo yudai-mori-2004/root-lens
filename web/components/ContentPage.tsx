@@ -44,7 +44,11 @@ export default function ContentPage({ page }: Props) {
     });
   }, [page.contentHash, page.thumbnailUrl]);
 
-  const capturedDate = record ? formatDate(record.capturedAt) : null;
+  // 日付ソース: TSA認証時刻 > captured_at属性 > 登録時刻
+  const hasTsa = corePayload?.tsa_timestamp != null;
+  const capturedDate = hasTsa
+    ? formatTimestamp(corePayload!.tsa_timestamp!)
+    : record ? formatDate(record.capturedAt) : null;
 
   // スコア — core + 全extensionのTEE署名を含む
   const coreSteps = [
@@ -83,9 +87,9 @@ export default function ContentPage({ page }: Props) {
                 : t("shotOnDefault")}
             </h1>
             <div className={styles.meta}>
-              <span className={styles.appBadge}>RootLens</span>
-              <span className={styles.separator} />
               <time className={styles.timestamp} dateTime={record.capturedAt}>{capturedDate}</time>
+              <span className={styles.separator} />
+              <span className={styles.dateSource}>{hasTsa ? t("dateTsa") : t("dateRegistration")}</span>
             </div>
           </>
         ) : (
