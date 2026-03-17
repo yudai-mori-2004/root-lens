@@ -93,81 +93,88 @@
   50% { opacity: 0.7; }
 }
 
-/* --- Verification --- */
+/* --- 一般向け: Trust Badge --- */
 
 .verificationSection {
-  padding: 16px 20px;
+  padding: 0 20px 16px;
 }
 
-.verifyCard {
-  border-radius: 12px;
-  padding: 16px;
+.trustBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
   border: 1px solid var(--border-light);
   background: var(--bg-primary);
 }
 
-.verifyCardOk {
+.trustOk {
   border-color: var(--verify-border);
   background: var(--verify-bg);
 }
 
-.verifyCardWarn {
+.trustWarn {
   border-color: var(--warn-border);
   background: var(--warn-bg);
 }
 
-.verifyHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.verifyTitle {
+.trustText {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  flex: 1;
 }
 
-.verifyLoading {
+.trustScore {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  font-variant: tabular-nums;
+}
+
+/* --- 技術者向け: Verification Details --- */
+
+.techSection {
+  margin-bottom: 16px;
+}
+
+.techTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+
+.techRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 4px 0;
   font-size: 13px;
-  color: var(--text-secondary);
 }
 
-.verifyItems {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.verifyItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.verifyItemLabel {
+.techLabel {
   color: var(--text-primary);
   font-weight: 500;
 }
 
-.verifyItemDetail {
+.techDetail {
   color: var(--text-tertiary);
   font-size: 12px;
   margin-left: auto;
 }
 
-.tsaNote {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-light);
-  font-size: 12px;
-  color: var(--text-tertiary);
+.dataLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.dataLink:hover {
+  text-decoration: underline;
 }
 
 /* --- Status Icons --- */
@@ -179,6 +186,11 @@
 
 .iconFailed {
   color: var(--color-failed);
+  flex-shrink: 0;
+}
+
+.iconSkipped {
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 

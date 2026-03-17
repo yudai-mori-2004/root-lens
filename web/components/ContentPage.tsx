@@ -4,8 +4,9 @@
  * 仕様書 §7.2 コンテンツページの表示内容
  * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
  *
- * content_hash + サムネイル以外、RootLens サーバーからデータを取得しない。
- * 検証データは Title Protocol (Solana / Arweave) からクライアントサイドで取得する。
+ * 2層表示:
+ *   一般向け: 写真 + 「本物です」or「確認できません」+ スコア
+ *   技術者向け: 全検証ステップ + オンチェーンデータ + リンク
  */
 
 import { useEffect, useState } from "react";
@@ -18,20 +19,12 @@ import type {
 import { fetchContentRecord, verifyContent } from "@/lib/data";
 import styles from "./ContentPage.module.css";
 
-interface UserProfile {
-  displayName: string;
-  address: string;
-  bio: string;
-  deviceName: string;
-}
-
 interface Props {
   page: PageMeta;
 }
 
 export default function ContentPage({ page }: Props) {
   const [record, setRecord] = useState<ContentRecord | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [verification, setVerification] = useState<VerificationResult>({
     collectionVerified: "pending",
     teeSignatureVerified: "pending",
@@ -41,10 +34,9 @@ export default function ContentPage({ page }: Props) {
     extensions: [],
     overall: "pending",
   });
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [techOpen, setTechOpen] = useState(false);
 
   useEffect(() => {
-    // content_hash → DAS API → cNFT → Arweave → 検証 (§7.4)
     fetchContentRecord(page.contentHash).then(({ record: r, resolved }) => {
       setRecord(r);
       verifyContent(page.contentHash, page.thumbnailUrl, resolved).then(
@@ -53,11 +45,19 @@ export default function ContentPage({ page }: Props) {
     });
   }, [page.contentHash, page.thumbnailUrl]);
 
-  // プロフィール取得（page に userId が紐付いている場合）
-  // 現時点では pages テーブルに user_id が入ったらここで取得
-  // TODO: page.userId が渡される仕組みを追加
-
   const capturedDate = record ? formatDate(record.capturedAt) : null;
+
+  // 検証スコア計算（skipped除外）
+  const allSteps = [
+    verification.collectionVerified,
+    verification.teeSignatureVerified,
+    verification.c2paChainVerified,
+    verification.phashMatched,
+    verification.hardwareVerified,
+  ];
+  const activeSteps = allSteps.filter(s => s !== "skipped" && s !== "pending");
+  const passedSteps = activeSteps.filter(s => s === "verified").length;
+  const totalSteps = activeSteps.length;
 
   return (
     <div className={styles.container}>
@@ -70,12 +70,12 @@ export default function ContentPage({ page }: Props) {
         />
       </div>
 
-      {/* Capture Info */}
+      {/* ===== 一般向け: シンプルな結果 ===== */}
       <div className={styles.infoSection}>
         {record ? (
           <>
             <h1 className={styles.headline}>
-              Shot on {record.deviceName || 'RootLens'}
+              Shot on {record.deviceName || "RootLens"}
             </h1>
             <div className={styles.meta}>
               <span className={styles.appBadge}>RootLens</span>
@@ -88,39 +88,136 @@ export default function ContentPage({ page }: Props) {
         ) : (
           <div className={styles.infoSkeleton}>
             <div className={styles.skeletonLine} style={{ width: "60%" }} />
-            <div
-              className={styles.skeletonLine}
-              style={{ width: "40%", height: 14 }}
-            />
+            <div className={styles.skeletonLine} style={{ width: "40%", height: 14 }} />
           </div>
         )}
       </div>
 
-      {/* Verification Summary */}
+      {/* 一般向け検証バッジ — 1行で完結 */}
       <div className={styles.verificationSection}>
-        <VerificationSummary
-          record={record}
-          verification={verification}
-        />
+        {verification.overall === "pending" ? (
+          <div className={styles.trustBadge}>
+            <LoadingDots />
+            <span className={styles.trustText}>検証中...</span>
+          </div>
+        ) : verification.overall === "verified" ? (
+          <div className={`${styles.trustBadge} ${styles.trustOk}`}>
+            <StatusIcon status="verified" size={18} />
+            <span className={styles.trustText}>
+              本物のコンテンツです
+            </span>
+            <span className={styles.trustScore}>{passedSteps}/{totalSteps}</span>
+          </div>
+        ) : (
+          <div className={`${styles.trustBadge} ${styles.trustWarn}`}>
+            <StatusIcon status="failed" size={18} />
+            <span className={styles.trustText}>
+              確認できない項目があります
+            </span>
+            <span className={styles.trustScore}>{passedSteps}/{totalSteps}</span>
+          </div>
+        )}
       </div>
 
-      {/* Technical Details (collapsible) */}
+      {/* ===== 技術者向け: 全検証詳細 (折りたたみ) ===== */}
       <div className={styles.detailsSection}>
         <button
           className={styles.detailsToggle}
-          onClick={() => setDetailsOpen(!detailsOpen)}
-          aria-expanded={detailsOpen}
+          onClick={() => setTechOpen(!techOpen)}
+          aria-expanded={techOpen}
         >
-          <span>技術的な詳細</span>
-          <ChevronIcon open={detailsOpen} />
+          <span>Verification Details</span>
+          <ChevronIcon open={techOpen} />
         </button>
 
-        {detailsOpen && (
-          <TechnicalDetails
-            record={record}
-            verification={verification}
-            contentHash={page.contentHash}
-          />
+        {techOpen && (
+          <div className={styles.details}>
+            {/* 検証ステップ */}
+            <div className={styles.techSection}>
+              <h3 className={styles.techTitle}>Core cNFT</h3>
+              <TechRow
+                status={verification.collectionVerified}
+                label="Collection Membership"
+                detail="core_collection_mint"
+              />
+              <TechRow
+                status={verification.teeSignatureVerified}
+                label="TEE Signature (Ed25519)"
+                detail={record?.teeType}
+              />
+              <TechRow
+                status={verification.c2paChainVerified}
+                label="C2PA Provenance Chain"
+                detail={record?.signingAlgorithm}
+              />
+            </div>
+
+            <div className={styles.techSection}>
+              <h3 className={styles.techTitle}>Extensions</h3>
+              <TechRow
+                status={verification.phashMatched}
+                label="image-phash"
+                detail={
+                  verification.phashDistance !== undefined
+                    ? `Hamming distance: ${verification.phashDistance}`
+                    : undefined
+                }
+              />
+              <TechRow
+                status={verification.hardwareVerified}
+                label="Hardware Signing"
+                detail={
+                  verification.hardwareVerified === "skipped"
+                    ? "Not present (software-signed)"
+                    : verification.extensions.find(e => e.extensionId.startsWith("hardware-"))?.extensionId
+                }
+              />
+              {verification.extensions
+                .filter(e => !e.extensionId.startsWith("hardware-") && e.extensionId !== "image-phash")
+                .map((ext, i) => (
+                  <TechRow
+                    key={i}
+                    status={ext.teeSignatureVerified}
+                    label={ext.extensionId}
+                    detail={ext.detail}
+                  />
+                ))
+              }
+            </div>
+
+            {/* オンチェーンデータ */}
+            <div className={styles.techSection}>
+              <h3 className={styles.techTitle}>On-chain Data</h3>
+              <DataRow label="Content Hash" value={page.contentHash} mono />
+              {verification.assetId && (
+                <DataRow label="cNFT Asset ID" value={verification.assetId} mono />
+              )}
+              {verification.arweaveUri && (
+                <DataRow label="Arweave URI" value={verification.arweaveUri} mono link />
+              )}
+              {record && (
+                <>
+                  <DataRow label="TEE Type" value={record.teeType} />
+                  <DataRow label="Signing Algorithm" value={record.signingAlgorithm} />
+                  {record.sourceDimensions.width > 0 && (
+                    <DataRow
+                      label="Source Dimensions"
+                      value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`}
+                    />
+                  )}
+                  {record.tsaProvider && (
+                    <DataRow label="TSA" value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
+                  )}
+                </>
+              )}
+            </div>
+
+            <p className={styles.detailsNote}>
+              All verification data is fetched directly from Solana RPC and Arweave.
+              No RootLens server is involved in the verification process.
+              You can confirm this in your browser&apos;s network inspector.
+            </p>
+          </div>
         )}
       </div>
 
@@ -128,9 +225,7 @@ export default function ContentPage({ page }: Props) {
       <footer className={styles.footer}>
         <div className={styles.footerBrand}>
           <span className={styles.footerLogo}>RootLens</span>
-          <span className={styles.footerTagline}>
-            Prove it&apos;s real.
-          </span>
+          <span className={styles.footerTagline}>Prove it&apos;s real.</span>
         </div>
         <a
           href="https://rootlens.io"
@@ -145,93 +240,9 @@ export default function ContentPage({ page }: Props) {
   );
 }
 
-// --- Sub-components ---
+// --- 技術者向けコンポーネント ---
 
-function VerificationSummary({
-  record,
-  verification,
-}: {
-  record: ContentRecord | null;
-  verification: VerificationResult;
-}) {
-  if (verification.overall === "pending") {
-    return (
-      <div className={styles.verifyCard}>
-        <div className={styles.verifyLoading}>
-          <LoadingDots />
-          <span>本物証明を照合しています</span>
-        </div>
-      </div>
-    );
-  }
-
-  const allVerified = verification.overall === "verified";
-
-  // §3.1.2: 技術用語をユーザー向け表現に
-  return (
-    <div
-      className={`${styles.verifyCard} ${allVerified ? styles.verifyCardOk : styles.verifyCardWarn}`}
-    >
-      <div className={styles.verifyHeader}>
-        <StatusIcon status={verification.overall} />
-        <span className={styles.verifyTitle}>
-          {allVerified
-            ? "本物証明が確認されました"
-            : record
-              ? "証明の照合に問題があります"
-              : "証明の記録が見つかりません"}
-        </span>
-      </div>
-
-      <div className={styles.verifyItems}>
-        <VerifyItem
-          status={verification.c2paChainVerified}
-          label="撮影証明"
-          detail={record ? record.signingAlgorithm : undefined}
-        />
-        <VerifyItem
-          status={verification.collectionVerified}
-          label="記録の正当性"
-        />
-        <VerifyItem
-          status={verification.teeSignatureVerified}
-          label="デバイス署名"
-          detail={record?.teeType}
-        />
-        <VerifyItem
-          status={verification.phashMatched}
-          label="コンテンツ同一性"
-          detail={
-            verification.phashDistance !== undefined
-              ? `距離: ${verification.phashDistance}`
-              : undefined
-          }
-        />
-        <VerifyItem
-          status={verification.hardwareVerified}
-          label="ハードウェア証明"
-          detail={
-            verification.hardwareVerified === "verified"
-              ? verification.extensions.find(e => e.extensionId.startsWith("hardware-"))?.detail
-              : verification.hardwareVerified === "skipped"
-                ? "ソフトウェア署名"
-                : undefined
-          }
-        />
-      </div>
-
-      {allVerified && record?.tsaProvider && (
-        <div className={styles.tsaNote}>
-          {record.tsaTimestamp
-            ? `${formatDateShort(record.tsaTimestamp)} に記録`
-            : "タイムスタンプ記録済み"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VerifyItem({
+function TechRow({
   status,
   label,
   detail,
@@ -241,83 +252,36 @@ function VerifyItem({
   detail?: string;
 }) {
   return (
-    <div className={styles.verifyItem}>
-      <StatusIcon status={status} size={16} />
-      <span className={styles.verifyItemLabel}>{label}</span>
-      {detail && <span className={styles.verifyItemDetail}>{detail}</span>}
+    <div className={styles.techRow}>
+      <StatusIcon status={status} size={14} />
+      <span className={styles.techLabel}>{label}</span>
+      {detail && <span className={styles.techDetail}>{detail}</span>}
     </div>
   );
 }
 
-function TechnicalDetails({
-  record,
-  verification,
-  contentHash,
-}: {
-  record: ContentRecord | null;
-  verification: VerificationResult;
-  contentHash: string;
-}) {
-  return (
-    <div className={styles.details}>
-      <DetailRow label="Content Hash" value={contentHash} mono />
-      {verification.assetId && (
-        <DetailRow label="cNFT Asset ID" value={verification.assetId} mono />
-      )}
-      {verification.arweaveUri && (
-        <DetailRow label="Arweave URI" value={verification.arweaveUri} mono />
-      )}
-      {record && (
-        <>
-          <DetailRow label="署名アルゴリズム" value={record.signingAlgorithm} />
-          <DetailRow label="TEE" value={record.teeType} />
-          <DetailRow
-            label="Assurance Level"
-            value={`Level ${record.assuranceLevel}`}
-          />
-          {record.sourceDimensions.width > 0 && (
-            <DetailRow
-              label="元の解像度"
-              value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`}
-            />
-          )}
-          {record.editOperations.length > 0 && (
-            <DetailRow
-              label="編集操作"
-              value={record.editOperations.map((op) => op.type).join(", ")}
-            />
-          )}
-          {record.tsaProvider && (
-            <DetailRow
-              label="タイムスタンプ"
-              value={`${record.tsaProvider} TSA`}
-            />
-          )}
-        </>
-      )}
-
-      <p className={styles.detailsNote}>
-        検証データは Solana RPC および Arweave から直接取得しています。
-        ブラウザの開発者ツールで通信先を確認できます。
-      </p>
-    </div>
-  );
-}
-
-function DetailRow({
+function DataRow({
   label,
   value,
   mono,
+  link,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  link?: boolean;
 }) {
   return (
     <div className={styles.detailRow}>
       <dt className={styles.detailLabel}>{label}</dt>
       <dd className={`${styles.detailValue} ${mono ? styles.mono : ""}`}>
-        {value}
+        {link ? (
+          <a href={value} target="_blank" rel="noopener noreferrer" className={styles.dataLink}>
+            {value}
+          </a>
+        ) : (
+          value
+        )}
       </dd>
     </div>
   );
@@ -325,100 +289,44 @@ function DetailRow({
 
 // --- Icons ---
 
-function StatusIcon({
-  status,
-  size = 20,
-}: {
-  status: VerifyStepStatus;
-  size?: number;
-}) {
+function StatusIcon({ status, size = 20 }: { status: VerifyStepStatus; size?: number }) {
   if (status === "pending") {
     return (
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 20 20"
-        className={styles.iconPending}
-      >
-        <circle
-          cx="10"
-          cy="10"
-          r="8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeDasharray="16 34"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 10 10"
-            to="360 10 10"
-            dur="1s"
-            repeatCount="indefinite"
-          />
+      <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconPending}>
+        <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="16 34">
+          <animateTransform attributeName="transform" type="rotate" from="0 10 10" to="360 10 10" dur="1s" repeatCount="indefinite" />
         </circle>
       </svg>
     );
   }
-
   if (status === "verified") {
     return (
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 20 20"
-        className={styles.iconVerified}
-      >
+      <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconVerified}>
         <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.12" />
-        <path
-          d="M6 10.5l2.5 2.5 5.5-5.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d="M6 10.5l2.5 2.5 5.5-5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
-
-  // failed / skipped
+  if (status === "skipped") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconSkipped}>
+        <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.08" />
+        <path d="M7 10h6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 20 20"
-      className={styles.iconFailed}
-    >
+    <svg width={size} height={size} viewBox="0 0 20 20" className={styles.iconFailed}>
       <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.12" />
-      <path
-        d="M7 7l6 6M13 7l-6 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}
-    >
-      <path
-        d="M4 6l4 4 4-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg width="16" height="16" viewBox="0 0 16 16" className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>
+      <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -426,9 +334,7 @@ function ChevronIcon({ open }: { open: boolean }) {
 function LoadingDots() {
   return (
     <span className={styles.loadingDots}>
-      <span />
-      <span />
-      <span />
+      <span /><span /><span />
     </span>
   );
 }
@@ -437,19 +343,10 @@ function LoadingDots() {
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = d.getHours().toString().padStart(2, "0");
-  const minutes = d.getMinutes().toString().padStart(2, "0");
-  return `${year}/${month}/${day} ${hours}:${minutes}`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function formatDateShort(iso: string): string {
   const d = new Date(iso);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = d.getHours().toString().padStart(2, "0");
-  const minutes = d.getMinutes().toString().padStart(2, "0");
-  return `${month}/${day} ${hours}:${minutes}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
