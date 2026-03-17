@@ -110,7 +110,7 @@ function FloatingHeader() {
 interface PublishedItem {
   shortId: string;
   thumbnailUrl: string;
-  contentHash: string;
+  contentCount: number;
   createdAt: string;
 }
 
@@ -261,6 +261,11 @@ export default function PublishedGalleryScreen() {
             ) : (
               <View style={[styles.thumbnail, styles.mockThumb]} />
             )}
+            {item.contentCount > 1 && (
+              <View style={styles.stackBadge}>
+                <Ionicons name="copy-outline" size={14} color={colors.white} />
+              </View>
+            )}
           </TouchableOpacity>
         )}
       />
@@ -344,6 +349,11 @@ const styles = StyleSheet.create({
     color: colors.textHint,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 11,
+  },
+  stackBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
   },
   grid: {
     padding: SPACING,

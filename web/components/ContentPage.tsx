@@ -23,26 +23,40 @@ interface Props {
 export default function ContentPage({ page }: Props) {
   const t = useTranslations("content");
   const tFooter = useTranslations("footer");
-  const [record, setRecord] = useState<ContentRecord | null>(null);
-  const [resolved, setResolved] = useState<ResolvedContent | null>(null);
-  const [verification, setVerification] = useState<VerificationResult>({
-    collectionVerified: "pending",
-    teeSignatureVerified: "pending",
-    c2paChainVerified: "pending",
-    phashMatched: "pending",
-    hardwareVerified: "skipped",
-    extensions: [],
-    overall: "pending",
-  });
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [records, setRecords] = useState<(ContentRecord | null)[]>([]);
+  const [resolvedList, setResolvedList] = useState<(ResolvedContent | null)[]>([]);
+  const [verifications, setVerifications] = useState<VerificationResult[]>([]);
   const [techOpen, setTechOpen] = useState(false);
 
   useEffect(() => {
-    fetchContentRecord(page.contentHash).then(({ record: r, resolved: res }) => {
-      setRecord(r);
-      setResolved(res);
-      verifyContent(page.contentHash, page.thumbnailUrl, res).then(setVerification);
+    // 全コンテンツを並列取得・検証
+    Promise.all(
+      page.contents.map(async (c) => {
+        const { record: r, resolved: res } = await fetchContentRecord(c.contentHash);
+        const v = await verifyContent(c.contentHash, c.thumbnailUrl, res);
+        return { record: r, resolved: res, verification: v };
+      })
+    ).then((results) => {
+      setRecords(results.map((r) => r.record));
+      setResolvedList(results.map((r) => r.resolved));
+      setVerifications(results.map((r) => r.verification));
     });
-  }, [page.contentHash, page.thumbnailUrl]);
+  }, [page.contents]);
+
+  // 現在表示中のコンテンツ
+  const currentContent = page.contents[activeIndex];
+  const record = records[activeIndex] ?? null;
+  const resolved = resolvedList[activeIndex] ?? null;
+  const verification = verifications[activeIndex] ?? {
+    collectionVerified: "pending" as const,
+    teeSignatureVerified: "pending" as const,
+    c2paChainVerified: "pending" as const,
+    phashMatched: "pending" as const,
+    hardwareVerified: "skipped" as const,
+    extensions: [],
+    overall: "pending" as const,
+  };
 
   // Core payload
   const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
@@ -74,7 +88,18 @@ export default function ContentPage({ page }: Props) {
     <div className={styles.container}>
       {/* Hero */}
       <div className={styles.imageWrapper}>
-        <img src={page.thumbnailUrl} alt="" className={styles.heroImage} />
+        <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} />
+        {page.contents.length > 1 && (
+          <div className={styles.pageIndicator}>
+            {page.contents.map((_, i) => (
+              <button
+                key={i}
+                className={`${styles.pageDot} ${i === activeIndex ? styles.pageDotActive : ""}`}
+                onClick={() => setActiveIndex(i)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ===== 一般向け ===== */}
@@ -261,7 +286,7 @@ export default function ContentPage({ page }: Props) {
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.refs.title")}</h3>
               <div className={styles.refsBlock}>
-                <RefRow label={t("tech.refs.contentHash")} sub={t("tech.refs.contentHashDesc")} value={page.contentHash} mono />
+                <RefRow label={t("tech.refs.contentHash")} sub={t("tech.refs.contentHashDesc")} value={currentContent.contentHash} mono />
                 {verification.assetId && (
                   <RefRow
                     label={t("tech.refs.assetId")}

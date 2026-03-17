@@ -30,12 +30,21 @@ export interface PageRecord {
   createdAt: string;
 }
 
+export interface ContentInput {
+  contentHash: string;
+  assetId: string;
+  thumbnailUrl: string;
+  ogpImageUrl: string;
+}
+
 export interface CreatePageInput {
   contentHash: string;
   assetId: string;
   thumbnailUrl: string;
   ogpImageUrl: string;
   address?: string;
+  /** 追加コンテンツ（2枚目以降）。省略時は単一コンテンツ */
+  additionalContents?: ContentInput[];
 }
 
 // ---------------------------------------------------------------------------
@@ -81,14 +90,27 @@ export async function createPage(input: CreatePageInput): Promise<PageRecord> {
 
   if (pageError) throw new Error(`pages insert failed: ${pageError.message}`);
 
-  // contents テーブルにコンテンツレコード作成
-  const { error: contentError } = await supabase.from("contents").insert({
-    page_id: page.id,
-    content_hash: input.contentHash,
-    title_protocol_asset_id: input.assetId,
-    thumbnail_url: input.thumbnailUrl,
-    ogp_image_url: input.ogpImageUrl,
-  });
+  // contents テーブルにコンテンツレコード作成（複数対応）
+  const contentRows = [
+    {
+      page_id: page.id,
+      content_hash: input.contentHash,
+      title_protocol_asset_id: input.assetId,
+      thumbnail_url: input.thumbnailUrl,
+      ogp_image_url: input.ogpImageUrl,
+    },
+    ...(input.additionalContents ?? []).map((c) => ({
+      page_id: page.id,
+      content_hash: c.contentHash,
+      title_protocol_asset_id: c.assetId,
+      thumbnail_url: c.thumbnailUrl,
+      ogp_image_url: c.ogpImageUrl,
+    })),
+  ];
+
+  const { error: contentError } = await supabase
+    .from("contents")
+    .insert(contentRows);
 
   if (contentError)
     throw new Error(`contents insert failed: ${contentError.message}`);

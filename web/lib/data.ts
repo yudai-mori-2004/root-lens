@@ -40,18 +40,21 @@ export async function resolvePageMeta(
 
   if (error || !data) return null;
 
-  const content = (data.contents as unknown as Array<{
+  const rawContents = (data.contents as unknown as Array<{
     content_hash: string;
     thumbnail_url: string;
     ogp_image_url: string;
-  }>)?.[0];
-  if (!content) return null;
+  }>) ?? [];
+
+  if (rawContents.length === 0) return null;
 
   return {
     shortId,
-    contentHash: content.content_hash,
-    thumbnailUrl: content.thumbnail_url || "",
-    ogpImageUrl: content.ogp_image_url || "",
+    contents: rawContents.map((c) => ({
+      contentHash: c.content_hash,
+      thumbnailUrl: c.thumbnail_url || "",
+      ogpImageUrl: c.ogp_image_url || "",
+    })),
   };
 }
 

@@ -26,7 +26,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: "Shot on RootLens",
       description: "Verified authentic content with tamper-proof provenance",
-      images: [{ url: page.ogpImageUrl, width: 1200, height: 630 }],
+      // OGPは仕様上1画像のため、全コンテンツのOGP画像を列挙
+      images: page.contents.map((c) => ({ url: c.ogpImageUrl, width: 1200, height: 630 })),
       type: "article",
       siteName: "RootLens",
     },
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: "Shot on RootLens",
       description: "Verified authentic content with tamper-proof provenance",
-      images: [page.ogpImageUrl],
+      images: page.contents.map((c) => c.ogpImageUrl),
     },
   };
 }

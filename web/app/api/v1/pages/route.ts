@@ -41,11 +41,14 @@ export async function GET(request: NextRequest) {
   }
 
   const items = (data ?? []).map((p: any) => {
-    const c = p.contents?.[0];
+    const allContents = (p.contents ?? []).map((c: any) => ({
+      contentHash: c.content_hash || "",
+      thumbnailUrl: c.thumbnail_url || "",
+    }));
     return {
       shortId: p.short_id,
-      thumbnailUrl: c?.thumbnail_url || "",
-      contentHash: c?.content_hash || "",
+      thumbnailUrl: allContents[0]?.thumbnailUrl || "",
+      contentCount: allContents.length,
       createdAt: p.created_at,
     };
   });

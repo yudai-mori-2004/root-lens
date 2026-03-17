@@ -107,6 +107,7 @@ const ja: TranslationDict = {
   'publishing.step.signing': '本物証明の記録',
   'publishing.step.uploading': 'コンテンツのアップロード',
   'publishing.step.registering': '公開ページの作成',
+  'publishing.progress': '{current}/{total} 処理中...',
   'publishing.errorTitle': '公開に失敗しました',
   'publishing.retry': 'リトライ',
   'publishing.back': '戻る',
@@ -120,6 +121,13 @@ const ja: TranslationDict = {
   'preview.title': 'プレビュー',
   'preview.share': 'SNSでシェア',
   'preview.copyLink': 'リンクをコピー',
+
+  // ── 3点メニュー ──
+  'menu.delete': 'コンテンツを削除',
+  'menu.deleteConfirm': 'この公開ページを削除しますか？',
+  'menu.deleteConfirmMessage': '削除すると公開リンクが無効になります。ブロックチェーン上の記録は残ります。',
+  'menu.cancel': 'キャンセル',
+  'menu.deleted': '削除しました',
 
   // ── 設定 ──
   'settings.title': '設定',
@@ -161,19 +169,6 @@ const ja: TranslationDict = {
   'settings.profileSave': '保存する',
   'settings.profileSaved': '保存しました',
 
-  // ── App (スプラッシュ) ──
-  'app.checking': '確認中...',
-  'app.provisioning': 'デバイス証明書を取得中...',
-  'app.provisionError': '証明書の取得に失敗しました',
-  'app.retry': '再試行',
-
-  // ── 3点メニュー ──
-  'menu.delete': 'コンテンツを削除',
-  'menu.deleteConfirm': 'この公開ページを削除しますか？',
-  'menu.deleteConfirmMessage': '削除すると公開リンクが無効になります。ブロックチェーン上の記録は残ります。',
-  'menu.cancel': 'キャンセル',
-  'menu.deleted': '削除しました',
-
   // ── 設定: 言語 ──
   'settings.language': '言語',
   'settings.languageJa': '日本語',
@@ -189,6 +184,12 @@ const ja: TranslationDict = {
 
   // ── プロフィール ──
   'profile.posts': '公開',
+
+  // ── App (スプラッシュ) ──
+  'app.checking': '確認中...',
+  'app.provisioning': 'デバイス証明書を取得中...',
+  'app.provisionError': '証明書の取得に失敗しました',
+  'app.retry': '再試行',
 
   // ── 共通 ──
   'common.error': 'エラー',
@@ -269,6 +270,7 @@ const en: TranslationDict = {
   'publishing.step.signing': 'Recording authenticity proof',
   'publishing.step.uploading': 'Uploading content',
   'publishing.step.registering': 'Creating public page',
+  'publishing.progress': '{current}/{total} processing...',
   'publishing.errorTitle': 'Publishing failed',
   'publishing.retry': 'Retry',
   'publishing.back': 'Back',
@@ -282,6 +284,13 @@ const en: TranslationDict = {
   'preview.title': 'Preview',
   'preview.share': 'Share on social',
   'preview.copyLink': 'Copy link',
+
+  // ── 3-dot menu ──
+  'menu.delete': 'Delete content',
+  'menu.deleteConfirm': 'Delete this page?',
+  'menu.deleteConfirmMessage': 'The public link will become invalid. The blockchain record will remain.',
+  'menu.cancel': 'Cancel',
+  'menu.deleted': 'Deleted',
 
   // ── Settings ──
   'settings.title': 'Settings',
@@ -323,19 +332,6 @@ const en: TranslationDict = {
   'settings.profileSave': 'Save',
   'settings.profileSaved': 'Saved',
 
-  // ── App (splash) ──
-  'app.checking': 'Checking...',
-  'app.provisioning': 'Obtaining device certificate...',
-  'app.provisionError': 'Failed to obtain certificate',
-  'app.retry': 'Retry',
-
-  // ── 3-dot menu ──
-  'menu.delete': 'Delete content',
-  'menu.deleteConfirm': 'Delete this page?',
-  'menu.deleteConfirmMessage': 'The public link will become invalid. The blockchain record will remain.',
-  'menu.cancel': 'Cancel',
-  'menu.deleted': 'Deleted',
-
   // ── Settings: language ──
   'settings.language': 'Language',
   'settings.languageJa': '日本語',
@@ -351,6 +347,12 @@ const en: TranslationDict = {
 
   // ── Profile ──
   'profile.posts': 'Published',
+
+  // ── App (splash) ──
+  'app.checking': 'Checking...',
+  'app.provisioning': 'Obtaining device certificate...',
+  'app.provisionError': 'Failed to obtain certificate',
+  'app.retry': 'Retry',
 
   // ── Common ──
   'common.error': 'Error',

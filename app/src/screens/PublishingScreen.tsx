@@ -55,6 +55,89 @@ export default function PublishingScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const publishingRef = useRef(false);
 
+  // 1件分のTP登録 + R2アップロードを実行
+  const processOneContent = async (uri: string) => {
+    const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+
+    // バイナリ読み取り（Title Protocol SDK用）
+    const fileBase64 = await FileSystem.readAsStringAsync(
+      fileUri,
+      { encoding: FileSystem.EncodingType.Base64 },
+    );
+    const binaryStr = atob(fileBase64);
+    const content = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      content[i] = binaryStr.charCodeAt(i);
+    }
+
+    const fileId = Crypto.randomUUID();
+
+    // パイプラインA (TP登録) と パイプラインB (R2アップロード) を並列実行
+    const [tpResult, r2Urls] = await Promise.all([
+      registerOnTitleProtocol(content),
+
+      (async () => {
+        const [displayResult, ogpResult] = await Promise.all([
+          ImageManipulator.manipulateAsync(
+            fileUri,
+            [{ resize: { width: DISPLAY_MAX_WIDTH } }],
+            { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+          ),
+          ImageManipulator.manipulateAsync(
+            fileUri,
+            [{ resize: { width: OGP_WIDTH } }],
+            { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
+          ),
+        ]);
+
+        const [displayUrlRes, ogpUrlRes] = await Promise.all([
+          fetch(config.uploadUrlEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'content' }),
+          }),
+          fetch(config.uploadUrlEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'ogp' }),
+          }),
+        ]);
+
+        if (!displayUrlRes.ok || !ogpUrlRes.ok) {
+          throw new Error('presigned URL の取得に失敗しました');
+        }
+
+        const displayUrlData = await displayUrlRes.json();
+        const ogpUrlData = await ogpUrlRes.json();
+
+        await Promise.all([
+          FileSystem.uploadAsync(displayUrlData.uploadUrl, displayResult.uri, {
+            httpMethod: 'PUT',
+            headers: { 'Content-Type': 'image/jpeg' },
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          }),
+          FileSystem.uploadAsync(ogpUrlData.uploadUrl, ogpResult.uri, {
+            httpMethod: 'PUT',
+            headers: { 'Content-Type': 'image/jpeg' },
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          }),
+        ]);
+
+        return {
+          displayPublicUrl: displayUrlData.publicUrl as string,
+          ogpPublicUrl: ogpUrlData.publicUrl as string,
+        };
+      })(),
+    ]);
+
+    return {
+      contentHash: tpResult.contentHash,
+      txSignature: tpResult.txSignature,
+      thumbnailUrl: r2Urls.displayPublicUrl,
+      ogpImageUrl: r2Urls.ogpPublicUrl,
+    };
+  };
+
   const publish = async () => {
     if (publishingRef.current) return;
     publishingRef.current = true;
@@ -63,98 +146,26 @@ export default function PublishingScreen() {
     setErrorMessage('');
 
     try {
-      const uri = signedUris[0];
-      const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-
-      // 仕様書 §6.1, §6.2: ファイルをバイナリとして読み取り（Title Protocol SDK用）
-      const fileBase64 = await FileSystem.readAsStringAsync(
-        fileUri,
-        { encoding: FileSystem.EncodingType.Base64 },
-      );
-      const binaryStr = atob(fileBase64);
-      const content = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        content[i] = binaryStr.charCodeAt(i);
-      }
-
-      // R2キーはcontent_hashと独立 — content_hashはTEEが算出するため事前に取得不可
-      const fileId = Crypto.randomUUID();
-
       setCurrentStep('uploading');
 
-      // パイプラインA (§6.1) と パイプラインB (§6.2) を並列実行
-      const [tpResult, r2Urls] = await Promise.all([
-        // パイプラインA: Title Protocol登録（SDK → TEE → cNFTミント）
-        // content_hash = SHA-256(Active Manifest の COSE 署名) を TEE が算出
-        registerOnTitleProtocol(content),
-
-        // パイプラインB: 表示用画像をリサイズ → R2に直接アップロード
-        (async () => {
-          const [displayResult, ogpResult] = await Promise.all([
-            ImageManipulator.manipulateAsync(
-              fileUri,
-              [{ resize: { width: DISPLAY_MAX_WIDTH } }],
-              { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
-            ),
-            ImageManipulator.manipulateAsync(
-              fileUri,
-              [{ resize: { width: OGP_WIDTH } }],
-              { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
-            ),
-          ]);
-
-          const [displayUrlRes, ogpUrlRes] = await Promise.all([
-            fetch(config.uploadUrlEndpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'content' }),
-            }),
-            fetch(config.uploadUrlEndpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId, contentType: 'image/jpeg', kind: 'ogp' }),
-            }),
-          ]);
-
-          if (!displayUrlRes.ok || !ogpUrlRes.ok) {
-            throw new Error('presigned URL の取得に失敗しました');
-          }
-
-          const displayUrlData = await displayUrlRes.json();
-          const ogpUrlData = await ogpUrlRes.json();
-
-          await Promise.all([
-            FileSystem.uploadAsync(displayUrlData.uploadUrl, displayResult.uri, {
-              httpMethod: 'PUT',
-              headers: { 'Content-Type': 'image/jpeg' },
-              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-            }),
-            FileSystem.uploadAsync(ogpUrlData.uploadUrl, ogpResult.uri, {
-              httpMethod: 'PUT',
-              headers: { 'Content-Type': 'image/jpeg' },
-              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-            }),
-          ]);
-
-          return {
-            displayPublicUrl: displayUrlData.publicUrl as string,
-            ogpPublicUrl: ogpUrlData.publicUrl as string,
-          };
-        })(),
-      ]);
+      // 全コンテンツを順次処理（TEEノードの負荷を考慮）
+      const results: { contentHash: string; txSignature: string; thumbnailUrl: string; ogpImageUrl: string }[] = [];
+      for (const uri of signedUris) {
+        results.push(await processOneContent(uri));
+      }
 
       setCurrentStep('registering');
 
-      // 両パイプライン完了後、TP の content_hash + R2 URL でページ作成
-      // content_hash が公開ページからオンチェーンデータへの唯一のキー
-      // addressはRegistrationScreenから明示的に渡される（非同期競合なし）
+      // 全コンテンツのメタデータを一括でサーバーに送信
       const publishRes = await fetch(config.publishUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contentHash: tpResult.contentHash,
-          thumbnailUrl: r2Urls.displayPublicUrl,
-          ogpImageUrl: r2Urls.ogpPublicUrl,
+          contents: results.map(r => ({
+            contentHash: r.contentHash,
+            thumbnailUrl: r.thumbnailUrl,
+            ogpImageUrl: r.ogpImageUrl,
+          })),
           address: address || undefined,
         }),
       });
@@ -169,8 +180,6 @@ export default function PublishingScreen() {
       const data: PublishResult = {
         shortId: serverData.shortId,
         pageUrl: serverData.pageUrl,
-        contentHash: tpResult.contentHash,
-        txSignature: tpResult.txSignature,
       };
 
       setResult(data);

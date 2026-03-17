@@ -28,6 +28,30 @@
   max-height: 70vh;
 }
 
+.pageIndicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.pageDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.4);
+  transition: background 0.15s;
+}
+
+.pageDotActive {
+  background: var(--color-accent);
+}
+
 /* --- Capture Info --- */
 
 .infoSection {

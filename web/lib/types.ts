@@ -7,15 +7,17 @@
 
 // --- サーバーから取得するデータ（最小限） ---
 
+/** 1件のコンテンツ情報 */
+export interface ContentMeta {
+  contentHash: string;
+  thumbnailUrl: string;
+  ogpImageUrl: string;
+}
+
 /** サーバーが shortId から解決するページ情報 */
 export interface PageMeta {
   shortId: string;
-  /** SHA-256(Active Manifest COSE署名) — TEE算出 */
-  contentHash: string;
-  /** R2 表示用画像URL */
-  thumbnailUrl: string;
-  /** R2 OGP画像URL */
-  ogpImageUrl: string;
+  contents: ContentMeta[];
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

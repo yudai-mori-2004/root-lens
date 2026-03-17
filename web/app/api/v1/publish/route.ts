@@ -4,10 +4,10 @@
  * POST /api/v1/publish
  *
  * パイプラインB: ページ生成
- * アプリ側で画像処理・R2アップロードは完了済み。
+ * アプリ側で画像処理・R2アップロード・Title Protocol登録は完了済み。
  * サーバーはメタデータを受け取り、Supabaseにページレコードを作成する。
  *
- * Title Protocol登録はアプリ側で並列実行される (§6.1)
+ * リクエスト: { contents: [{ contentHash, thumbnailUrl, ogpImageUrl }], address? }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,22 +15,35 @@ import { createPage } from "@/lib/server/page-store";
 
 export async function POST(req: NextRequest) {
   try {
-    const { contentHash, thumbnailUrl, ogpImageUrl, address } = await req.json();
+    const { contents, address } = await req.json();
 
-    if (!contentHash || !thumbnailUrl) {
+    if (!Array.isArray(contents) || contents.length === 0) {
+      return NextResponse.json(
+        { error: "contents array is required" },
+        { status: 400 },
+      );
+    }
+
+    const first = contents[0];
+    if (!first.contentHash || !first.thumbnailUrl) {
       return NextResponse.json(
         { error: "contentHash and thumbnailUrl are required" },
         { status: 400 },
       );
     }
 
-    // Supabase ページ作成
     const record = await createPage({
-      contentHash,
+      contentHash: first.contentHash,
       assetId: "",
-      thumbnailUrl,
-      ogpImageUrl: ogpImageUrl || thumbnailUrl,
+      thumbnailUrl: first.thumbnailUrl,
+      ogpImageUrl: first.ogpImageUrl || first.thumbnailUrl,
       address: address || undefined,
+      additionalContents: contents.slice(1).map((c: any) => ({
+        contentHash: c.contentHash,
+        assetId: "",
+        thumbnailUrl: c.thumbnailUrl,
+        ogpImageUrl: c.ogpImageUrl || c.thumbnailUrl,
+      })),
     });
 
     const baseUrl = process.env.PUBLIC_PAGE_URL || "https://www.rootlens.io";
@@ -39,7 +52,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       shortId: record.shortId,
       pageUrl,
-      contentHash,
     });
   } catch (e: unknown) {
     console.error("[publish] Error:", e);
