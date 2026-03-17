@@ -130,7 +130,7 @@ export default function RegistrationScreen() {
     'idle': '',
     'logging-in': t('login.button'),
     'waiting-wallet': t('app.checking'),
-    'syncing': t('publishing.step.registering'),
+    'syncing': t('common.loading'),
   }[phase];
 
   const previewPad = spacing.xl;

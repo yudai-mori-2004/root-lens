@@ -104,10 +104,10 @@ const ja: TranslationDict = {
 
   // ── 公開画面 ──
   'publishing.loading': '公開中...',
-  'publishing.step.signing': '本物証明の記録',
-  'publishing.step.uploading': 'コンテンツのアップロード',
-  'publishing.step.registering': '公開ページの作成',
-  'publishing.progress': '{current}/{total} 処理中...',
+  'publishing.step.reading': 'データを読み込み中',
+  'publishing.step.extracting': '撮影情報を抽出中',
+  'publishing.step.recording': 'ブロックチェーンに記録中',
+  'publishing.step.creating': '公開ページを作成中',
   'publishing.errorTitle': '公開に失敗しました',
   'publishing.retry': 'リトライ',
   'publishing.back': '戻る',
@@ -267,10 +267,10 @@ const en: TranslationDict = {
 
   // ── Publishing ──
   'publishing.loading': 'Publishing...',
-  'publishing.step.signing': 'Recording authenticity proof',
-  'publishing.step.uploading': 'Uploading content',
-  'publishing.step.registering': 'Creating public page',
-  'publishing.progress': '{current}/{total} processing...',
+  'publishing.step.reading': 'Reading data',
+  'publishing.step.extracting': 'Extracting capture proof',
+  'publishing.step.recording': 'Recording on blockchain',
+  'publishing.step.creating': 'Creating public page',
   'publishing.errorTitle': 'Publishing failed',
   'publishing.retry': 'Retry',
   'publishing.back': 'Back',

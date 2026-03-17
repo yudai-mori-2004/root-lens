@@ -37,12 +37,13 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Publishing'>;
 
 type Phase = 'publishing' | 'done' | 'error';
-type ProgressStep = 'signing' | 'uploading' | 'registering';
+type ProgressStep = 'reading' | 'extracting' | 'recording' | 'creating';
 
 const STEP_KEYS: { key: ProgressStep; i18nKey: string }[] = [
-  { key: 'signing', i18nKey: 'publishing.step.signing' },
-  { key: 'uploading', i18nKey: 'publishing.step.uploading' },
-  { key: 'registering', i18nKey: 'publishing.step.registering' },
+  { key: 'reading', i18nKey: 'publishing.step.reading' },
+  { key: 'extracting', i18nKey: 'publishing.step.extracting' },
+  { key: 'recording', i18nKey: 'publishing.step.recording' },
+  { key: 'creating', i18nKey: 'publishing.step.creating' },
 ];
 
 /** ファイルパスからメディアタイプを推定 */
@@ -66,10 +67,20 @@ export default function PublishingScreen() {
   const { signedUris, address } = route.params;
 
   const [phase, setPhase] = useState<Phase>('publishing');
-  const [currentStep, setCurrentStep] = useState<ProgressStep>('signing');
+  const [currentStep, setCurrentStep] = useState<ProgressStep>('reading');
   const [result, setResult] = useState<PublishResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const publishingRef = useRef(false);
+  const stepIndexRef = useRef(0);
+
+  // ステップは前にしか進まない（並列処理で戻らないようにする）
+  const advanceToStep = (step: ProgressStep) => {
+    const idx = STEP_KEYS.findIndex(s => s.key === step);
+    if (idx > stepIndexRef.current) {
+      stepIndexRef.current = idx;
+      setCurrentStep(step);
+    }
+  };
 
   // サムネイル生成（メディアタイプ別）
   const generateThumbnails = async (fileUri: string, mediaType: string) => {
@@ -117,6 +128,8 @@ export default function PublishingScreen() {
     const mediaType = detectMediaType(uri);
     const ext = uri.match(/\.(\w+)$/)?.[1] || 'jpg';
 
+    advanceToStep('reading');
+
     // バイナリ読み取り（Title Protocol SDK用）
     const fileBase64 = await FileSystem.readAsStringAsync(
       fileUri,
@@ -130,9 +143,14 @@ export default function PublishingScreen() {
 
     const fileId = Crypto.randomUUID();
 
+    advanceToStep('extracting');
+
     // パイプラインA (TP登録) と パイプラインB (R2アップロード) を並列実行
     const [tpResult, r2Urls] = await Promise.all([
-      registerOnTitleProtocol(content),
+      registerOnTitleProtocol(content).then(r => {
+        advanceToStep('recording');
+        return r;
+      }),
 
       (async () => {
         // サムネイル生成
@@ -232,19 +250,17 @@ export default function PublishingScreen() {
     if (publishingRef.current) return;
     publishingRef.current = true;
     setPhase('publishing');
-    setCurrentStep('signing');
+    setCurrentStep('reading');
+    stepIndexRef.current = 0;
     setErrorMessage('');
 
     try {
-      setCurrentStep('uploading');
+      // 全コンテンツを一括並列処理
+      const results = await Promise.all(
+        signedUris.map((uri) => processOneContent(uri))
+      );
 
-      // 全コンテンツを順次処理（TEEノードの負荷を考慮）
-      const results: Awaited<ReturnType<typeof processOneContent>>[] = [];
-      for (const uri of signedUris) {
-        results.push(await processOneContent(uri));
-      }
-
-      setCurrentStep('registering');
+      advanceToStep('creating');
 
       // 全コンテンツのメタデータを一括でサーバーに送信
       const publishRes = await fetch(config.publishUrl, {
@@ -307,7 +323,6 @@ export default function PublishingScreen() {
   };
 
   // --- ローディング ---
-  // デザイン方針: 下寄せ。ステップリストが主体。スピナーは控えめに。
   if (phase === 'publishing') {
     const currentStepIndex = STEP_KEYS.findIndex(s => s.key === currentStep);
 
