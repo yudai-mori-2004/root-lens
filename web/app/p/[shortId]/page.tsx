@@ -21,20 +21,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return {
-    title: "Shot on RootLens",
-    description: "Verified authentic content with tamper-proof provenance",
+    title: "Real · Verified",
+    description: "This photo is not AI. Tap to see proof.",
     openGraph: {
-      title: "Shot on RootLens",
-      description: "Verified authentic content with tamper-proof provenance",
-      // OGPは仕様上1画像のため、全コンテンツのOGP画像を列挙
+      title: "Real · Verified",
+      description: "This photo is not AI. Tap to see proof.",
       images: page.contents.map((c) => ({ url: c.ogpImageUrl, width: 1200, height: 630 })),
       type: "article",
       siteName: "RootLens",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Shot on RootLens",
-      description: "Verified authentic content with tamper-proof provenance",
+      title: "Real · Verified",
+      description: "This photo is not AI. Tap to see proof.",
       images: page.contents.map((c) => c.ogpImageUrl),
     },
   };
