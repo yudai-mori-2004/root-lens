@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -11,7 +11,7 @@ import DeviceGalleryScreen from '../screens/DeviceGalleryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { GalleryStackParamList, TabParamList, RootStackParamList } from './types';
 import { colors, typography, spacing, radii, shadows, navigationHeaderOptions } from '../theme';
-import { t } from '../i18n';
+import { t, addLocaleListener } from '../i18n';
 
 // 仕様書 §3.2 画面構成
 
@@ -58,6 +58,9 @@ function CameraTabButton({ onPress }: { onPress?: (...args: any[]) => void }) {
 }
 
 export default function TabNavigator() {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => addLocaleListener(() => forceUpdate(n => n + 1)), []);
+
   return (
     <Tab.Navigator
       screenOptions={{

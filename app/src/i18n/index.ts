@@ -2,10 +2,12 @@
 // 対応言語: ja (デフォルト), en
 
 import { Platform, NativeModules } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Locale = 'ja' | 'en';
 
-// デバイスの言語を取得
+const LOCALE_KEY = 'rootlens_locale';
+
 function getDeviceLocale(): Locale {
   let locale = 'ja';
   try {
@@ -15,13 +17,19 @@ function getDeviceLocale(): Locale {
     } else {
       locale = NativeModules.I18nManager?.localeIdentifier || 'ja';
     }
-  } catch {
-    // fallback
-  }
+  } catch {}
   return locale.startsWith('en') ? 'en' : 'ja';
 }
 
 let currentLocale: Locale = getDeviceLocale();
+
+type LocaleListener = (locale: Locale) => void;
+const listeners: Set<LocaleListener> = new Set();
+
+export function addLocaleListener(fn: LocaleListener) {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
 
 export function getLocale(): Locale {
   return currentLocale;
@@ -29,6 +37,15 @@ export function getLocale(): Locale {
 
 export function setLocale(locale: Locale) {
   currentLocale = locale;
+  AsyncStorage.setItem(LOCALE_KEY, locale);
+  listeners.forEach(fn => fn(locale));
+}
+
+export async function initLocale() {
+  const saved = await AsyncStorage.getItem(LOCALE_KEY);
+  if (saved === 'ja' || saved === 'en') {
+    currentLocale = saved;
+  }
 }
 
 // 翻訳辞書の型

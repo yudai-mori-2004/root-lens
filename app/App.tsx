@@ -3,7 +3,7 @@ import 'react-native-get-random-values';
 import 'fast-text-encoding';
 import '@ethersproject/shims';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -29,11 +29,14 @@ import RegistrationScreen from './src/screens/RegistrationScreen';
 import type { RootStackParamList } from './src/navigation/types';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
 import { colors, typography, spacing, radii } from './src/theme';
-import { t } from './src/i18n';
+import { t, initLocale } from './src/i18n';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [localeReady, setLocaleReady] = useState(false);
+  useEffect(() => { initLocale().then(() => setLocaleReady(true)); }, []);
+
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
     Inter_400Regular,
@@ -41,7 +44,7 @@ export default function App() {
     Inter_600SemiBold,
   });
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !localeReady) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.accent} />

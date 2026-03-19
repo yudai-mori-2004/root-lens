@@ -109,7 +109,7 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.divider} />
         <View style={styles.inputRow}>
-          <Text style={styles.inputLabel}>Solana アドレス</Text>
+          <Text style={styles.inputLabel}>{t('settings.address')}</Text>
           <Text style={styles.addressValue} numberOfLines={1}>
             {solanaAddress ? shortenAddress(solanaAddress) : '—'}
           </Text>

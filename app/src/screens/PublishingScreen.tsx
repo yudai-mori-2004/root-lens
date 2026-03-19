@@ -127,19 +127,10 @@ export default function PublishingScreen() {
     const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
     const mediaType = detectMediaType(uri);
     const ext = uri.match(/\.(\w+)$/)?.[1] || 'jpg';
+    const t0 = Date.now();
+    const lap = (label: string) => console.log(`[PERF] ${label}: ${Date.now() - t0}ms`);
 
     advanceToStep('reading');
-
-    // バイナリ読み取り（Title Protocol SDK用）
-    const fileBase64 = await FileSystem.readAsStringAsync(
-      fileUri,
-      { encoding: FileSystem.EncodingType.Base64 },
-    );
-    const binaryStr = atob(fileBase64);
-    const content = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      content[i] = binaryStr.charCodeAt(i);
-    }
 
     const fileId = Crypto.randomUUID();
 
@@ -147,14 +138,19 @@ export default function PublishingScreen() {
 
     // パイプラインA (TP登録) と パイプラインB (R2アップロード) を並列実行
     const [tpResult, r2Urls] = await Promise.all([
-      registerOnTitleProtocol(content).then(r => {
+      (async () => {
+        lap('TP register start');
+        const r = await registerOnTitleProtocol(fileUri);
+        lap('TP register done');
         advanceToStep('recording');
         return r;
-      }),
+      })(),
 
       (async () => {
         // サムネイル生成
+        lap('thumbnails start');
         const thumbs = await generateThumbnails(fileUri, mediaType);
+        lap('thumbnails done');
 
         // presigned URL取得: サムネイル + OGP + (動画の場合) 本体
         const urlRequests: Promise<Response>[] = [];
@@ -185,12 +181,14 @@ export default function PublishingScreen() {
           );
         }
 
+        lap('presigned URL start');
         const urlResponses = await Promise.all(urlRequests);
         if (urlResponses.some(r => !r.ok)) {
           throw new Error('presigned URL の取得に失敗しました');
         }
 
         const urlData = await Promise.all(urlResponses.map(r => r.json()));
+        lap('presigned URL done');
 
         // アップロード実行
         const uploads: Promise<any>[] = [];
@@ -226,7 +224,9 @@ export default function PublishingScreen() {
           }));
         }
 
+        lap('R2 upload start');
         await Promise.all(uploads);
+        lap('R2 upload done');
 
         return {
           displayPublicUrl: displayPublicUrl || mediaPublicUrl,
