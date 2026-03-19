@@ -22,6 +22,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
 import { config } from '../config';
 import { registerOnTitleProtocol } from '../services/titleProtocol';
+import { stampOgp } from '../native/c2paBridge';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
 
@@ -97,11 +98,12 @@ export default function PublishingScreen() {
           { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
         ),
       ]);
-      return { displayUri: display.uri, ogpUri: ogp.uri };
+      const stampedOgpPath = await stampOgp(ogp.uri);
+      const stampedUri = stampedOgpPath.startsWith('file://') ? stampedOgpPath : `file://${stampedOgpPath}`;
+      return { displayUri: display.uri, ogpUri: stampedUri };
     }
 
     if (mediaType === 'video') {
-      // 動画: 先頭フレームを抽出してサムネイルに使用
       const thumb = await VideoThumbnails.getThumbnailAsync(fileUri, { time: 0 });
       const [display, ogp] = await Promise.all([
         ImageManipulator.manipulateAsync(
@@ -115,7 +117,9 @@ export default function PublishingScreen() {
           { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
         ),
       ]);
-      return { displayUri: display.uri, ogpUri: ogp.uri };
+      const stampedOgpPath = await stampOgp(ogp.uri);
+      const stampedUri = stampedOgpPath.startsWith('file://') ? stampedOgpPath : `file://${stampedOgpPath}`;
+      return { displayUri: display.uri, ogpUri: stampedUri };
     }
 
     // audio等: サムネイルなし（プレースホルダー）

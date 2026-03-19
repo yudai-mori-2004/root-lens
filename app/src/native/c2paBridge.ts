@@ -73,6 +73,16 @@ try {
  * @param imagePath 入力画像のパス
  * @returns 署名済みファイルのパス
  */
+/**
+ * OGP画像に「Real · Verified」チップを焼き込む
+ */
+export async function stampOgp(imagePath: string): Promise<string> {
+  if (!C2paBridge) {
+    throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
+  }
+  return C2paBridge.stampOgp(imagePath);
+}
+
 export async function signContent(imagePath: string): Promise<string> {
   if (!C2paBridge) {
     throw new Error(
