@@ -26,6 +26,7 @@ class MainApplication : Application(), ReactApplication {
             // Packages that cannot be autolinked yet can be added manually here, for example:
             // packages.add(new MyReactNativePackage());
             packages.add(C2paBridgePackage())
+            packages.add(AesGcmPackage())
             return packages
           }
 

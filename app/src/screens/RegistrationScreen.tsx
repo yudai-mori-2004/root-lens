@@ -172,12 +172,6 @@ export default function RegistrationScreen() {
       </View>
 
       <View style={styles.footer}>
-        {busy && statusLabel ? (
-          <View style={styles.statusRow}>
-            <ActivityIndicator size="small" color={colors.accent} />
-            <Text style={styles.statusText}>{statusLabel}</Text>
-          </View>
-        ) : null}
         <TouchableOpacity
           style={[styles.publishButton, busy && styles.publishButtonDisabled]}
           onPress={handleRegister}

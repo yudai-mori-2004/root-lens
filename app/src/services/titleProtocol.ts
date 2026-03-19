@@ -4,6 +4,7 @@
 
 import { fetchGlobalConfig, TitleClient } from '@title-protocol/sdk';
 import { Connection } from '@solana/web3.js';
+import { nativeCryptoProvider } from './nativeCryptoProvider';
 
 // devnet MVP: Privy未実装のためオペレーターウォレットを使用
 const OWNER_WALLET = 'wrVwsTuRzbsDutybqqpf9tBE7JUqRPYzJ3iPUgcFmna';
@@ -27,7 +28,7 @@ export async function registerOnTitleProtocol(
 ): Promise<TitleProtocolResult> {
   const connection = new Connection(SOLANA_RPC_URL);
   const globalConfig = await fetchGlobalConfig(connection, 'devnet');
-  const client = new TitleClient(globalConfig);
+  const client = new TitleClient(globalConfig, { crypto: nativeCryptoProvider });
 
   const result = await client.register({
     content,
