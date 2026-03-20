@@ -80,11 +80,11 @@
         "title": "Technical design",
         "stateless": {
           "label": "Stateless TEE — two-phase processing",
-          "text": "Processing is split into a verification phase and a signing phase. The TEE never holds wallet keys or external state, enabling zero-cost restarts and minimizing the blast radius of any TEE compromise."
+          "text": "Phase 1 (Verify): the TEE decrypts the content, verifies the C2PA signature chain, and signs the verification result with its own key. The signed result is returned to the client encrypted. Phase 2 (Sign): after the client stores the signed result in permanent off-chain storage (Arweave), the TEE re-verifies its own signature, constructs a blockchain transaction, and partially signs it. The client applies the final wallet signature and broadcasts. This design means the TEE never needs to hold a wallet, never maintains state between requests, and can be restarted or replaced at any time. If a TEE instance is compromised, the damage is temporally localized — it cannot retroactively affect records already on the blockchain."
         },
         "e2ee": {
-          "label": "Transit encryption",
-          "text": "Content and wallet addresses are encrypted with an ephemeral ECDH key derived from the TEE's public key (published on-chain). This protects content from node operators during transit to the TEE enclave — operators can only relay or refuse."
+          "label": "Client-side encryption",
+          "text": "The content owner encrypts the content and wallet address on their own device before uploading. Encryption uses an ephemeral X25519 keypair: the client generates a one-time key, derives a shared secret with the TEE's public key (published on-chain in Global Config), and encrypts with AES-256-GCM. The TEE's response is also encrypted with the same derived key. Node operators see only ciphertext — they cannot read, modify, or determine the destination wallet. The ephemeral key is discarded after use, providing forward secrecy."
         },
         "coreExt": {
           "label": "Core / Extension architecture",
@@ -96,7 +96,7 @@
         },
         "security": {
           "label": "Security considerations",
-          "text": "TEEs are not infallible — side-channel attacks have been demonstrated against some implementations. Title Protocol's architecture mitigates this through stateless operation (no persistent keys in TEE), separation of wallet keys from the verification enclave, and remote attestation for verifying TEE integrity. The trust in TEE is qualitatively different from trusting a company: the security model is publicly auditable and does not depend on the operator's honesty. Full threat model and security analysis are documented in the specification."
+          "text": "TEEs are not infallible — side-channel attacks have been demonstrated against some implementations (e.g., Foreshadow against SGX). Title Protocol mitigates this through multiple layers: (1) Stateless operation — no persistent keys survive across requests, so a compromised instance cannot affect past or future records. (2) Wallet key separation — the TEE never holds the user's wallet key; it only partially signs transactions. (3) Client-side encryption — even if the TEE host is compromised, the node operator still cannot read content because encryption happens on the user's device. (4) Remote attestation — clients verify TEE integrity before submitting content. (5) All TEE enclave code is open source and independently auditable. The protocol also explicitly does not prevent provenance laundering (re-registering someone else's content) — similarity-based deduplication at registration time would destroy the low-cost design. Instead, duplicate detection is handled at query time by applications. Content semantics (legality, appropriateness) are also outside protocol scope — these are application-layer responsibilities."
         }
       }
     },
@@ -106,7 +106,7 @@
       "intro": "C2PA verification services and provenance registries exist. Here is where the gaps remain.",
       "scenario1": {
         "label": "Proof that survives sharing",
-        "text": "C2PA data is stripped by nearly every platform. Existing solutions attempt to recover the full manifest via watermarks or centralized storage. Title Protocol takes a different approach: the verified attributes are already recorded independently before sharing occurs."
+        "text": "C2PA data is stripped by nearly every platform. Existing solutions attempt to recover the full manifest via watermarks or centralized cloud. Title Protocol takes a different approach: verified attributes exist as independent records on the blockchain, so even after C2PA metadata is stripped from the file, the provenance data remains accessible without recovering the original manifest."
       },
       "scenario2": {
         "label": "Querying attributes without the file",
@@ -114,11 +114,11 @@
       },
       "scenario3": {
         "label": "Cross-platform rights tracing",
-        "text": "When content goes viral, tracing the original creator requires searching across fragmented services, each with its own ID scheme. Title Protocol provides a single, deterministic content ID and links rights holders by wallet address across all platforms."
+        "text": "When content goes viral, tracing the original creator requires searching across fragmented services, each with its own ID scheme. Title Protocol uses a content ID derived from the SHA-256 hash of the C2PA manifest signature — a value anyone can compute from the same C2PA content, independent of Title Protocol. Rights holders are linked by wallet address, enabling cross-platform tracing through a neutral, non-proprietary identifier."
       },
       "scenario4": {
         "label": "Trusting the verifier",
-        "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE — the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. The trust shifts from a company's reputation to a publicly auditable security model."
+        "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE — the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. All TEE enclave code is open source, so the verification logic itself can be independently audited. The trust shifts from a company's reputation to a publicly auditable codebase and security model."
       }
     },
 
@@ -136,7 +136,7 @@
 
     "openSource": {
       "title": "Open source. Open protocol.",
-      "spec": "The Title Protocol specification (~3,000 lines) documents every data structure, API endpoint, and cryptographic parameter. You can read the spec and independently reimplement the entire system.",
+      "spec": "The specification, architecture documentation, and implementation are all publicly available. You can read the docs and independently verify or reimplement the entire system.",
       "node": "Anyone can run a verification node. Anyone can build an application on the protocol. Governance is managed by a DAO — no single entity controls it.",
       "code": "All source code is public, released under Apache 2.0.",
       "tpRepo": "Title Protocol",
