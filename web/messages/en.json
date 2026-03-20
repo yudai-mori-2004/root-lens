@@ -1,4 +1,160 @@
 {
+  "lp": {
+    "hero": {
+      "title": "Prove it's real.",
+      "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
+      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. Title Protocol saves that proof as a permanent, independent record — so even when social media strips the data from your file, the proof still exists.",
+      "ctaHow": "Why this matters",
+      "ctaGithub": "View on GitHub"
+    },
+
+    "appFlow": {
+      "title": "How it works",
+      "step1": { "label": "Capture", "text": "Take a photo or video with RootLens. A digital signature is attached instantly." },
+      "step2": { "label": "Prove", "text": "Title Protocol verifies the signature and saves the proof as a permanent record — separate from the file itself." },
+      "step3": { "label": "Share", "text": "Get a link. Post it anywhere. Anyone who opens it can see when, where, and on what device the content was captured." },
+      "editing": "You can still crop, mask, or trim before sharing. RootLens tracks every edit, so viewers can see exactly what was changed and confirm the original is real."
+    },
+
+    "issues": {
+      "title": "Why this matters",
+      "intro": "Across industries, the same crisis is unfolding: nobody can tell what's real anymore.",
+      "sns": {
+        "label": "Social media & creators",
+        "text": "Deepfake videos go viral with fabricated news logos. Creators face accusations that real content is AI-generated. Unauthorized reposting is the norm — revenue goes to the copier, not the original creator."
+      },
+      "media": {
+        "label": "News & journalism",
+        "text": "Reporters face accusations that real footage was AI-generated. Video evidence — once considered conclusive — is now questioned by default. The speed of misinformation structurally outpaces correction."
+      },
+      "insurance": {
+        "label": "Insurance & finance",
+        "text": "An estimated 10% of insurance claims involve fraud. Damage photos, medical documents, and property listings can be fabricated with increasing sophistication. Recipients have no independent way to verify authenticity."
+      },
+      "ai": {
+        "label": "AI, courts, healthcare, academia",
+        "text": "AI companies face billion-dollar lawsuits over training data rights. Forged documents challenge court evidence. Telemedicine images lack tamper verification. Research retractions rise as image fabrication becomes trivial."
+      }
+    },
+
+    "c2pa": {
+      "title": "The right foundation already exists",
+      "p1": "The root cause of all these problems is the same: digital content's origin and rightful owner are unknowable.",
+      "p2": "Detecting fakes after the fact — with AI or watermarks — is a structural arms race. As generation improves, so does the ability to fake. There is no inherent advantage for defenders.",
+      "p3": "The sound approach is to record provenance at the time of creation with cryptographic signatures. The security of these signatures depends on the integrity of signing keys, the certificate chain, and the implementation — but unlike post-hoc detection, this approach has a structural foundation rather than an endless game of catch-up.",
+      "p4": "C2PA (Coalition for Content Provenance and Authenticity), backed by Adobe, Microsoft, Google, and over 6,000 organizations, is the open standard for exactly this. It records who captured content, when, with what tool, and what edits were made — all cryptographically bound to the content.",
+      "p5": "Google Pixel signs photos with its Titan M2 chip. Sony, Nikon, and Canon cameras embed C2PA signatures. OpenAI, Google, and Adobe sign their AI-generated content with C2PA. The infrastructure is real and growing."
+    },
+
+    "gap": {
+      "title": "But proof dies when shared",
+      "p1": "C2PA binds provenance data tightly to the content file itself. The proof and the content are inseparable — by design.",
+      "p2": "This creates a fundamental problem: nearly every social media platform, messaging app, and CDN strips metadata on upload. Facebook, Instagram, X, YouTube — they all remove C2PA data. The World Privacy Forum calls this \"the primary obstacle to C2PA interoperability.\"",
+      "p3": "Even when C2PA data survives, the verified attributes inside — hardware capture proof, timestamp, edit history — can only be accessed by parsing the full manifest from the original file. There is no way for a third party to independently query those attributes without having the file in hand.",
+      "p4": "Existing solutions try to recover the full manifest through watermarks or centralized cloud storage. But these approaches either rely on a single company's infrastructure or attempt to reconstruct what was lost, rather than ensuring it was never lost in the first place.",
+      "p5": "To build an app where proof of authenticity actually reaches people on social media, we needed to solve a different problem: separating verified attributes from the content itself, so the proof exists independently and survives no matter what happens to the file."
+    },
+
+    "tp": {
+      "title": "Title Protocol — making proof independent",
+      "subtitle": "Extracting verified attributes from content and recording them as standalone, trustworthy records.",
+      "p1": "Title Protocol takes C2PA-signed content, verifies it inside a Trusted Execution Environment (TEE) — hardware-isolated processing designed so that the server operator cannot access or alter the verification — and extracts the verified attributes into independent on-chain records.",
+      "p2": "The result: provenance data that exists on its own. No original file needed. Anyone can query the attributes — who captured it, when, with what device, whether it was hardware-signed — directly from the blockchain.",
+      "step1": {
+        "label": "Sign at capture",
+        "text": "C2PA records who captured the content, when, and with what tool — cryptographically bound to the content."
+      },
+      "step2": {
+        "label": "Verify in isolated hardware",
+        "text": "A TEE (currently targeting AWS Nitro Enclaves) verifies the C2PA data. The TEE is designed so that the operator cannot access the process. The verification result is signed with the TEE's internal key."
+      },
+      "step3": {
+        "label": "Extract and record",
+        "text": "The verified attributes are extracted and recorded on the Solana blockchain as a compressed NFT. Cost at current network conditions: ~$0.00015 per record. 100,000 records per month cost roughly $15."
+      },
+      "step4": {
+        "label": "Anyone can verify, anywhere",
+        "text": "Your browser fetches data directly from blockchain nodes and checks the TEE signature. The proof exists independently of the content file."
+      },
+      "techDetails": {
+        "title": "Technical design",
+        "stateless": {
+          "label": "Stateless TEE — two-phase processing",
+          "text": "Processing is split into a verification phase and a signing phase. The TEE never holds wallet keys or external state, enabling zero-cost restarts and minimizing the blast radius of any TEE compromise."
+        },
+        "e2ee": {
+          "label": "Transit encryption",
+          "text": "Content and wallet addresses are encrypted with an ephemeral ECDH key derived from the TEE's public key (published on-chain). This protects content from node operators during transit to the TEE enclave — operators can only relay or refuse."
+        },
+        "coreExt": {
+          "label": "Core / Extension architecture",
+          "text": "Core records the C2PA provenance chain and rights structure. Extensions add computed attributes — perceptual hash, hardware signing proof, AI detection flags — as WASM modules executed inside the TEE. Extensions enable content lookup even after platforms strip the original metadata."
+        },
+        "cost": {
+          "label": "Compressed NFT cost optimization",
+          "text": "Using Solana's Bubblegum compressed NFT standard, per-record cost is ~¥0.023 (~$0.00015) at current network conditions. 100,000 monthly registrations cost roughly ¥2,250 (~$15)."
+        },
+        "security": {
+          "label": "Security considerations",
+          "text": "TEEs are not infallible — side-channel attacks have been demonstrated against some implementations. Title Protocol's architecture mitigates this through stateless operation (no persistent keys in TEE), separation of wallet keys from the verification enclave, and remote attestation for verifying TEE integrity. The trust in TEE is qualitatively different from trusting a company: the security model is publicly auditable and does not depend on the operator's honesty. Full threat model and security analysis are documented in the specification."
+        }
+      }
+    },
+
+    "comparison": {
+      "title": "What exists today and what remains unsolved",
+      "intro": "C2PA verification services and provenance registries exist. Here is where the gaps remain.",
+      "scenario1": {
+        "label": "Proof that survives sharing",
+        "text": "C2PA data is stripped by nearly every platform. Existing solutions attempt to recover the full manifest via watermarks or centralized storage. Title Protocol takes a different approach: the verified attributes are already recorded independently before sharing occurs."
+      },
+      "scenario2": {
+        "label": "Querying attributes without the file",
+        "text": "Existing services store full C2PA manifests externally — you still need to parse the manifest to access specific attributes. Title Protocol extracts and records individual verified attributes, making them directly queryable from the blockchain."
+      },
+      "scenario3": {
+        "label": "Cross-platform rights tracing",
+        "text": "When content goes viral, tracing the original creator requires searching across fragmented services, each with its own ID scheme. Title Protocol provides a single, deterministic content ID and links rights holders by wallet address across all platforms."
+      },
+      "scenario4": {
+        "label": "Trusting the verifier",
+        "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE — the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. The trust shifts from a company's reputation to a publicly auditable security model."
+      }
+    },
+
+    "rootlens": {
+      "title": "RootLens",
+      "subtitle": "The reason we built Title Protocol",
+      "p1": "RootLens is a camera app that proves your photo or video was really captured — and lets you share that proof on any platform.",
+      "step1": "Capture a photo or video",
+      "step2": "The app signs it with C2PA using the device's secure hardware",
+      "step3": "Publish — Title Protocol extracts and records the proof",
+      "step4": "Share the link anywhere — anyone can verify it",
+      "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain on the blockchain. Other applications built on Title Protocol can access the same records.",
+      "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real."
+    },
+
+    "openSource": {
+      "title": "Open source. Open protocol.",
+      "spec": "The Title Protocol specification (~3,000 lines) documents every data structure, API endpoint, and cryptographic parameter. You can read the spec and independently reimplement the entire system.",
+      "node": "Anyone can run a verification node. Anyone can build an application on the protocol. Governance is managed by a DAO — no single entity controls it.",
+      "code": "All source code is public, released under Apache 2.0.",
+      "tpRepo": "Title Protocol",
+      "rlRepo": "RootLens",
+      "specLink": "Read the specification"
+    },
+
+    "footer": {
+      "builtBy": "Built by Yudai Mori and Akito Kawano",
+      "links": {
+        "spec": "Specification",
+        "github": "GitHub",
+        "app": "RootLens App"
+      },
+      "license": "Apache 2.0"
+    }
+  },
+
   "content": {
     "shotOn": "Shot on {device}",
     "shotOnDefault": "Shot on RootLens",

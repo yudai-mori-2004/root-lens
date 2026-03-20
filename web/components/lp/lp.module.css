@@ -1,0 +1,466 @@
+/* ============================================================
+   Landing Page — CSS Module
+
+   Design principles:
+   - Tinted neutrals (no pure black/white)
+   - Generous line-height for long prose
+   - Single-column centered prose (max 680px)
+   - Navy (#1E3A5F) as brand accent
+   - No decorative animation
+   ============================================================ */
+
+/* ---- Layout ---- */
+.page {
+  --lp-prose-width: 680px;
+  --lp-wide-width: 960px;
+  --lp-text: #1a1c1e;
+  --lp-text-secondary: #4a4e54;
+  --lp-text-tertiary: #6e7279;
+  --lp-bg: #fafaf8;
+  --lp-bg-alt: #f0f0ec;
+  --lp-accent: #1E3A5F;
+  --lp-accent-light: #2d5a8a;
+  --lp-border: #d8d8d4;
+  --lp-code-bg: #eeeee9;
+
+  font-family: var(--font-lp-body, var(--font-geist-sans, sans-serif));
+  color: var(--lp-text);
+  background: var(--lp-bg);
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --lp-text: #e0ddd8;
+    --lp-text-secondary: #a8a49e;
+    --lp-text-tertiary: #7a776f;
+    --lp-bg: #111210;
+    --lp-bg-alt: #1a1b18;
+    --lp-accent: #7B9CC0;
+    --lp-accent-light: #9ab6d4;
+    --lp-border: #2c2d2a;
+    --lp-code-bg: #1e1f1c;
+  }
+}
+
+/* ---- Section ---- */
+.section {
+  padding: 80px 24px;
+}
+
+.section:nth-child(even) {
+  background: var(--lp-bg-alt);
+}
+
+.sectionInner {
+  max-width: var(--lp-prose-width);
+  margin: 0 auto;
+}
+
+.sectionWide {
+  max-width: var(--lp-wide-width);
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin-bottom: 24px;
+  color: var(--lp-text);
+}
+
+.sectionSubtitle {
+  font-size: 1.05rem;
+  color: var(--lp-text-secondary);
+  margin-bottom: 40px;
+  line-height: 1.7;
+}
+
+/* ---- Typography ---- */
+.prose {
+  font-size: 1rem;
+  line-height: 1.72;
+  color: var(--lp-text-secondary);
+}
+
+.prose + .prose {
+  margin-top: 20px;
+}
+
+.emphasis {
+  color: var(--lp-text);
+  font-weight: 500;
+}
+
+/* ---- Hero ---- */
+.hero {
+  padding: 120px 24px 80px;
+  text-align: left;
+}
+
+.heroInner {
+  max-width: var(--lp-prose-width);
+  margin: 0 auto;
+}
+
+.heroTitle {
+  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
+  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--lp-accent);
+  margin-bottom: 24px;
+}
+
+.heroTagline {
+  font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+  line-height: 1.6;
+  color: var(--lp-text);
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.heroDescription {
+  font-size: 1rem;
+  line-height: 1.72;
+  color: var(--lp-text-secondary);
+  margin-bottom: 40px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--lp-accent);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease-out;
+}
+
+.ctaPrimary:hover {
+  background: var(--lp-accent-light);
+}
+
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: transparent;
+  color: var(--lp-accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--lp-accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease-out, color 0.15s ease-out;
+}
+
+.ctaSecondary:hover {
+  background: var(--lp-accent);
+  color: #fff;
+}
+
+/* ---- Issues grid ---- */
+.issuesGrid {
+  display: grid;
+  gap: 2px;
+  margin-top: 32px;
+}
+
+.issueItem {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.issueItem:last-child {
+  border-bottom: none;
+}
+
+.issueLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lp-accent);
+  margin-bottom: 6px;
+}
+
+.issueText {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--lp-text-secondary);
+}
+
+/* ---- Steps ---- */
+.steps {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 16px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.step:last-child {
+  border-bottom: none;
+}
+
+.stepNumber {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.stepLabel {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--lp-text);
+  margin-bottom: 4px;
+}
+
+.stepText {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--lp-text-secondary);
+}
+
+/* ---- Tech details (collapsible) ---- */
+.techDetails {
+  margin-top: 48px;
+  border-top: 1px solid var(--lp-border);
+  padding-top: 32px;
+}
+
+.techToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lp-accent);
+  margin-bottom: 24px;
+}
+
+.techToggle::before {
+  content: '▸';
+  transition: transform 0.15s ease-out;
+}
+
+.techToggle[data-open="true"]::before {
+  transform: rotate(90deg);
+}
+
+.techItem {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.techItem:last-child {
+  border-bottom: none;
+}
+
+.techLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lp-text);
+  margin-bottom: 4px;
+  font-family: var(--font-lp-mono, var(--font-geist-mono, monospace));
+}
+
+.techText {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--lp-text-secondary);
+}
+
+/* ---- Comparison ---- */
+.comparisonList {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.comparisonItem {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.comparisonItem:last-child {
+  border-bottom: none;
+}
+
+.comparisonLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--lp-text);
+  margin-bottom: 6px;
+}
+
+.comparisonText {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--lp-text-secondary);
+}
+
+/* ---- RootLens section ---- */
+.rootlensFlow {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flowStep {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--lp-text);
+}
+
+.flowNumber {
+  font-family: var(--font-lp-mono, var(--font-geist-mono, monospace));
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--lp-accent);
+  flex-shrink: 0;
+  width: 20px;
+}
+
+/* ---- Open Source ---- */
+.repoLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 32px 0;
+}
+
+.repoLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 1px solid var(--lp-border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--lp-text);
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+
+.repoLink:hover {
+  border-color: var(--lp-accent);
+  background: var(--lp-bg-alt);
+}
+
+.repoIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ---- Footer ---- */
+.footer {
+  padding: 48px 24px;
+  border-top: 1px solid var(--lp-border);
+}
+
+.footerInner {
+  max-width: var(--lp-prose-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.footerBuiltBy {
+  font-size: 0.9rem;
+  color: var(--lp-text-secondary);
+}
+
+.footerLinks {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.footerLink {
+  font-size: 0.85rem;
+  color: var(--lp-accent);
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  text-decoration: underline;
+}
+
+.footerLicense {
+  font-size: 0.8rem;
+  color: var(--lp-text-tertiary);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+  .hero {
+    padding: 80px 20px 60px;
+  }
+
+  .section {
+    padding: 56px 20px;
+  }
+
+  .step {
+    grid-template-columns: 36px 1fr;
+    gap: 12px;
+  }
+
+  .heroCtas {
+    flex-direction: column;
+  }
+
+  .ctaPrimary,
+  .ctaSecondary {
+    justify-content: center;
+    width: 100%;
+  }
+}

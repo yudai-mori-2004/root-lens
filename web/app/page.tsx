@@ -1,11 +1,5 @@
-import styles from "./page.module.css";
+import LandingPage from "../components/lp/LandingPage";
 
-/** ランディングページ — 最小限。公開ページへのルーティングが主目的 */
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>RootLens</h1>
-      <p className={styles.tagline}>Prove it&apos;s real.</p>
-    </div>
-  );
+  return <LandingPage />;
 }
