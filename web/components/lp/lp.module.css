@@ -727,8 +727,12 @@
     gap: 32px;
   }
 
+  .heroPhoneWrap {
+    justify-self: center;
+  }
+
   .heroPhoneWrap .phoneFrame {
-    width: 180px;
+    width: 200px;
   }
 
   .phoneCarousel .phoneFrame {
