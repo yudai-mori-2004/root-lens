@@ -23,16 +23,29 @@ export default async function HomePage() {
             <h1 className={s.heroTitle}>{t("title")}</h1>
             <p className={s.heroTagline}>{t("tagline")}</p>
             <p className={s.heroDescription}>{t("description")}</p>
+            <div className={s.storeBadges}>
+              <div className={s.storeBadge}>
+                <AppleIcon />
+                <div className={s.storeBadgeText}>
+                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                  <span className={s.storeBadgeName}>App Store</span>
+                </div>
+              </div>
+              <div className={s.storeBadge}>
+                <PlayIcon />
+                <div className={s.storeBadgeText}>
+                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                  <span className={s.storeBadgeName}>Google Play</span>
+                </div>
+              </div>
+            </div>
             <div className={s.heroCtas}>
-              <a href={DEMO_URL} className={s.ctaPrimary}>
+              <a href={DEMO_URL} className={s.ctaSecondary}>
                 {tc("seeVerifiedPhoto")}
               </a>
               <a href="/technology" className={s.ctaSecondary}>
                 {t("ctaHow")}
               </a>
-            </div>
-            <div className={s.storeHint}>
-              <AppleIcon /> App Store <span className={s.storeHintSep}>&</span> <PlayIcon /> Google Play — {tc("comingSoon")}
             </div>
           </div>
           <div className={s.heroPhoneWrap}>

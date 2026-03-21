@@ -663,25 +663,48 @@
   opacity: 0.4;
 }
 
-/* ---- Store Hint ---- */
+/* ---- Store Badges ---- */
 
-.storeHint {
+.storeBadges {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 20px;
-  font-size: 0.8rem;
-  color: var(--lp-text-tertiary);
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
-.storeHint svg {
-  width: 14px;
-  height: 14px;
+.storeBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #18181c;
+  color: #fff;
+  min-width: 148px;
+}
+
+.storeBadge svg {
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
 }
 
-.storeHintSep {
-  margin: 0 2px;
+.storeBadgeText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.storeBadgeLabel {
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.storeBadgeName {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 /* ---- Closing CTA (homepage only) ---- */
