@@ -1,6 +1,5 @@
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
-import { PhoneMockup } from "./Placeholder";
 
 const DEMO_URL = "/p/BatH5xy";
 
@@ -32,10 +31,9 @@ export default async function HomePage() {
               </a>
             </div>
           </div>
-          <PhoneMockup
-            label="App screenshot"
-            sublabel="Camera → Verify → Share link"
-          />
+          <div className={s.heroPhone}>
+            <img src="/app-verify.png" alt="RootLens verification page" className={s.heroPhoneImg} />
+          </div>
         </div>
       </section>
 
@@ -43,6 +41,20 @@ export default async function HomePage() {
       <section className={s.section}>
         <div className={s.sectionInner}>
           <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
+          <div className={s.appScreenshots}>
+            <div className={s.appScreenshot}>
+              <img src="/app-camera.png" alt="RootLens camera" className={s.appScreenshotImg} />
+              <span className={s.appScreenshotLabel}>{tFlow("step1.label")}</span>
+            </div>
+            <div className={s.appScreenshot}>
+              <img src="/app-verify.png" alt="Verified content" className={s.appScreenshotImg} />
+              <span className={s.appScreenshotLabel}>{tFlow("step2.label")}</span>
+            </div>
+            <div className={s.appScreenshot}>
+              <img src="/app-gallery.png" alt="Published gallery" className={s.appScreenshotImg} />
+              <span className={s.appScreenshotLabel}>{tFlow("step3.label")}</span>
+            </div>
+          </div>
           <div className={s.steps}>
             {flowSteps.map((key, i) => (
               <div key={key} className={s.step}>
