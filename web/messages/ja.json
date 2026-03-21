@@ -7,6 +7,50 @@
     "demo": "デモを見る"
   },
 
+  "pages": {
+    "home": {
+      "closingTitle": "自分の目で確かめる",
+      "closingDesc": "検証済みの写真を開くか、なぜこれが必要なのかを読む。",
+      "closingCtaWhy": "なぜ必要なのか"
+    },
+    "technology": {
+      "heroTitle": "仕組み",
+      "heroSubtitle": "C2PAが暗号学的な基盤を提供し、Title Protocolがそれを現実世界で機能させる。",
+      "leadIn": "Adobe、Microsoft、Googleが支援するオープン標準C2PAは、カメラで撮影したコンテンツに署名することを可能にします。技術は機能しています。問題は、その後に起きることです。",
+      "closingTitle": "実際に動いているところを見る",
+      "closingDesc": "検証済みの写真を開いて、証明を自分で確認できます。検証ページのすべてがブラウザ内で実行されています。",
+      "closingCtaCode": "ソースコードを読む"
+    },
+    "why": {
+      "heroTitle": "信頼の問題",
+      "heroSubtitle": "デジタルコンテンツは、どこから来たのか、誰が作ったのか、改ざんされていないかを証明する手段を失いました。これは映像証拠に依存するすべての産業に影響しています。",
+      "closingTitle": "解決策がある",
+      "closingDesc": "Title Protocolは証明をファイルから分離し、プラットフォームがメタデータを削除しても検証が存続するようにします。",
+      "closingCtaTech": "仕組みを見る"
+    },
+    "developers": {
+      "heroTitle": "Title Protocol上で構築する",
+      "heroSubtitle": "プロトコル、ツール、ドキュメントはすべてオープンソースです。ノードを運営し、アプリケーションを構築し、仕様に貢献できます。",
+      "involvedTitle": "参加する",
+      "involved1Label": "検証ノードを運営する",
+      "involved1Text": "コンテンツを検証し、手数料を得ます。ノードソフトウェアはオープンソースで、標準的なハードウェアで動作します。",
+      "involved2Label": "アプリケーションを構築する",
+      "involved2Text": "Title Protocolは写真だけのものではありません。あらゆるC2PA署名付きコンテンツを登録できます。あなたのプロダクトに検証機能を組み込めます。",
+      "involved3Label": "仕様書を読む",
+      "involved3Text": "完全なプロトコル仕様書は、信頼モデル、データ構造、TEE要件、拡張アーキテクチャをカバーしています。",
+      "closingTitle": "構築を始める",
+      "closingDesc": "必要なものはすべてGitHubにあります。"
+    },
+    "about": {
+      "heroTitle": "RootLensについて",
+      "heroSubtitle": "コンテンツが本物であることを証明するカメラアプリ。単一のプロダクトより長く存続するよう設計されたオープンプロトコル上に構築されています。",
+      "flowIntro": "写真を公開する時、内部で起きていること:",
+      "closingTitle": "私たちが作ったものを見る",
+      "closingDesc": "検証済み写真を試すか、コードを探索するか、仕様書を読む。",
+      "closingCtaGithub": "GitHubで見る"
+    }
+  },
+
   "lp": {
     "hero": {
       "title": "Prove it's real.",

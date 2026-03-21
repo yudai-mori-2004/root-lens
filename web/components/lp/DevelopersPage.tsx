@@ -14,41 +14,95 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-export default function DevelopersPage() {
+function PageHero() {
+  const t = useTranslations("pages.developers");
+  return (
+    <section className={s.pageHero}>
+      <div className={s.pageHeroInner}>
+        <h1 className={s.pageHeroTitle}>{t("heroTitle")}</h1>
+        <p className={s.pageHeroSubtitle}>{t("heroSubtitle")}</p>
+      </div>
+    </section>
+  );
+}
+
+function OpenSource() {
   const t = useTranslations("lp.openSource");
 
   return (
-    <div className={s.page}>
-      <section className={s.section} style={{ paddingTop: 48 }}>
-        <div className={s.sectionInner}>
-          <h1 className={s.sectionTitle}>{t("title")}</h1>
-          <p className={s.prose}>{t("spec")}</p>
-          <p className={s.prose}>{t("node")}</p>
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.prose}>{t("spec")}</p>
+        <p className={s.prose}>{t("node")}</p>
 
-          <div className={s.repoLinks}>
-            <a
-              href={GITHUB_TP}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={s.repoLink}
-            >
-              <GitHubIcon className={s.repoIcon} />
-              {t("tpRepo")}
-            </a>
-            <a
-              href={GITHUB_RL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={s.repoLink}
-            >
-              <GitHubIcon className={s.repoIcon} />
-              {t("rlRepo")}
-            </a>
-          </div>
-
-          <p className={s.prose}>{t("code")}</p>
+        <div className={s.repoLinks}>
+          <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
+            <GitHubIcon className={s.repoIcon} />
+            {t("tpRepo")}
+          </a>
+          <a href={GITHUB_RL} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
+            <GitHubIcon className={s.repoIcon} />
+            {t("rlRepo")}
+          </a>
         </div>
-      </section>
+
+        <p className={s.prose}>{t("code")}</p>
+      </div>
+    </section>
+  );
+}
+
+function GetInvolved() {
+  const t = useTranslations("pages.developers");
+  const items = ["involved1", "involved2", "involved3"] as const;
+
+  return (
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("involvedTitle")}</h2>
+        <div className={s.involveGrid}>
+          {items.map((key) => (
+            <div key={key} className={s.involveItem}>
+              <div className={s.involveLabel}>{t(`${key}Label`)}</div>
+              <div className={s.involveText}>{t(`${key}Text`)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClosingCTA() {
+  const t = useTranslations("pages.developers");
+  return (
+    <section className={s.closingCta}>
+      <div className={s.closingCtaInner}>
+        <div className={s.closingCtaTitle}>{t("closingTitle")}</div>
+        <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
+        <div className={s.closingCtaButtons}>
+          <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.ctaPrimary}>
+            <GitHubIcon className={s.repoIcon} />
+            Title Protocol
+          </a>
+          <a href={GITHUB_RL} target="_blank" rel="noopener noreferrer" className={s.ctaSecondary}>
+            <GitHubIcon className={s.repoIcon} />
+            RootLens
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function DevelopersPage() {
+  return (
+    <div className={s.page}>
+      <PageHero />
+      <OpenSource />
+      <GetInvolved />
+      <ClosingCTA />
     </div>
   );
 }

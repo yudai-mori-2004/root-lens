@@ -44,6 +44,63 @@
   }
 }
 
+/* ---- Page Hero (subpages) ---- */
+.pageHero {
+  padding: 64px 24px 48px;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.pageHeroInner {
+  max-width: var(--lp-prose-width);
+  margin: 0 auto;
+}
+
+.pageHeroTitle {
+  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--lp-accent);
+  margin-bottom: 12px;
+}
+
+.pageHeroSubtitle {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--lp-text-secondary);
+}
+
+/* ---- Involve grid (developers page) ---- */
+.involveGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 32px;
+}
+
+.involveItem {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.involveItem:last-child {
+  border-bottom: none;
+}
+
+.involveLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--lp-text);
+  margin-bottom: 4px;
+}
+
+.involveText {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--lp-text-secondary);
+}
+
 /* ---- Section ---- */
 .section {
   padding: 80px 24px;

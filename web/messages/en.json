@@ -7,6 +7,50 @@
     "demo": "See Demo"
   },
 
+  "pages": {
+    "home": {
+      "closingTitle": "See the proof for yourself",
+      "closingDesc": "Open a real verified photo. Or find out why this matters now.",
+      "closingCtaWhy": "Why this matters"
+    },
+    "technology": {
+      "heroTitle": "How it works",
+      "heroSubtitle": "C2PA provides the cryptographic foundation. Title Protocol makes it survive the real world.",
+      "leadIn": "C2PA, the open standard backed by Adobe, Microsoft, and Google, lets cameras sign content at capture. The technology works. The problem is what happens next.",
+      "closingTitle": "See it in action",
+      "closingDesc": "Open a verified photo and inspect the proof yourself. Everything on the verification page runs in your browser.",
+      "closingCtaCode": "Read the source code"
+    },
+    "why": {
+      "heroTitle": "The trust problem",
+      "heroSubtitle": "Digital content has lost its ability to prove where it came from, who made it, and whether it has been altered. This affects every industry that depends on visual evidence.",
+      "closingTitle": "There is a solution",
+      "closingDesc": "Title Protocol separates the proof from the file, so verification survives even when platforms strip the metadata.",
+      "closingCtaTech": "See how it works"
+    },
+    "developers": {
+      "heroTitle": "Build on Title Protocol",
+      "heroSubtitle": "The protocol, tools, and documentation are open source. Run a node, build an application, or contribute to the specification.",
+      "involvedTitle": "Get involved",
+      "involved1Label": "Run a verification node",
+      "involved1Text": "Verify content and earn fees. The node software is open source and runs on standard hardware.",
+      "involved2Label": "Build an application",
+      "involved2Text": "Title Protocol is not just for photos. Any C2PA-signed content can be registered. Build verification into your own product.",
+      "involved3Label": "Read the specification",
+      "involved3Text": "The full protocol specification covers the trust model, data structures, TEE requirements, and extension architecture.",
+      "closingTitle": "Start building",
+      "closingDesc": "Everything you need is on GitHub."
+    },
+    "about": {
+      "heroTitle": "About RootLens",
+      "heroSubtitle": "A camera app that proves your content is real, built on an open protocol designed to outlast any single product.",
+      "flowIntro": "Here is what happens under the hood when you publish a photo:",
+      "closingTitle": "See what we have built",
+      "closingDesc": "Try a verified photo, explore the code, or read the spec.",
+      "closingCtaGithub": "View on GitHub"
+    }
+  },
+
   "lp": {
     "hero": {
       "title": "Prove it's real.",

@@ -6,7 +6,6 @@ import { PhoneMockup } from "./Placeholder";
 
 const DEMO_URL = "/p/demo";
 
-/* ---- Hero ---- */
 function Hero() {
   const t = useTranslations("lp.hero");
   return (
@@ -25,7 +24,6 @@ function Hero() {
             </a>
           </div>
         </div>
-        {/* TODO: Replace with real app screenshot */}
         <PhoneMockup
           label="App screenshot"
           sublabel="Camera → Verify → Share link"
@@ -35,7 +33,6 @@ function Hero() {
   );
 }
 
-/* ---- How it works (3 steps) ---- */
 function AppFlow() {
   const t = useTranslations("lp.appFlow");
   const steps = ["step1", "step2", "step3"] as const;
@@ -66,21 +63,19 @@ function AppFlow() {
   );
 }
 
-/* ---- Closing CTA ---- */
 function ClosingCTA() {
+  const t = useTranslations("pages.home");
   return (
     <section className={s.closingCta}>
       <div className={s.closingCtaInner}>
-        <div className={s.closingCtaTitle}>Try it yourself</div>
-        <div className={s.closingCtaDesc}>
-          See a real verified photo. Or learn how the technology works.
-        </div>
+        <div className={s.closingCtaTitle}>{t("closingTitle")}</div>
+        <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
         <div className={s.closingCtaButtons}>
           <a href={DEMO_URL} className={s.ctaPrimary}>
             See a verified photo
           </a>
-          <a href="/technology" className={s.ctaSecondary}>
-            How it works
+          <a href="/why" className={s.ctaSecondary}>
+            {t("closingCtaWhy")}
           </a>
         </div>
       </div>
@@ -88,7 +83,6 @@ function ClosingCTA() {
   );
 }
 
-/* ---- Main ---- */
 export default function HomePage() {
   return (
     <div className={s.page}>
