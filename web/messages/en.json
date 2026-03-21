@@ -3,7 +3,7 @@
     "hero": {
       "title": "Prove it's real.",
       "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
-      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. Title Protocol saves that proof as a permanent, independent record — so even when social media strips the data from your file, the proof still exists.",
+      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. Title Protocol saves that proof as a permanent, independent record. Even when social media strips the data from your file, the proof still exists.",
       "ctaHow": "Why this matters",
       "ctaGithub": "View on GitHub"
     },
@@ -11,7 +11,7 @@
     "appFlow": {
       "title": "How it works",
       "step1": { "label": "Capture", "text": "Take a photo or video with RootLens. A digital signature is attached instantly." },
-      "step2": { "label": "Prove", "text": "Title Protocol verifies the signature and saves the proof as a permanent record — separate from the file itself." },
+      "step2": { "label": "Prove", "text": "Title Protocol verifies the signature and saves the proof as a permanent record, separate from the file itself." },
       "step3": { "label": "Share", "text": "Get a link. Post it anywhere. Anyone who opens it can see when, where, and on what device the content was captured." },
       "editing": "You can still crop, mask, or trim before sharing. RootLens tracks every edit, so viewers can see exactly what was changed and confirm the original is real."
     },
@@ -21,11 +21,11 @@
       "intro": "Across industries, the same crisis is unfolding: nobody can tell what's real anymore.",
       "sns": {
         "label": "Social media & creators",
-        "text": "Deepfake videos go viral with fabricated news logos. Creators face accusations that real content is AI-generated. Unauthorized reposting is the norm — revenue goes to the copier, not the original creator."
+        "text": "Deepfake videos go viral with fabricated news logos. Creators face accusations that real content is AI-generated. Unauthorized reposting is the norm, and revenue goes to the copier, not the original creator."
       },
       "media": {
         "label": "News & journalism",
-        "text": "Reporters face accusations that real footage was AI-generated. Video evidence — once considered conclusive — is now questioned by default. The speed of misinformation structurally outpaces correction."
+        "text": "Reporters face accusations that real footage was AI-generated. Video evidence, once considered conclusive, is now questioned by default. The speed of misinformation structurally outpaces correction."
       },
       "insurance": {
         "label": "Insurance & finance",
@@ -40,29 +40,29 @@
     "c2pa": {
       "title": "The right foundation already exists",
       "p1": "The root cause of all these problems is the same: digital content's origin and rightful owner are unknowable.",
-      "p2": "Detecting fakes after the fact — with AI or watermarks — is a structural arms race. As generation improves, so does the ability to fake. There is no inherent advantage for defenders.",
-      "p3": "The sound approach is to record provenance at the time of creation with cryptographic signatures. The security of these signatures depends on the integrity of signing keys, the certificate chain, and the implementation — but unlike post-hoc detection, this approach has a structural foundation rather than an endless game of catch-up.",
-      "p4": "C2PA (Coalition for Content Provenance and Authenticity), backed by Adobe, Microsoft, Google, and over 6,000 organizations, is the open standard for exactly this. It records who captured content, when, with what tool, and what edits were made — all cryptographically bound to the content.",
+      "p2": "Detecting fakes after the fact, using AI or watermarks, is a structural arms race. As generation improves, so does the ability to fake. There is no inherent advantage for defenders.",
+      "p3": "The sound approach is to record provenance at the time of creation with cryptographic signatures. The security of these signatures depends on the integrity of signing keys, the certificate chain, and the implementation. But unlike post-hoc detection, this approach has a structural foundation rather than an endless game of catch-up.",
+      "p4": "C2PA (Coalition for Content Provenance and Authenticity), backed by Adobe, Microsoft, Google, and over 6,000 organizations, is the open standard for exactly this. It records who captured content, when, with what tool, and what edits were made, all cryptographically bound to the content.",
       "p5": "Google Pixel signs photos with its Titan M2 chip. Sony, Nikon, and Canon cameras embed C2PA signatures. OpenAI, Google, and Adobe sign their AI-generated content with C2PA. The infrastructure is real and growing."
     },
 
     "gap": {
       "title": "But proof dies when shared",
-      "p1": "C2PA binds provenance data tightly to the content file itself. The proof and the content are inseparable — by design.",
-      "p2": "This creates a fundamental problem: nearly every social media platform, messaging app, and CDN strips metadata on upload. Facebook, Instagram, X, YouTube — they all remove C2PA data. The World Privacy Forum calls this \"the primary obstacle to C2PA interoperability.\"",
-      "p3": "Even when C2PA data survives, the verified attributes inside — hardware capture proof, timestamp, edit history — can only be accessed by parsing the full manifest from the original file. There is no way for a third party to independently query those attributes without having the file in hand.",
+      "p1": "C2PA binds provenance data tightly to the content file itself. The proof and the content are inseparable. This is by design.",
+      "p2": "This creates a fundamental problem: nearly every social media platform, messaging app, and CDN strips metadata on upload. Facebook, Instagram, X, and YouTube all remove C2PA data. The World Privacy Forum calls this \"the primary obstacle to C2PA interoperability.\"",
+      "p3": "Even when C2PA data survives, the verified attributes inside (hardware capture proof, timestamp, edit history) can only be accessed by parsing the full manifest from the original file. There is no way for a third party to independently query those attributes without having the file in hand.",
       "p4": "Existing solutions try to recover the full manifest through watermarks or centralized cloud storage. But these approaches either rely on a single company's infrastructure or attempt to reconstruct what was lost, rather than ensuring it was never lost in the first place.",
       "p5": "To build an app where proof of authenticity actually reaches people on social media, we needed to solve a different problem: separating verified attributes from the content itself, so the proof exists independently and survives no matter what happens to the file."
     },
 
     "tp": {
-      "title": "Title Protocol — making proof independent",
+      "title": "Title Protocol: making proof independent",
       "subtitle": "Extracting verified attributes from content and recording them as standalone, trustworthy records.",
-      "p1": "Title Protocol takes C2PA-signed content, verifies it inside a Trusted Execution Environment (TEE) — hardware-isolated processing designed so that the server operator cannot access or alter the verification — and extracts the verified attributes into independent on-chain records.",
-      "p2": "The result: provenance data that exists on its own. No original file needed. Anyone can query the attributes — who captured it, when, with what device, whether it was hardware-signed — directly from the blockchain.",
+      "p1": "Title Protocol takes C2PA-signed content and verifies it inside a Trusted Execution Environment (TEE): hardware-isolated processing designed so that the server operator cannot access or alter the verification. The verified attributes are then extracted into independent on-chain records.",
+      "p2": "The result: provenance data that exists on its own. No original file needed. Anyone can query the attributes (who captured it, when, with what device, whether it was hardware-signed) directly from the blockchain.",
       "step1": {
         "label": "Sign at capture",
-        "text": "C2PA records who captured the content, when, and with what tool — cryptographically bound to the content."
+        "text": "C2PA records who captured the content, when, and with what tool, cryptographically bound to the content."
       },
       "step2": {
         "label": "Verify in isolated hardware",
@@ -79,16 +79,16 @@
       "techDetails": {
         "title": "Technical design",
         "stateless": {
-          "label": "Stateless TEE — two-phase processing",
-          "text": "Phase 1 (Verify): the TEE decrypts the content, verifies the C2PA signature chain, and signs the verification result with its own key. The signed result is returned to the client encrypted. Phase 2 (Sign): after the client stores the signed result in permanent off-chain storage (Arweave), the TEE re-verifies its own signature, constructs a blockchain transaction, and partially signs it. The client applies the final wallet signature and broadcasts. This design means the TEE never needs to hold a wallet, never maintains state between requests, and can be restarted or replaced at any time. If a TEE instance is compromised, the damage is temporally localized — it cannot retroactively affect records already on the blockchain."
+          "label": "Stateless TEE: two-phase processing",
+          "text": "Phase 1 (Verify): the TEE decrypts the content, verifies the C2PA signature chain, and signs the verification result with its own key. The signed result is returned to the client encrypted. Phase 2 (Sign): after the client stores the signed result in permanent off-chain storage (Arweave), the TEE re-verifies its own signature, constructs a blockchain transaction, and partially signs it. The client applies the final wallet signature and broadcasts. This design means the TEE never needs to hold a wallet, never maintains state between requests, and can be restarted or replaced at any time. If a TEE instance is compromised, the damage is temporally localized: it cannot retroactively affect records already on the blockchain."
         },
         "e2ee": {
           "label": "Client-side encryption",
-          "text": "The content owner encrypts the content and wallet address on their own device before uploading. Encryption uses an ephemeral X25519 keypair: the client generates a one-time key, derives a shared secret with the TEE's public key (published on-chain in Global Config), and encrypts with AES-256-GCM. The TEE's response is also encrypted with the same derived key. Node operators see only ciphertext — they cannot read, modify, or determine the destination wallet. The ephemeral key is discarded after use, providing forward secrecy."
+          "text": "The content owner encrypts the content and wallet address on their own device before uploading. Encryption uses an ephemeral X25519 keypair: the client generates a one-time key, derives a shared secret with the TEE's public key (published on-chain in Global Config), and encrypts with AES-256-GCM. The TEE's response is also encrypted with the same derived key. Node operators see only ciphertext and cannot read, modify, or determine the destination wallet. The ephemeral key is discarded after use, providing forward secrecy."
         },
         "coreExt": {
           "label": "Core / Extension architecture",
-          "text": "Core records the C2PA provenance chain and rights structure. Extensions add computed attributes — perceptual hash, hardware signing proof, AI detection flags — as WASM modules executed inside the TEE. Extensions enable content lookup even after platforms strip the original metadata."
+          "text": "Core records the C2PA provenance chain and rights structure. Extensions add computed attributes (perceptual hash, hardware signing proof, AI detection flags) as WASM modules executed inside the TEE. Extensions enable content lookup even after platforms strip the original metadata."
         },
         "cost": {
           "label": "Compressed NFT cost optimization",
@@ -96,7 +96,7 @@
         },
         "security": {
           "label": "Security considerations",
-          "text": "TEEs are not infallible — side-channel attacks have been demonstrated against some implementations (e.g., Foreshadow against SGX). Title Protocol mitigates this through multiple layers: (1) Stateless operation — no persistent keys survive across requests, so a compromised instance cannot affect past or future records. (2) Wallet key separation — the TEE never holds the user's wallet key; it only partially signs transactions. (3) Client-side encryption — even if the TEE host is compromised, the node operator still cannot read content because encryption happens on the user's device. (4) Remote attestation — clients verify TEE integrity before submitting content. (5) All TEE enclave code is open source and independently auditable. The protocol also explicitly does not prevent provenance laundering (re-registering someone else's content) — similarity-based deduplication at registration time would destroy the low-cost design. Instead, duplicate detection is handled at query time by applications. Content semantics (legality, appropriateness) are also outside protocol scope — these are application-layer responsibilities."
+          "text": "TEEs are not infallible. Side-channel attacks have been demonstrated against some implementations (e.g., Foreshadow against SGX). Title Protocol mitigates this through multiple layers: (1) Stateless operation: no persistent keys survive across requests, so a compromised instance cannot affect past or future records. (2) Wallet key separation: the TEE never holds the user's wallet key; it only partially signs transactions. (3) Client-side encryption: even if the TEE host is compromised, the node operator still cannot read content because encryption happens on the user's device. (4) Remote attestation: clients verify TEE integrity before submitting content. (5) All TEE enclave code is open source and independently auditable. The protocol also explicitly does not prevent provenance laundering (re-registering someone else's content). Similarity-based deduplication at registration time would destroy the low-cost design, so duplicate detection is handled at query time by applications. Content semantics (legality, appropriateness) are also outside protocol scope and are application-layer responsibilities."
         }
       }
     },
@@ -110,26 +110,26 @@
       },
       "scenario2": {
         "label": "Querying attributes without the file",
-        "text": "Existing services store full C2PA manifests externally — you still need to parse the manifest to access specific attributes. Title Protocol extracts and records individual verified attributes, making them directly queryable from the blockchain."
+        "text": "Existing services store full C2PA manifests externally, so you still need to parse the manifest to access specific attributes. Title Protocol extracts and records individual verified attributes, making them directly queryable from the blockchain."
       },
       "scenario3": {
         "label": "Cross-platform rights tracing",
-        "text": "When content goes viral, tracing the original creator requires searching across fragmented services, each with its own ID scheme. Title Protocol uses a content ID derived from the SHA-256 hash of the C2PA manifest signature — a value anyone can compute from the same C2PA content, independent of Title Protocol. Rights holders are linked by wallet address, enabling cross-platform tracing through a neutral, non-proprietary identifier."
+        "text": "When content goes viral, tracing the original creator requires searching across fragmented services, each with its own ID scheme. Title Protocol uses a content ID derived from the SHA-256 hash of the C2PA manifest signature. This is a value anyone can compute from the same C2PA content, independent of Title Protocol. Rights holders are linked by wallet address, enabling cross-platform tracing through a neutral, non-proprietary identifier."
       },
       "scenario4": {
         "label": "Trusting the verifier",
-        "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE — the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. All TEE enclave code is open source, so the verification logic itself can be independently audited. The trust shifts from a company's reputation to a publicly auditable codebase and security model."
+        "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE: the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. All TEE enclave code is open source, so the verification logic itself can be independently audited. The trust shifts from a company's reputation to a publicly auditable codebase and security model."
       }
     },
 
     "rootlens": {
       "title": "RootLens",
       "subtitle": "The reason we built Title Protocol",
-      "p1": "RootLens is a camera app that proves your photo or video was really captured — and lets you share that proof on any platform.",
+      "p1": "RootLens is a camera app that proves your photo or video was really captured, and lets you share that proof on any platform.",
       "step1": "Capture a photo or video",
       "step2": "The app signs it with C2PA using the device's secure hardware",
-      "step3": "Publish — Title Protocol extracts and records the proof",
-      "step4": "Share the link anywhere — anyone can verify it",
+      "step3": "Publish. Title Protocol extracts and records the proof",
+      "step4": "Share the link anywhere. Anyone can verify it",
       "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain on the blockchain. Other applications built on Title Protocol can access the same records.",
       "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real."
     },
@@ -137,7 +137,7 @@
     "openSource": {
       "title": "Open source. Open protocol.",
       "spec": "The specification, architecture documentation, and implementation are all publicly available. You can read the docs and independently verify or reimplement the entire system.",
-      "node": "Anyone can run a verification node. Anyone can build an application on the protocol. Governance is managed by a DAO — no single entity controls it.",
+      "node": "Anyone can run a verification node. Anyone can build an application on the protocol. Governance is managed by a DAO, and no single entity controls it.",
       "code": "All source code is public, released under Apache 2.0.",
       "tpRepo": "Title Protocol",
       "rlRepo": "RootLens",
