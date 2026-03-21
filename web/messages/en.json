@@ -1,4 +1,20 @@
 {
+  "common": {
+    "seeVerifiedPhoto": "See a verified photo",
+    "demoLink": "See a verified photo in action"
+  },
+
+  "diagram": {
+    "c2paTitle": "C2PA alone",
+    "c2paSubtitle": "Proof is in the file",
+    "tpTitle": "With Title Protocol",
+    "tpSubtitle": "Proof is on-chain",
+    "step1": "Original capture",
+    "step2": "Screenshot / re-save",
+    "step3": "Social media upload",
+    "step4": "Re-download"
+  },
+
   "nav": {
     "technology": "Technology",
     "why": "Why",

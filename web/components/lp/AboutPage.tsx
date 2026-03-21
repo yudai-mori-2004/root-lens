@@ -82,7 +82,7 @@ function ClosingCTA() {
         <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
         <div className={s.closingCtaButtons}>
           <a href={DEMO_URL} className={s.ctaPrimary}>
-            See a verified photo
+            {useTranslations("common")("seeVerifiedPhoto")}
           </a>
           <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.ctaSecondary}>
             <GitHubIcon className={s.repoIcon} />

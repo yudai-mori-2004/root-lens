@@ -70,7 +70,7 @@ function ClosingCTA() {
             {t("closingCtaTech")}
           </a>
           <a href={DEMO_URL} className={s.ctaSecondary}>
-            See a verified photo
+            {useTranslations("common")("seeVerifiedPhoto")}
           </a>
         </div>
       </div>

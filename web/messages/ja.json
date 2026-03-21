@@ -1,17 +1,33 @@
 {
+  "common": {
+    "seeVerifiedPhoto": "検証済み写真を見る",
+    "demoLink": "検証済み写真を確認する"
+  },
+
+  "diagram": {
+    "c2paTitle": "C2PA単体",
+    "c2paSubtitle": "証明はファイルの中",
+    "tpTitle": "Title Protocol併用",
+    "tpSubtitle": "証明はオンチェーン",
+    "step1": "撮影",
+    "step2": "スクリーンショット / 再保存",
+    "step3": "SNSアップロード",
+    "step4": "再ダウンロード"
+  },
+
   "nav": {
     "technology": "技術",
     "why": "課題",
     "developers": "開発者",
     "about": "概要",
-    "demo": "デモを見る"
+    "demo": "検証ページ"
   },
 
   "pages": {
     "home": {
-      "closingTitle": "自分の目で確かめる",
-      "closingDesc": "検証済みの写真を開くか、なぜこれが必要なのかを読む。",
-      "closingCtaWhy": "なぜ必要なのか"
+      "closingTitle": "試してみる",
+      "closingDesc": "検証済みの写真を開いて、仕組みを確認できます。",
+      "closingCtaWhy": "背景を読む"
     },
     "technology": {
       "heroTitle": "仕組み",
@@ -29,7 +45,7 @@
       "closingCtaTech": "仕組みを見る"
     },
     "developers": {
-      "heroTitle": "Title Protocol上で構築する",
+      "heroTitle": "Title Protocolで開発する",
       "heroSubtitle": "プロトコル、ツール、ドキュメントはすべてオープンソースです。ノードを運営し、アプリケーションを構築し、仕様に貢献できます。",
       "involvedTitle": "参加する",
       "involved1Label": "検証ノードを運営する",
@@ -38,14 +54,14 @@
       "involved2Text": "Title Protocolは写真だけのものではありません。あらゆるC2PA署名付きコンテンツを登録できます。あなたのプロダクトに検証機能を組み込めます。",
       "involved3Label": "仕様書を読む",
       "involved3Text": "完全なプロトコル仕様書は、信頼モデル、データ構造、TEE要件、拡張アーキテクチャをカバーしています。",
-      "closingTitle": "構築を始める",
+      "closingTitle": "開発を始める",
       "closingDesc": "必要なものはすべてGitHubにあります。"
     },
     "about": {
       "heroTitle": "RootLensについて",
       "heroSubtitle": "コンテンツが本物であることを証明するカメラアプリ。単一のプロダクトより長く存続するよう設計されたオープンプロトコル上に構築されています。",
       "flowIntro": "写真を公開する時、内部で起きていること:",
-      "closingTitle": "私たちが作ったものを見る",
+      "closingTitle": "プロジェクトを見る",
       "closingDesc": "検証済み写真を試すか、コードを探索するか、仕様書を読む。",
       "closingCtaGithub": "GitHubで見る"
     }
@@ -56,8 +72,8 @@
       "title": "Prove it's real.",
       "tagline": "写真を撮る。改ざんできない記録が残る。リンクを共有すれば、誰でも確認できる。",
       "description": "RootLensは撮影した瞬間にデジタル署名を付けるカメラアプリです。Title Protocolはその証明を独立した永続的な記録として保存します。SNSがファイルからデータを削除しても、証明は残り続けます。",
-      "ctaDemo": "検証済み写真を見る",
-      "ctaHow": "使い方を見る"
+      "ctaDemo": "検証ページを開く",
+      "ctaHow": "仕組みを見る"
     },
 
     "appFlow": {

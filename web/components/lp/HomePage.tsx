@@ -6,6 +6,10 @@ import { PhoneMockup } from "./Placeholder";
 
 const DEMO_URL = "/p/demo";
 
+function useCommon() {
+  return useTranslations("common");
+}
+
 function Hero() {
   const t = useTranslations("lp.hero");
   return (
@@ -56,7 +60,7 @@ function AppFlow() {
           <span className={s.emphasis}>{t("editing")}</span>
         </p>
         <a href={DEMO_URL} className={s.demoLink}>
-          See a verified photo in action &rarr;
+          {useCommon()("demoLink")} &rarr;
         </a>
       </div>
     </section>
@@ -72,7 +76,7 @@ function ClosingCTA() {
         <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
         <div className={s.closingCtaButtons}>
           <a href={DEMO_URL} className={s.ctaPrimary}>
-            See a verified photo
+            {useCommon()("seeVerifiedPhoto")}
           </a>
           <a href="/why" className={s.ctaSecondary}>
             {t("closingCtaWhy")}
