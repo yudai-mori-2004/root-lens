@@ -5,15 +5,14 @@
    - Tinted neutrals (no pure black/white)
    - Generous line-height for long prose
    - Single-column centered prose (max 680px)
-   - Navy (#1E3A5F) as brand accent (interactive elements only)
+   - Navy (#1E3A5F) as brand accent
    - No decorative animation
-   - CJK-aware font stack
    ============================================================ */
 
 /* ---- Layout ---- */
 .page {
   --lp-prose-width: 680px;
-  --lp-wide-width: 720px;
+  --lp-wide-width: 960px;
   --lp-text: #1a1c1e;
   --lp-text-secondary: #4a4e54;
   --lp-text-tertiary: #6e7279;
@@ -29,76 +28,11 @@
   font-family: var(--font-lp-body, var(--font-geist-sans, sans-serif)), "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
   color: var(--lp-text);
   background: var(--lp-bg);
-  line-height: 1.8;
+  line-height: 1.72;
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  .page {
-    --lp-text: #e0ddd8;
-    --lp-text-secondary: #a8a49e;
-    --lp-text-tertiary: #7a776f;
-    --lp-bg: #111210;
-    --lp-bg-alt: #1a1b18;
-    --lp-accent: #7B9CC0;
-    --lp-accent-light: #9ab6d4;
-    --lp-border: #2c2d2a;
-    --lp-code-bg: #1e1f1c;
-    --lp-fail: #c48a7e;
-    --lp-fail-muted: #8a6a62;
-  }
-}
-
-/* ---- Page Hero (subpages) ---- */
-.pageHero {
-  padding: 64px 24px 48px;
-}
-
-.pageHeroInner {
-  max-width: var(--lp-prose-width);
-  margin: 0 auto;
-}
-
-.pageHeroTitle {
-  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
-  font-size: clamp(1.8rem, 5vw, 2.5rem);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: var(--lp-text);
-  margin-bottom: 12px;
-}
-
-.pageHeroSubtitle {
-  font-size: 1.05rem;
-  line-height: 1.7;
-  color: var(--lp-text-secondary);
-}
-
-/* ---- Involve grid (developers page) ---- */
-.involveGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 32px;
-}
-
-.involveItem {
-  padding: 16px 0;
-}
-
-.involveLabel {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--lp-text);
-  margin-bottom: 4px;
-}
-
-.involveText {
-  font-size: 0.9rem;
-  line-height: 1.7;
-  color: var(--lp-text-secondary);
-}
+/* Dark mode disabled — always light */
 
 /* ---- Section ---- */
 .section {
@@ -139,7 +73,7 @@
 /* ---- Typography ---- */
 .prose {
   font-size: 1rem;
-  line-height: 1.8;
+  line-height: 1.72;
   color: var(--lp-text-secondary);
 }
 
@@ -169,7 +103,7 @@
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.025em;
-  color: var(--lp-text);
+  color: var(--lp-accent);
   margin-bottom: 24px;
 }
 
@@ -178,12 +112,12 @@
   line-height: 1.6;
   color: var(--lp-text);
   margin-bottom: 16px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .heroDescription {
   font-size: 1rem;
-  line-height: 1.8;
+  line-height: 1.72;
   color: var(--lp-text-secondary);
   margin-bottom: 40px;
 }
@@ -198,57 +132,78 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 24px;
+  padding: 12px 28px;
   background: var(--lp-accent);
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  border-radius: 3px;
+  border-radius: 6px;
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: opacity 0.15s ease-out;
+  transition: background 0.15s ease-out;
 }
 
 .ctaPrimary:hover {
-  opacity: 0.88;
+  background: var(--lp-accent-light);
 }
 
 .ctaSecondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 24px;
+  padding: 12px 28px;
   background: transparent;
   color: var(--lp-accent);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  border-radius: 3px;
-  border: 1px solid var(--lp-border);
+  border-radius: 6px;
+  border: 1px solid var(--lp-accent);
   cursor: pointer;
   text-decoration: none;
-  transition: border-color 0.15s ease-out;
+  transition: background 0.15s ease-out, color 0.15s ease-out;
 }
 
 .ctaSecondary:hover {
-  border-color: var(--lp-accent);
+  background: var(--lp-accent);
+  color: #fff;
+}
+
+/* ---- Hero with visual (split layout, homepage only) ---- */
+.heroSplit {
+  padding: 120px 24px 80px;
+}
+
+.heroSplitInner {
+  max-width: var(--lp-wide-width);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 48px;
+  align-items: center;
 }
 
 /* ---- Issues grid ---- */
 .issuesGrid {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   margin-top: 32px;
 }
 
 .issueItem {
-  padding: 16px 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.issueItem:last-child {
+  border-bottom: none;
 }
 
 .issueLabel {
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--lp-accent);
   margin-bottom: 6px;
 }
@@ -264,14 +219,19 @@
   margin-top: 40px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .step {
   display: grid;
   grid-template-columns: 48px 1fr;
   gap: 16px;
-  padding: 16px 0;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.step:last-child {
+  border-bottom: none;
 }
 
 .stepNumber {
@@ -333,6 +293,11 @@
 
 .techItem {
   padding: 16px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.techItem:last-child {
+  border-bottom: none;
 }
 
 .techLabel {
@@ -354,11 +319,16 @@
   margin-top: 32px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .comparisonItem {
-  padding: 16px 0;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.comparisonItem:last-child {
+  border-bottom: none;
 }
 
 .comparisonLabel {
@@ -412,18 +382,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 16px 20px;
   border: 1px solid var(--lp-border);
-  border-radius: 3px;
+  border-radius: 6px;
   text-decoration: none;
   color: var(--lp-text);
   font-weight: 600;
   font-size: 0.95rem;
-  transition: border-color 0.15s ease-out;
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
 }
 
 .repoLink:hover {
   border-color: var(--lp-accent);
+  background: var(--lp-bg-alt);
 }
 
 .repoIcon {
@@ -472,20 +443,6 @@
   color: var(--lp-text-tertiary);
 }
 
-/* ---- Hero with visual (split layout) ---- */
-.heroSplit {
-  padding: 100px 24px 72px;
-}
-
-.heroSplitInner {
-  max-width: var(--lp-wide-width);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 240px;
-  gap: 48px;
-  align-items: center;
-}
-
 /* ---- Placeholder / Mockup ---- */
 .placeholder {
   width: 100%;
@@ -515,10 +472,10 @@
 }
 
 .phoneMockup {
-  width: 200px;
+  width: 220px;
   aspect-ratio: 9/19;
-  border-radius: 24px;
-  border: 2.5px solid var(--lp-text);
+  border-radius: 28px;
+  border: 3px solid var(--lp-text);
   background: var(--lp-bg-alt);
   position: relative;
   overflow: hidden;
@@ -528,10 +485,10 @@
 }
 
 .phoneNotch {
-  width: 60px;
-  height: 16px;
+  width: 80px;
+  height: 20px;
   background: var(--lp-text);
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 12px 12px;
   margin: 0 auto;
   flex-shrink: 0;
 }
@@ -546,101 +503,10 @@
   padding: 16px;
 }
 
-/* ---- Diagram section ---- */
-.diagramSection {
-  padding: 60px 24px;
-  background: var(--lp-bg-alt);
-}
-
-.diagramInner {
-  max-width: var(--lp-wide-width);
-  margin: 0 auto;
-}
-
-/* ---- Feature/Highlight section ---- */
-.sectionHighlight {
-  padding: 80px 24px;
-  background: #1a2a3e;
-  color: #fff;
-}
-
-.sectionHighlight .sectionTitle {
-  color: #fff;
-}
-
-.sectionHighlight .sectionSubtitle {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.sectionHighlight .prose {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.sectionHighlight .emphasis {
-  color: #fff;
-}
-
-.sectionHighlight .flowStep {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.sectionHighlight .flowNumber {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* ---- Closing CTA ---- */
-.closingCta {
-  padding: 72px 24px;
-  text-align: center;
-}
-
-.closingCtaInner {
-  max-width: var(--lp-prose-width);
-  margin: 0 auto;
-}
-
-.closingCtaTitle {
-  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
-  font-size: clamp(1.2rem, 3vw, 1.6rem);
-  font-weight: 700;
-  color: var(--lp-text);
-  margin-bottom: 8px;
-}
-
-.closingCtaDesc {
-  font-size: 0.95rem;
-  color: var(--lp-text-secondary);
-  margin-bottom: 28px;
-  line-height: 1.7;
-}
-
-.closingCtaButtons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-/* ---- Demo link (inline) ---- */
-.demoLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--lp-accent);
-  text-decoration: none;
-  margin-top: 16px;
-}
-
-.demoLink:hover {
-  text-decoration: underline;
-}
-
 /* ---- Gap Diagram ---- */
 .gapTrack {
   flex: 1 1 280px;
-  max-width: 340px;
+  max-width: 320px;
   padding: 28px 24px;
   border-radius: 6px;
   margin: 8px;
@@ -690,7 +556,6 @@
 .gapIconPass {
   background: var(--lp-accent);
   color: #fff;
-  border: none;
 }
 
 .gapIconFail {
@@ -715,19 +580,72 @@
   opacity: 0.4;
 }
 
+/* ---- Closing CTA (homepage only) ---- */
+.closingCta {
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.closingCtaInner {
+  max-width: var(--lp-prose-width);
+  margin: 0 auto;
+}
+
+.closingCtaTitle {
+  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 700;
+  color: var(--lp-text);
+  margin-bottom: 12px;
+}
+
+.closingCtaDesc {
+  font-size: 1rem;
+  color: var(--lp-text-secondary);
+  margin-bottom: 32px;
+  line-height: 1.7;
+}
+
+.closingCtaButtons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---- Demo link (inline) ---- */
+.demoLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lp-accent);
+  text-decoration: none;
+  margin-top: 16px;
+}
+
+.demoLink:hover {
+  text-decoration: underline;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 640px) {
+  .hero {
+    padding: 80px 20px 60px;
+  }
+
+  .heroSplit {
+    padding: 80px 20px 60px;
+  }
+
   .heroSplitInner {
     grid-template-columns: 1fr;
     gap: 32px;
   }
 
   .phoneMockup {
-    width: 160px;
-  }
-
-  .heroSplit {
-    padding: 72px 20px 56px;
+    width: 180px;
   }
 
   .section {
@@ -747,10 +665,5 @@
   .ctaSecondary {
     justify-content: center;
     width: 100%;
-  }
-
-  .closingCtaButtons {
-    flex-direction: column;
-    align-items: center;
   }
 }

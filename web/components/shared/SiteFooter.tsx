@@ -1,37 +1,24 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import s from "./shared.module.css";
-
-const GITHUB_TP = "https://github.com/yudai-mori-2004/title-protocol";
+import s from "../lp/lp.module.css";
 
 export default function SiteFooter() {
-  const tFooter = useTranslations("lp.footer");
-  const tNav = useTranslations("nav");
+  const t = useTranslations("lp.footer");
 
   return (
-    <footer className={s.siteFooter}>
-      <div className={s.siteFooterInner}>
-        <div className={s.footerLeft}>
-          <div className={s.footerBrand}>RootLens</div>
-          <div className={s.footerBuiltBy}>{tFooter("builtBy")}</div>
+    <footer className={s.footer}>
+      <div className={s.footerInner}>
+        <div className={s.footerBuiltBy}>
+          <a href="https://moodai.jp" target="_blank" rel="noopener noreferrer" className={s.footerLink}>
+            Yudai Mori
+          </a>
+          {" & "}
+          <a href="https://akitozizi818.github.io/portfolio/" target="_blank" rel="noopener noreferrer" className={s.footerLink}>
+            Akito Kono
+          </a>
         </div>
-        <div className={s.footerRight}>
-          <div className={s.footerNavGroup}>
-            <a href="/technology" className={s.footerNavLink}>{tNav("technology")}</a>
-            <a href="/why" className={s.footerNavLink}>{tNav("why")}</a>
-            <a href="/developers" className={s.footerNavLink}>{tNav("developers")}</a>
-            <a href="/about" className={s.footerNavLink}>{tNav("about")}</a>
-          </div>
-          <div className={s.footerNavGroup}>
-            <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.footerNavLink}>
-              GitHub
-            </a>
-          </div>
-        </div>
-      </div>
-      <div className={s.footerBottom}>
-        {tFooter("license")}
+        <div className={s.footerLicense}>{t("license")}</div>
       </div>
     </footer>
   );

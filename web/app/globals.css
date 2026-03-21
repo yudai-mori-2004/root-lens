@@ -25,26 +25,7 @@
   --page-bg: #f8f8f8;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-accent: #7B9CC0;
-
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #111111;
-    --bg-skeleton: #333333;
-
-    --text-primary: #ededed;
-    --text-secondary: #a0a0a0;
-    --text-tertiary: #666666;
-
-    --border-light: #2a2a2a;
-
-    --color-verified: #7B9CC0;
-    --color-failed: #D08080;
-
-    --page-bg: #0a0a0a;
-  }
-}
+/* Dark mode disabled — always light */
 
 *,
 *::before,

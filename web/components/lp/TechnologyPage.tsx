@@ -1,12 +1,17 @@
 "use client";
 
+/**
+ * /technology — 元の1枚LPの全ストーリーをそのまま展開する「読ませる」ページ。
+ * 課題 → C2PA → Gap(図解付き) → Title Protocol → 比較 → RootLens → OSS → フッター
+ */
+
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import s from "./lp.module.css";
 import GapDiagram from "./GapDiagram";
 
-const DEMO_URL = "/p/demo";
 const GITHUB_TP = "https://github.com/yudai-mori-2004/title-protocol";
+const GITHUB_RL = "https://github.com/yudai-mori-2004/root-lens";
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -16,69 +21,87 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-/* ---- Page Hero ---- */
-function PageHero() {
+function Hero() {
   const t = useTranslations("pages.technology");
   return (
-    <section className={s.pageHero}>
-      <div className={s.pageHeroInner}>
-        <h1 className={s.pageHeroTitle}>{t("heroTitle")}</h1>
-        <p className={s.pageHeroSubtitle}>{t("heroSubtitle")}</p>
+    <section className={s.hero}>
+      <div className={s.heroInner}>
+        <h1 className={s.heroTitle}>{t("heroTitle")}</h1>
+        <p className={s.heroDescription}>{t("heroSubtitle")}</p>
       </div>
     </section>
   );
 }
 
-/* ---- Gap section (with lead-in replacing C2PA p1-p5) ---- */
-function GapSection() {
-  const tPage = useTranslations("pages.technology");
-  const tGap = useTranslations("lp.gap");
+function SocialIssues() {
+  const t = useTranslations("lp.issues");
+  const issues = ["sns", "media", "insurance", "ai"] as const;
 
   return (
     <section className={s.section}>
       <div className={s.sectionInner}>
-        {/* One-line lead-in replaces the full C2PA explanation */}
-        <p className={s.prose}>
-          <span className={s.emphasis}>{tPage("leadIn")}</span>
-        </p>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.sectionSubtitle}>{t("intro")}</p>
+        <div className={s.issuesGrid}>
+          {issues.map((key) => (
+            <div key={key} className={s.issueItem}>
+              <div className={s.issueLabel}>{t(`${key}.label`)}</div>
+              <div className={s.issueText}>{t(`${key}.text`)}</div>
+            </div>
+          ))}
+        </div>
       </div>
+    </section>
+  );
+}
 
-      <div className={s.diagramInner} style={{ marginTop: 32 }}>
-        <h2 className={s.sectionTitle}>{tGap("title")}</h2>
-        <p className={s.prose} style={{ maxWidth: 680, marginBottom: 16 }}>
-          {tGap("p1")}
+function C2PASection() {
+  const t = useTranslations("lp.c2pa");
+  return (
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.prose}>{t("p1")}</p>
+        <p className={s.prose}>{t("p2")}</p>
+        <p className={s.prose}>{t("p3")}</p>
+        <p className={s.prose}>
+          <span className={s.emphasis}>{t("p4")}</span>
         </p>
-        <p className={s.prose} style={{ maxWidth: 680, marginBottom: 32 }}>
-          {tGap("p2")}
-        </p>
+        <p className={s.prose}>{t("p5")}</p>
+      </div>
+    </section>
+  );
+}
+
+function GapSection() {
+  const t = useTranslations("lp.gap");
+  return (
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.prose}>{t("p1")}</p>
+        <p className={s.prose}>{t("p2")}</p>
+      </div>
+      <div style={{ maxWidth: 680, margin: "32px auto 0" }}>
         <GapDiagram />
-        <p className={s.prose} style={{ maxWidth: 680, marginTop: 24 }}>
-          {tGap("p3")}
-        </p>
-        <p className={s.prose} style={{ maxWidth: 680, marginTop: 16 }}>
-          {tGap("p4")}
-        </p>
-        <p className={s.prose} style={{ maxWidth: 680, marginTop: 16 }}>
-          <span className={s.emphasis}>{tGap("p5")}</span>
+      </div>
+      <div className={s.sectionInner} style={{ marginTop: 32 }}>
+        <p className={s.prose}>{t("p3")}</p>
+        <p className={s.prose}>{t("p4")}</p>
+        <p className={s.prose}>
+          <span className={s.emphasis}>{t("p5")}</span>
         </p>
       </div>
     </section>
   );
 }
 
-/* ---- Title Protocol ---- */
 function TitleProtocolSection() {
   const t = useTranslations("lp.tp");
   const [techOpen, setTechOpen] = useState(false);
 
   const steps = ["step1", "step2", "step3", "step4"] as const;
-  const techItems = [
-    "stateless",
-    "e2ee",
-    "coreExt",
-    "cost",
-    "security",
-  ] as const;
+  const techItems = ["stateless", "e2ee", "coreExt", "cost", "security"] as const;
 
   return (
     <section className={s.section}>
@@ -112,12 +135,8 @@ function TitleProtocolSection() {
             <div>
               {techItems.map((key) => (
                 <div key={key} className={s.techItem}>
-                  <div className={s.techLabel}>
-                    {t(`techDetails.${key}.label`)}
-                  </div>
-                  <div className={s.techText}>
-                    {t(`techDetails.${key}.text`)}
-                  </div>
+                  <div className={s.techLabel}>{t(`techDetails.${key}.label`)}</div>
+                  <div className={s.techText}>{t(`techDetails.${key}.text`)}</div>
                 </div>
               ))}
             </div>
@@ -128,7 +147,6 @@ function TitleProtocolSection() {
   );
 }
 
-/* ---- Comparison ---- */
 function ComparisonSection() {
   const t = useTranslations("lp.comparison");
   const scenarios = ["scenario1", "scenario2", "scenario3", "scenario4"] as const;
@@ -151,23 +169,59 @@ function ComparisonSection() {
   );
 }
 
-/* ---- Closing CTA ---- */
-function ClosingCTA() {
-  const t = useTranslations("pages.technology");
+function RootLensSection() {
+  const t = useTranslations("lp.rootlens");
+  const flowSteps = ["step1", "step2", "step3", "step4"] as const;
+
   return (
-    <section className={s.closingCta}>
-      <div className={s.closingCtaInner}>
-        <div className={s.closingCtaTitle}>{t("closingTitle")}</div>
-        <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
-        <div className={s.closingCtaButtons}>
-          <a href={DEMO_URL} className={s.ctaPrimary}>
-            {useTranslations("common")("seeVerifiedPhoto")}
-          </a>
-          <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.ctaSecondary}>
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.sectionSubtitle}>{t("subtitle")}</p>
+        <p className={s.prose}>{t("p1")}</p>
+
+        <div className={s.rootlensFlow}>
+          {flowSteps.map((key, i) => (
+            <div key={key} className={s.flowStep}>
+              <span className={s.flowNumber}>{i + 1}.</span>
+              <span>{t(key)}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className={s.prose} style={{ marginTop: 32 }}>
+          {t("permanence")}
+        </p>
+        <p className={s.prose}>
+          <span className={s.emphasis}>{t("targets")}</span>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function OpenSourceSection() {
+  const t = useTranslations("lp.openSource");
+
+  return (
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.prose}>{t("spec")}</p>
+        <p className={s.prose}>{t("node")}</p>
+
+        <div className={s.repoLinks}>
+          <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
             <GitHubIcon className={s.repoIcon} />
-            {t("closingCtaCode")}
+            {t("tpRepo")}
+          </a>
+          <a href={GITHUB_RL} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
+            <GitHubIcon className={s.repoIcon} />
+            {t("rlRepo")}
           </a>
         </div>
+
+        <p className={s.prose}>{t("code")}</p>
       </div>
     </section>
   );
@@ -176,11 +230,13 @@ function ClosingCTA() {
 export default function TechnologyPage() {
   return (
     <div className={s.page}>
-      <PageHero />
+      <Hero />
+      <C2PASection />
       <GapSection />
       <TitleProtocolSection />
       <ComparisonSection />
-      <ClosingCTA />
+      <RootLensSection />
+      <OpenSourceSection />
     </div>
   );
 }

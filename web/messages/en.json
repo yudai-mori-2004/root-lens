@@ -8,7 +8,7 @@
     "c2paTitle": "C2PA alone",
     "c2paSubtitle": "Proof is in the file",
     "tpTitle": "With Title Protocol",
-    "tpSubtitle": "Proof is on-chain",
+    "tpSubtitle": "Proof is linked on-chain",
     "step1": "Original capture",
     "step2": "Screenshot / re-save",
     "step3": "Social media upload",
@@ -27,11 +27,11 @@
     "home": {
       "closingTitle": "See the proof for yourself",
       "closingDesc": "Open a real verified photo. Or find out why this matters now.",
-      "closingCtaWhy": "Why this matters"
+      "closingCtaWhy": "Read more"
     },
     "technology": {
-      "heroTitle": "How it works",
-      "heroSubtitle": "C2PA provides the cryptographic foundation. Title Protocol makes it survive the real world.",
+      "heroTitle": "Proof, independent of the file.",
+      "heroSubtitle": "C2PA signs content at capture. But the proof is locked inside the file, and platforms strip it on upload. We needed a way to separate the proof from the file so it survives anything.",
       "leadIn": "C2PA, the open standard backed by Adobe, Microsoft, and Google, lets cameras sign content at capture. The technology works. The problem is what happens next.",
       "closingTitle": "See it in action",
       "closingDesc": "Open a verified photo and inspect the proof yourself. Everything on the verification page runs in your browser.",
@@ -71,7 +71,7 @@
     "hero": {
       "title": "Prove it's real.",
       "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
-      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. Title Protocol saves that proof as a permanent, independent record. Even when social media strips the data from your file, the proof still exists.",
+      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. The proof is saved as a permanent record, independent of the file. Even when social media strips the data, the proof remains.",
       "ctaDemo": "See a verified photo",
       "ctaHow": "How it works"
     },
@@ -138,7 +138,7 @@
       },
       "step3": {
         "label": "Extract and record",
-        "text": "The verified attributes are extracted and recorded on the Solana blockchain as a compressed NFT. Cost at current network conditions: ~$0.00015 per record. 100,000 records per month cost roughly $15."
+        "text": "The verified attributes are extracted and linked to a compressed NFT on the Solana blockchain. Cost at current network conditions: ~$0.00015 per record. 100,000 records per month cost roughly $15."
       },
       "step4": {
         "label": "Anyone can verify, anywhere",
@@ -205,7 +205,7 @@
     "openSource": {
       "title": "Open source. Open protocol.",
       "spec": "The specification, architecture documentation, and implementation are all publicly available. You can read the docs and independently verify or reimplement the entire system.",
-      "node": "Anyone can run a verification node. Anyone can build an application on the protocol. Governance is managed by a DAO, and no single entity controls it.",
+      "node": "RootLens is built on Title Protocol, an open protocol. Anyone can run a verification node, and anyone can build an application on it.",
       "code": "All source code is public, released under Apache 2.0.",
       "tpRepo": "Title Protocol",
       "rlRepo": "RootLens",

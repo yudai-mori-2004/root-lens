@@ -6,12 +6,9 @@ import { PhoneMockup } from "./Placeholder";
 
 const DEMO_URL = "/p/demo";
 
-function useCommon() {
-  return useTranslations("common");
-}
-
 function Hero() {
   const t = useTranslations("lp.hero");
+  const tc = useTranslations("common");
   return (
     <section className={s.heroSplit}>
       <div className={s.heroSplitInner}>
@@ -21,10 +18,10 @@ function Hero() {
           <p className={s.heroDescription}>{t("description")}</p>
           <div className={s.heroCtas}>
             <a href={DEMO_URL} className={s.ctaPrimary}>
-              {t("ctaDemo")}
+              {tc("seeVerifiedPhoto")}
             </a>
-            <a href="#how-it-works" className={s.ctaSecondary}>
-              {t("ctaHow")} &darr;
+            <a href="/technology" className={s.ctaSecondary}>
+              {t("ctaHow")}
             </a>
           </div>
         </div>
@@ -39,10 +36,11 @@ function Hero() {
 
 function AppFlow() {
   const t = useTranslations("lp.appFlow");
+  const tc = useTranslations("common");
   const steps = ["step1", "step2", "step3"] as const;
 
   return (
-    <section id="how-it-works" className={s.section}>
+    <section className={s.section}>
       <div className={s.sectionInner}>
         <h2 className={s.sectionTitle}>{t("title")}</h2>
         <div className={s.steps}>
@@ -60,8 +58,30 @@ function AppFlow() {
           <span className={s.emphasis}>{t("editing")}</span>
         </p>
         <a href={DEMO_URL} className={s.demoLink}>
-          {useCommon()("demoLink")} &rarr;
+          {tc("demoLink")} &rarr;
         </a>
+      </div>
+    </section>
+  );
+}
+
+function SocialIssues() {
+  const t = useTranslations("lp.issues");
+  const issues = ["sns", "media", "insurance", "ai"] as const;
+
+  return (
+    <section className={s.section}>
+      <div className={s.sectionInner}>
+        <h2 className={s.sectionTitle}>{t("title")}</h2>
+        <p className={s.sectionSubtitle}>{t("intro")}</p>
+        <div className={s.issuesGrid}>
+          {issues.map((key) => (
+            <div key={key} className={s.issueItem}>
+              <div className={s.issueLabel}>{t(`${key}.label`)}</div>
+              <div className={s.issueText}>{t(`${key}.text`)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -69,6 +89,7 @@ function AppFlow() {
 
 function ClosingCTA() {
   const t = useTranslations("pages.home");
+  const tc = useTranslations("common");
   return (
     <section className={s.closingCta}>
       <div className={s.closingCtaInner}>
@@ -76,9 +97,9 @@ function ClosingCTA() {
         <div className={s.closingCtaDesc}>{t("closingDesc")}</div>
         <div className={s.closingCtaButtons}>
           <a href={DEMO_URL} className={s.ctaPrimary}>
-            {useCommon()("seeVerifiedPhoto")}
+            {tc("seeVerifiedPhoto")}
           </a>
-          <a href="/why" className={s.ctaSecondary}>
+          <a href="/technology" className={s.ctaSecondary}>
             {t("closingCtaWhy")}
           </a>
         </div>
@@ -92,6 +113,7 @@ export default function HomePage() {
     <div className={s.page}>
       <Hero />
       <AppFlow />
+      <SocialIssues />
       <ClosingCTA />
     </div>
   );
