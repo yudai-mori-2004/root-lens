@@ -1,127 +1,155 @@
 /**
- * Visual diagram: C2PA proof dies when shared vs. Title Protocol proof survives
- * SVG-based, responsive, dark-mode aware via CSS variables
+ * Gap Diagram: Two-track comparison
+ * Left track: C2PA proof degrades (checkmark → X → X → X)
+ * Right track: Title Protocol proof persists (checkmark → checkmark → checkmark → checkmark)
+ *
+ * Pure SVG, dark-mode aware via CSS variables, responsive.
  */
 export default function GapDiagram() {
+  const steps = [
+    { label: "Original capture", left: true, right: true },
+    { label: "Screenshot / re-save", left: false, right: true },
+    { label: "Social media upload", left: false, right: true },
+    { label: "Re-download", left: false, right: true },
+  ];
+
   return (
-    <svg
-      viewBox="0 0 680 320"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label="Diagram showing how C2PA proof is lost when shared on social media, while Title Protocol preserves it independently"
-      style={{ width: "100%", height: "auto", maxWidth: 680 }}
+    <div style={{ display: "flex", gap: 0, justifyContent: "center", flexWrap: "wrap" }}>
+      {/* Left Track: C2PA only */}
+      <Track
+        title="C2PA alone"
+        subtitle="Proof is in the file"
+        steps={steps.map((s) => ({ label: s.label, pass: s.left }))}
+        variant="degrading"
+      />
+      {/* Right Track: With Title Protocol */}
+      <Track
+        title="With Title Protocol"
+        subtitle="Proof is on-chain"
+        steps={steps.map((s) => ({ label: s.label, pass: s.right }))}
+        variant="persistent"
+      />
+    </div>
+  );
+}
+
+function Track({
+  title,
+  subtitle,
+  steps,
+  variant,
+}: {
+  title: string;
+  subtitle: string;
+  steps: { label: string; pass: boolean }[];
+  variant: "degrading" | "persistent";
+}) {
+  const isRight = variant === "persistent";
+
+  return (
+    <div
+      style={{
+        flex: "1 1 280px",
+        maxWidth: 340,
+        padding: "28px 24px",
+        border: `1.5px solid ${isRight ? "var(--lp-accent, #1E3A5F)" : "var(--lp-border, #d8d8d4)"}`,
+        borderRadius: 8,
+        margin: 8,
+        background: isRight
+          ? "color-mix(in srgb, var(--lp-accent, #1E3A5F) 4%, transparent)"
+          : "var(--lp-bg, #fafaf8)",
+      }}
     >
-      {/* Background */}
-      <rect width="680" height="320" rx="8" fill="var(--lp-bg-alt, #f0f0ec)" />
+      <div
+        style={{
+          fontSize: "0.75rem",
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase" as const,
+          color: isRight ? "var(--lp-accent, #1E3A5F)" : "var(--lp-text-tertiary, #6e7279)",
+          marginBottom: 2,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          fontSize: "0.8rem",
+          color: "var(--lp-text-secondary, #4a4e54)",
+          marginBottom: 20,
+        }}
+      >
+        {subtitle}
+      </div>
 
-      {/* --- Top path: Without Title Protocol --- */}
-      <text x="20" y="36" fontSize="11" fontWeight="700" fill="var(--lp-text-tertiary, #6e7279)" letterSpacing="0.06em">
-        WITHOUT TITLE PROTOCOL
-      </text>
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {steps.map((step, i) => {
+          const showLine = i < steps.length - 1;
+          // Color logic: degrading track starts pass then fails; persistent always passes
+          const color = step.pass
+            ? "var(--lp-accent, #1E3A5F)"
+            : "#9a6458";
+          const nextPass = i < steps.length - 1 ? steps[i + 1].pass : step.pass;
+          const lineColor = nextPass
+            ? "var(--lp-accent, #1E3A5F)"
+            : "#c4a49c";
 
-      {/* Photo + C2PA */}
-      <rect x="20" y="52" width="120" height="56" rx="6" fill="var(--lp-accent, #1E3A5F)" opacity="0.12" />
-      <rect x="20" y="52" width="120" height="56" rx="6" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" fill="none" />
-      <text x="80" y="75" fontSize="12" fontWeight="600" fill="var(--lp-text, #1a1c1e)" textAnchor="middle">
-        Photo
-      </text>
-      <text x="80" y="93" fontSize="10" fill="var(--lp-accent, #1E3A5F)" textAnchor="middle" fontWeight="500">
-        + C2PA proof
-      </text>
-
-      {/* Arrow 1 */}
-      <line x1="148" y1="80" x2="192" y2="80" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1.5" />
-      <polygon points="192,75 204,80 192,85" fill="var(--lp-border, #d8d8d4)" />
-
-      {/* SNS Upload */}
-      <rect x="210" y="52" width="140" height="56" rx="6" fill="var(--lp-bg, #fafaf8)" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1.5" />
-      <text x="280" y="75" fontSize="12" fontWeight="600" fill="var(--lp-text, #1a1c1e)" textAnchor="middle">
-        SNS upload
-      </text>
-      <text x="280" y="93" fontSize="10" fill="var(--lp-text-tertiary, #6e7279)" textAnchor="middle">
-        metadata stripped
-      </text>
-
-      {/* Arrow 2 */}
-      <line x1="358" y1="80" x2="402" y2="80" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1.5" />
-      <polygon points="402,75 414,80 402,85" fill="var(--lp-border, #d8d8d4)" />
-
-      {/* Result: proof lost */}
-      <rect x="420" y="52" width="240" height="56" rx="6" fill="none" stroke="var(--lp-text-tertiary, #6e7279)" strokeWidth="1.5" strokeDasharray="6 4" />
-      <text x="540" y="75" fontSize="12" fontWeight="600" fill="var(--lp-text-tertiary, #6e7279)" textAnchor="middle">
-        Photo without proof
-      </text>
-      <text x="540" y="93" fontSize="10" fill="var(--lp-text-tertiary, #6e7279)" textAnchor="middle">
-        &quot;Is this real?&quot; Unverifiable.
-      </text>
-
-      {/* --- Divider --- */}
-      <line x1="20" y1="140" x2="660" y2="140" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1" />
-
-      {/* --- Bottom path: With Title Protocol --- */}
-      <text x="20" y="172" fontSize="11" fontWeight="700" fill="var(--lp-accent, #1E3A5F)" letterSpacing="0.06em">
-        WITH TITLE PROTOCOL
-      </text>
-
-      {/* Photo + C2PA */}
-      <rect x="20" y="188" width="120" height="56" rx="6" fill="var(--lp-accent, #1E3A5F)" opacity="0.12" />
-      <rect x="20" y="188" width="120" height="56" rx="6" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" fill="none" />
-      <text x="80" y="211" fontSize="12" fontWeight="600" fill="var(--lp-text, #1a1c1e)" textAnchor="middle">
-        Photo
-      </text>
-      <text x="80" y="229" fontSize="10" fill="var(--lp-accent, #1E3A5F)" textAnchor="middle" fontWeight="500">
-        + C2PA proof
-      </text>
-
-      {/* Arrow to TP */}
-      <line x1="148" y1="216" x2="192" y2="216" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" />
-      <polygon points="192,211 204,216 192,221" fill="var(--lp-accent, #1E3A5F)" />
-
-      {/* Title Protocol box */}
-      <rect x="210" y="188" width="140" height="56" rx="6" fill="var(--lp-accent, #1E3A5F)" opacity="0.08" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" />
-      <text x="280" y="211" fontSize="12" fontWeight="600" fill="var(--lp-accent, #1E3A5F)" textAnchor="middle">
-        Title Protocol
-      </text>
-      <text x="280" y="229" fontSize="10" fill="var(--lp-text-secondary, #4a4e54)" textAnchor="middle">
-        extracts &amp; records proof
-      </text>
-
-      {/* Two arrows out: file goes to SNS, proof goes to chain */}
-      {/* Arrow: file → SNS (top branch) */}
-      <line x1="350" y1="204" x2="414" y2="204" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1.5" />
-      <polygon points="414,199 426,204 414,209" fill="var(--lp-border, #d8d8d4)" />
-
-      {/* Arrow: proof → chain (bottom branch) */}
-      <line x1="350" y1="228" x2="414" y2="228" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" />
-      <polygon points="414,223 426,228 414,233" fill="var(--lp-accent, #1E3A5F)" />
-
-      {/* SNS result (top) */}
-      <rect x="432" y="188" width="108" height="28" rx="4" fill="var(--lp-bg, #fafaf8)" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1" />
-      <text x="486" y="207" fontSize="10" fill="var(--lp-text-tertiary, #6e7279)" textAnchor="middle">
-        file (stripped)
-      </text>
-
-      {/* Chain result (bottom) */}
-      <rect x="432" y="220" width="108" height="28" rx="4" fill="var(--lp-accent, #1E3A5F)" opacity="0.12" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1" />
-      <text x="486" y="239" fontSize="10" fontWeight="600" fill="var(--lp-accent, #1E3A5F)" textAnchor="middle">
-        proof (on-chain)
-      </text>
-
-      {/* Arrow: converge to verification */}
-      <line x1="540" y1="204" x2="570" y2="216" stroke="var(--lp-border, #d8d8d4)" strokeWidth="1" />
-      <line x1="540" y1="234" x2="570" y2="222" stroke="var(--lp-accent, #1E3A5F)" strokeWidth="1.5" />
-
-      {/* Final: verified */}
-      <rect x="576" y="200" width="84" height="36" rx="6" fill="var(--lp-accent, #1E3A5F)" />
-      <text x="618" y="223" fontSize="11" fontWeight="600" fill="#fff" textAnchor="middle">
-        Verified
-      </text>
-
-      {/* Bottom caption */}
-      <text x="340" y="288" fontSize="10" fill="var(--lp-text-tertiary, #6e7279)" textAnchor="middle">
-        Proof exists independently of the file. Metadata stripping doesn&apos;t matter.
-      </text>
-    </svg>
+          return (
+            <div key={i}>
+              {/* Step row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* Icon */}
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    background: step.pass
+                      ? "var(--lp-accent, #1E3A5F)"
+                      : "transparent",
+                    border: step.pass
+                      ? "none"
+                      : "1.5px solid #c4a49c",
+                    fontSize: "0.7rem",
+                    color: step.pass ? "#fff" : "#9a6458",
+                    fontWeight: 700,
+                  }}
+                >
+                  {step.pass ? "\u2713" : "\u2717"}
+                </div>
+                {/* Label */}
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: i === 0 ? 600 : 400,
+                    color: step.pass
+                      ? "var(--lp-text, #1a1c1e)"
+                      : "var(--lp-text-tertiary, #6e7279)",
+                  }}
+                >
+                  {step.label}
+                </div>
+              </div>
+              {/* Connector line */}
+              {showLine && (
+                <div
+                  style={{
+                    width: 1.5,
+                    height: 16,
+                    marginLeft: 10.5,
+                    background: lineColor,
+                    opacity: 0.4,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
