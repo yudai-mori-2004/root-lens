@@ -498,7 +498,7 @@
   height: 18px;
   background: #18181c;
   border-radius: 999px;
-  margin: 8px auto 0;
+  margin: 6px auto -6px;
   position: relative;
   z-index: 2;
 }
@@ -507,8 +507,9 @@
   position: relative;
   overflow: hidden;
   line-height: 0;
-  /* Crop bottom ~8% to hide the navigation bar */
-  margin-bottom: -28px;
+  /* Crop top (status bar area) and bottom (nav bar) */
+  margin-top: -16px;
+  margin-bottom: -40px;
 }
 
 .phoneScreen::after {
