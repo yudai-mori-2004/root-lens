@@ -1,4 +1,12 @@
 {
+  "nav": {
+    "technology": "技術",
+    "why": "課題",
+    "developers": "開発者",
+    "about": "概要",
+    "demo": "デモを見る"
+  },
+
   "lp": {
     "hero": {
       "title": "Prove it's real.",

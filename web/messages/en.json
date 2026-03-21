@@ -1,4 +1,12 @@
 {
+  "nav": {
+    "technology": "Technology",
+    "why": "Why",
+    "developers": "Developers",
+    "about": "About",
+    "demo": "See Demo"
+  },
+
   "lp": {
     "hero": {
       "title": "Prove it's real.",
