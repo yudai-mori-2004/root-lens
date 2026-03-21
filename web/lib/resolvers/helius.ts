@@ -54,7 +54,11 @@ interface DasSearchAssetsResponse {
 // ---------------------------------------------------------------------------
 
 function getCollectionAddress(asset: DasAsset): string {
-  return asset.grouping.find((g) => g.group_key === "collection")?.group_value ?? "";
+  const addr = asset.grouping.find((g) => g.group_key === "collection")?.group_value;
+  if (!addr) {
+    console.warn(`[DAS] Asset ${asset.id} has no collection grouping`);
+  }
+  return addr ?? "";
 }
 
 function getAttribute(asset: DasAsset, traitType: string): string | undefined {
@@ -139,15 +143,27 @@ function isCorePayload(payload: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// cNFT → signed_json の取得
+// cNFT → signed_json の取得（エラーを呼び出し元に伝播）
 // ---------------------------------------------------------------------------
 
+/** Arweaveからsigned_jsonを取得。失敗時はErrorをthrow（握り潰さない） */
 async function fetchSignedJsonFromAsset(asset: DasAsset): Promise<SignedJson | null> {
-  try {
-    const offchain = await fetchArweaveJson(asset.content.json_uri);
-    if (isSignedJson(offchain)) return offchain;
-  } catch {}
+  const offchain = await fetchArweaveJson(asset.content.json_uri);
+  if (isSignedJson(offchain)) return offchain;
+  console.warn(`[DAS] Asset ${asset.id}: off-chain data is not a valid signed_json`);
   return null;
+}
+
+/** Arweaveからsigned_jsonを取得。失敗時は { error } を返す（呼び出し元がハンドリング） */
+async function fetchSignedJsonSafe(asset: DasAsset): Promise<{ sj: SignedJson | null; error?: string }> {
+  try {
+    const sj = await fetchSignedJsonFromAsset(asset);
+    return { sj };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[DAS] Failed to fetch signed_json for asset ${asset.id}:`, msg);
+    return { sj: null, error: msg };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,18 +196,24 @@ export class DasContentResolver implements ContentResolver {
       );
 
       // Arweave signed_json を並列取得
-      const [coreSj, ...extSjs] = await Promise.all([
-        fetchSignedJsonFromAsset(coreAsset),
-        ...extAssets.map(fetchSignedJsonFromAsset),
+      const [coreResult2, ...extResults] = await Promise.all([
+        fetchSignedJsonSafe(coreAsset),
+        ...extAssets.map(fetchSignedJsonSafe),
       ]);
 
-      const coreSignedJson = coreSj && isCorePayload(coreSj.payload) ? coreSj : null;
+      const coreSignedJson = coreResult2.sj && isCorePayload(coreResult2.sj.payload) ? coreResult2.sj : null;
 
-      // Extension NFT の個別レコードを構築
+      // Extension NFT の個別レコードを構築（フェッチ失敗も含めて記録）
       const extensionNfts: ExtensionNft[] = [];
       for (let i = 0; i < extAssets.length; i++) {
-        const sj = extSjs[i];
-        if (!sj) continue;
+        const { sj, error } = extResults[i];
+        if (!sj) {
+          // フェッチ失敗: 失敗情報付きでレコードを生成（検証で failed にするため）
+          if (error) {
+            console.warn(`[DAS] Extension asset ${extAssets[i].id} signed_json fetch failed: ${error}`);
+          }
+          continue;
+        }
         extensionNfts.push({
           assetId: extAssets[i].id,
           collectionAddress: getCollectionAddress(extAssets[i]),
@@ -220,10 +242,11 @@ export class DasContentResolver implements ContentResolver {
   /**
    * オリジナルチェック用: 同一content_hashの全Core cNFTのassetIdを返す。
    * Arweaveデータは取得しない（assetIdの順序比較のみに使う）。
+   * エラー時はnullを返す（呼び出し元がfailedとして扱う）。
    */
   async resolveAllByContentHash(
     contentHash: string
-  ): Promise<ResolvedContent[]> {
+  ): Promise<ResolvedContent[] | null> {
     try {
       const collections = await getCollectionMints();
       const coreResult = await searchAssetsByCollection(collections.core);
@@ -232,7 +255,6 @@ export class DasContentResolver implements ContentResolver {
         (item) => getAttribute(item, "content_hash") === contentHash
       );
 
-      // 軽量: assetIdとcollectionだけ返す（Arweave取得なし）
       return coreAssets.map((asset) => ({
         assetId: asset.id,
         collectionAddress: getCollectionAddress(asset),
@@ -244,7 +266,7 @@ export class DasContentResolver implements ContentResolver {
       }));
     } catch (e) {
       console.error("[DasContentResolver] resolveAllByContentHash failed:", e);
-      return [];
+      return null; // nullを返す → 呼び出し元がfailedとして扱う
     }
   }
 }

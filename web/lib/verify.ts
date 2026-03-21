@@ -115,11 +115,27 @@ export async function verifyContentOnChain(
   // Core固有: オリジナルチェック（自分が最古の登録か）
   if (contentResolver.resolveAllByContentHash) {
     const allResolved = await contentResolver.resolveAllByContentHash(queryContentHash);
-    const isOriginal = allResolved.length === 0 || allResolved[0].assetId === resolved.assetId;
+    if (allResolved === null) {
+      // DAS APIエラー: 比較不能 → failed（"判定不能"であり"オリジナル"ではない）
+      coreNft.specificChecks.push({
+        label: tc("original_check"),
+        status: "failed",
+        detail: tc("original_check_error"),
+      });
+    } else {
+      const isOriginal = allResolved.length === 0 || allResolved[0].assetId === resolved.assetId;
+      coreNft.specificChecks.push({
+        label: tc("original_check"),
+        status: isOriginal ? "verified" : "failed",
+        detail: isOriginal ? tc("original_check_pass") : tc("original_check_fail"),
+      });
+    }
+  } else {
+    // resolverがメソッドを持たない場合も明示的にfailed
     coreNft.specificChecks.push({
       label: tc("original_check"),
-      status: isOriginal ? "verified" : "failed",
-      detail: isOriginal ? tc("original_check_pass") : tc("original_check_fail"),
+      status: "failed",
+      detail: tc("original_check_error"),
     });
   }
 
@@ -158,10 +174,18 @@ export async function verifyContentOnChain(
         detail: matchedVersion ? tc("wasm_hash_pass") : tc("wasm_hash_fail"),
       });
     } else if (wasmHash) {
+      // GlobalConfigにモジュール未登録（devnet等）
       nftVerif.specificChecks.push({
         label: tc("wasm_hash"),
         status: "skipped",
         detail: tc("wasm_hash_skip"),
+      });
+    } else {
+      // wasm_hashがペイロードに存在しない → Extension NFTとして不正
+      nftVerif.specificChecks.push({
+        label: tc("wasm_hash"),
+        status: "failed",
+        detail: tc("wasm_hash_missing"),
       });
     }
 
@@ -254,7 +278,6 @@ async function verifyTeeSignature(
     return valid ? "verified" : "failed";
   } catch (e) {
     console.warn("  → Ed25519 verification error:", e);
-    if (e instanceof Error && e.message.includes("not supported")) return "skipped";
     return "failed";
   }
 }
@@ -283,7 +306,7 @@ async function verifyPHashWithImage(
     };
   } catch (e) {
     console.warn("  → pHash computation error:", e);
-    return { status: "skipped", reason: `Computation failed: ${e}` };
+    return { status: "failed", reason: `Computation failed: ${e}` };
   }
 }
 

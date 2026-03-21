@@ -52,8 +52,8 @@ export interface ResolvedContent {
 export interface ContentResolver {
   /** content_hash trait から cNFT を検索し、オフチェーンデータを含むレコードを返す */
   resolveByContentHash(contentHash: string): Promise<ResolvedContent | null>;
-  /** content_hash trait から全 Core cNFT を返す（重複解決用） */
-  resolveAllByContentHash?(contentHash: string): Promise<ResolvedContent[]>;
+  /** content_hash trait から全 Core cNFT を返す（重複解決用）。エラー時はnull */
+  resolveAllByContentHash?(contentHash: string): Promise<ResolvedContent[] | null>;
 }
 
 // ---------------------------------------------------------------------------
