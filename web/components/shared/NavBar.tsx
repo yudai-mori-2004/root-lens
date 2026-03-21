@@ -10,8 +10,10 @@ export default function NavBar() {
     <nav className={s.nav}>
       <div className={s.navInner}>
         <a href="/" className={s.navLogo}>
-          RootLens
+          <img src="/logo.png" alt="" className={s.navLogoIcon} />
+          <span className={s.navLogoText}>RootLens</span>
         </a>
+        <div className={s.navSpacer} />
         <a
           href="/technology"
           className={`${s.navLink} ${pathname === "/technology" ? s.navLinkActive : ""}`}
