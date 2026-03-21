@@ -5,22 +5,50 @@
  * DCT計算はWASM（TEEと同一バイナリ）が行う。
  * これにより pHash の完全一致が保証される。
  *
- * 将来的に wasm_source が GlobalConfig に入ったら、
- * そこからダウンロードする形に切り替える。
+ * WASMバイナリはGlobalConfigのtrusted_wasm_modulesに登録された
+ * wasm_sourceから動的に取得し、SHA-256ハッシュをwasm_hashと照合して
+ * 改ざんされていないことを確認してから実行する。
  */
 
-// WASM バイナリのURL（public/wasm/ に配置）
-// TODO: GlobalConfig.trusted_wasm_ids から動的取得に変更
-const PHASH_WASM_URL = "/wasm/image-phash.wasm";
+import { getGlobalConfigData } from "./config";
 
-let wasmCache: ArrayBuffer | null = null;
+let wasmCache: { buf: ArrayBuffer; hash: string } | null = null;
 
 async function loadWasm(): Promise<ArrayBuffer> {
-  if (wasmCache) return wasmCache;
-  const res = await fetch(PHASH_WASM_URL);
-  if (!res.ok) throw new Error(`Failed to load phash WASM: ${res.status}`);
-  wasmCache = await res.arrayBuffer();
-  return wasmCache;
+  if (wasmCache) return wasmCache.buf;
+
+  const globalConfig = await getGlobalConfigData();
+  const phashModule = globalConfig.trustedWasmModules.find(
+    (m) => m.extension_id === "image-phash"
+  );
+
+  if (!phashModule) {
+    throw new Error("image-phash module not found in GlobalConfig trusted_wasm_modules");
+  }
+
+  // wasm_source からバイナリを取得
+  const res = await fetch(phashModule.wasm_source);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch WASM from ${phashModule.wasm_source}: ${res.status}`);
+  }
+  const buf = await res.arrayBuffer();
+
+  // SHA-256 ハッシュを計算して wasm_hash と照合
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  const hashHex = Array.from(new Uint8Array(hashBuf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const expectedHash = phashModule.wasm_hash.replace(/^0x/, "");
+  if (hashHex !== expectedHash) {
+    throw new Error(
+      `WASM hash mismatch: expected ${expectedHash}, got ${hashHex}. Binary may be tampered.`
+    );
+  }
+
+  console.log("[phash-wasm] Loaded from GlobalConfig wasm_source, hash verified:", hashHex.slice(0, 16) + "...");
+  wasmCache = { buf, hash: hashHex };
+  return buf;
 }
 
 /**
