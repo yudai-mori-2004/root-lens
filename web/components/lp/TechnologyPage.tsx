@@ -1,14 +1,13 @@
-"use client";
-
 /**
- * /technology — 元の1枚LPの全ストーリーをそのまま展開する「読ませる」ページ。
- * 課題 → C2PA → Gap(図解付き) → Title Protocol → 比較 → RootLens → OSS → フッター
+ * /technology — full story as a "reading" page.
+ * Server component for SSR (bot/AI readable).
+ * Only the tech details toggle is a client component.
  */
 
-import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
 import GapDiagram from "./GapDiagram";
+import TechToggle from "./TechToggle";
 
 const GITHUB_TP = "https://github.com/yudai-mori-2004/title-protocol";
 const GITHUB_RL = "https://github.com/yudai-mori-2004/root-lens";
@@ -21,222 +20,158 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-function Hero() {
-  const t = useTranslations("pages.technology");
-  return (
-    <section className={s.hero}>
-      <div className={s.heroInner}>
-        <h1 className={s.heroTitle}>{t("heroTitle")}</h1>
-        <p className={s.heroDescription}>{t("heroSubtitle")}</p>
-      </div>
-    </section>
-  );
-}
+export default async function TechnologyPage() {
+  const tPage = await getTranslations("pages.technology");
+  const tC2pa = await getTranslations("lp.c2pa");
+  const tGap = await getTranslations("lp.gap");
+  const tTp = await getTranslations("lp.tp");
+  const tComp = await getTranslations("lp.comparison");
+  const tRl = await getTranslations("lp.rootlens");
+  const tOs = await getTranslations("lp.openSource");
 
-function SocialIssues() {
-  const t = useTranslations("lp.issues");
-  const issues = ["sns", "media", "insurance", "ai"] as const;
-
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.sectionSubtitle}>{t("intro")}</p>
-        <div className={s.issuesGrid}>
-          {issues.map((key) => (
-            <div key={key} className={s.issueItem}>
-              <div className={s.issueLabel}>{t(`${key}.label`)}</div>
-              <div className={s.issueText}>{t(`${key}.text`)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function C2PASection() {
-  const t = useTranslations("lp.c2pa");
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.prose}>{t("p1")}</p>
-        <p className={s.prose}>{t("p2")}</p>
-        <p className={s.prose}>{t("p3")}</p>
-        <p className={s.prose}>
-          <span className={s.emphasis}>{t("p4")}</span>
-        </p>
-        <p className={s.prose}>{t("p5")}</p>
-      </div>
-    </section>
-  );
-}
-
-function GapSection() {
-  const t = useTranslations("lp.gap");
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.prose}>{t("p1")}</p>
-        <p className={s.prose}>{t("p2")}</p>
-      </div>
-      <div style={{ maxWidth: 680, margin: "32px auto 0" }}>
-        <GapDiagram />
-      </div>
-      <div className={s.sectionInner} style={{ marginTop: 32 }}>
-        <p className={s.prose}>{t("p3")}</p>
-        <p className={s.prose}>{t("p4")}</p>
-        <p className={s.prose}>
-          <span className={s.emphasis}>{t("p5")}</span>
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function TitleProtocolSection() {
-  const t = useTranslations("lp.tp");
-  const [techOpen, setTechOpen] = useState(false);
-
-  const steps = ["step1", "step2", "step3", "step4"] as const;
+  const tpSteps = ["step1", "step2", "step3", "step4"] as const;
   const techItems = ["stateless", "e2ee", "coreExt", "cost", "security"] as const;
+  const scenarios = ["scenario1", "scenario2", "scenario3", "scenario4"] as const;
+  const rlFlowSteps = ["step1", "step2", "step3", "step4"] as const;
 
   return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.sectionSubtitle}>{t("subtitle")}</p>
-        <p className={s.prose}>{t("p1")}</p>
-        <p className={s.prose}>{t("p2")}</p>
-
-        <div className={s.steps}>
-          {steps.map((key, i) => (
-            <div key={key} className={s.step}>
-              <div className={s.stepNumber}>{i + 1}</div>
-              <div>
-                <div className={s.stepLabel}>{t(`${key}.label`)}</div>
-                <div className={s.stepText}>{t(`${key}.text`)}</div>
-              </div>
-            </div>
-          ))}
+    <div className={s.page}>
+      {/* Hero */}
+      <section className={s.hero}>
+        <div className={s.heroInner}>
+          <h1 className={s.heroTitle}>{tPage("heroTitle")}</h1>
+          <p className={s.heroDescription}>{tPage("heroSubtitle")}</p>
         </div>
+      </section>
 
-        <div className={s.techDetails}>
-          <button
-            className={s.techToggle}
-            data-open={techOpen}
-            onClick={() => setTechOpen(!techOpen)}
-          >
-            {t("techDetails.title")}
-          </button>
-          {techOpen && (
+      {/* C2PA */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tC2pa("title")}</h2>
+          <p className={s.prose}>{tC2pa("p1")}</p>
+          <p className={s.prose}>{tC2pa("p2")}</p>
+          <p className={s.prose}>{tC2pa("p3")}</p>
+          <p className={s.prose}>
+            <span className={s.emphasis}>{tC2pa("p4")}</span>
+          </p>
+          <p className={s.prose}>{tC2pa("p5")}</p>
+        </div>
+      </section>
+
+      {/* Gap */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tGap("title")}</h2>
+          <p className={s.prose}>{tGap("p1")}</p>
+          <p className={s.prose}>{tGap("p2")}</p>
+        </div>
+        <div style={{ maxWidth: 680, margin: "32px auto 0" }}>
+          <GapDiagram />
+        </div>
+        <div className={s.sectionInner} style={{ marginTop: 32 }}>
+          <p className={s.prose}>{tGap("p3")}</p>
+          <p className={s.prose}>{tGap("p4")}</p>
+          <p className={s.prose}>
+            <span className={s.emphasis}>{tGap("p5")}</span>
+          </p>
+        </div>
+      </section>
+
+      {/* Title Protocol */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tTp("title")}</h2>
+          <p className={s.sectionSubtitle}>{tTp("subtitle")}</p>
+          <p className={s.prose}>{tTp("p1")}</p>
+          <p className={s.prose}>{tTp("p2")}</p>
+
+          <div className={s.steps}>
+            {tpSteps.map((key, i) => (
+              <div key={key} className={s.step}>
+                <div className={s.stepNumber}>{i + 1}</div>
+                <div>
+                  <div className={s.stepLabel}>{tTp(`${key}.label`)}</div>
+                  <div className={s.stepText}>{tTp(`${key}.text`)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <TechToggle title={tTp("techDetails.title")}>
             <div>
               {techItems.map((key) => (
                 <div key={key} className={s.techItem}>
-                  <div className={s.techLabel}>{t(`techDetails.${key}.label`)}</div>
-                  <div className={s.techText}>{t(`techDetails.${key}.text`)}</div>
+                  <div className={s.techLabel}>{tTp(`techDetails.${key}.label`)}</div>
+                  <div className={s.techText}>{tTp(`techDetails.${key}.text`)}</div>
                 </div>
               ))}
             </div>
-          )}
+          </TechToggle>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function ComparisonSection() {
-  const t = useTranslations("lp.comparison");
-  const scenarios = ["scenario1", "scenario2", "scenario3", "scenario4"] as const;
-
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.sectionSubtitle}>{t("intro")}</p>
-        <div className={s.comparisonList}>
-          {scenarios.map((key) => (
-            <div key={key} className={s.comparisonItem}>
-              <div className={s.comparisonLabel}>{t(`${key}.label`)}</div>
-              <div className={s.comparisonText}>{t(`${key}.text`)}</div>
-            </div>
-          ))}
+      {/* Comparison */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tComp("title")}</h2>
+          <p className={s.sectionSubtitle}>{tComp("intro")}</p>
+          <div className={s.comparisonList}>
+            {scenarios.map((key) => (
+              <div key={key} className={s.comparisonItem}>
+                <div className={s.comparisonLabel}>{tComp(`${key}.label`)}</div>
+                <div className={s.comparisonText}>{tComp(`${key}.text`)}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function RootLensSection() {
-  const t = useTranslations("lp.rootlens");
-  const flowSteps = ["step1", "step2", "step3", "step4"] as const;
+      {/* RootLens */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tRl("title")}</h2>
+          <p className={s.sectionSubtitle}>{tRl("subtitle")}</p>
+          <p className={s.prose}>{tRl("p1")}</p>
 
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.sectionSubtitle}>{t("subtitle")}</p>
-        <p className={s.prose}>{t("p1")}</p>
+          <div className={s.rootlensFlow}>
+            {rlFlowSteps.map((key, i) => (
+              <div key={key} className={s.flowStep}>
+                <span className={s.flowNumber}>{i + 1}.</span>
+                <span>{tRl(key)}</span>
+              </div>
+            ))}
+          </div>
 
-        <div className={s.rootlensFlow}>
-          {flowSteps.map((key, i) => (
-            <div key={key} className={s.flowStep}>
-              <span className={s.flowNumber}>{i + 1}.</span>
-              <span>{t(key)}</span>
-            </div>
-          ))}
+          <p className={s.prose} style={{ marginTop: 32 }}>
+            {tRl("permanence")}
+          </p>
+          <p className={s.prose}>
+            <span className={s.emphasis}>{tRl("targets")}</span>
+          </p>
         </div>
+      </section>
 
-        <p className={s.prose} style={{ marginTop: 32 }}>
-          {t("permanence")}
-        </p>
-        <p className={s.prose}>
-          <span className={s.emphasis}>{t("targets")}</span>
-        </p>
-      </div>
-    </section>
-  );
-}
+      {/* Open Source */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tOs("title")}</h2>
+          <p className={s.prose}>{tOs("spec")}</p>
+          <p className={s.prose}>{tOs("node")}</p>
 
-function OpenSourceSection() {
-  const t = useTranslations("lp.openSource");
+          <div className={s.repoLinks}>
+            <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
+              <GitHubIcon className={s.repoIcon} />
+              {tOs("tpRepo")}
+            </a>
+            <a href={GITHUB_RL} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
+              <GitHubIcon className={s.repoIcon} />
+              {tOs("rlRepo")}
+            </a>
+          </div>
 
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.prose}>{t("spec")}</p>
-        <p className={s.prose}>{t("node")}</p>
-
-        <div className={s.repoLinks}>
-          <a href={GITHUB_TP} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
-            <GitHubIcon className={s.repoIcon} />
-            {t("tpRepo")}
-          </a>
-          <a href={GITHUB_RL} target="_blank" rel="noopener noreferrer" className={s.repoLink}>
-            <GitHubIcon className={s.repoIcon} />
-            {t("rlRepo")}
-          </a>
+          <p className={s.prose}>{tOs("code")}</p>
         </div>
-
-        <p className={s.prose}>{t("code")}</p>
-      </div>
-    </section>
-  );
-}
-
-export default function TechnologyPage() {
-  return (
-    <div className={s.page}>
-      <Hero />
-      <C2PASection />
-      <GapSection />
-      <TitleProtocolSection />
-      <ComparisonSection />
-      <RootLensSection />
-      <OpenSourceSection />
+      </section>
     </div>
   );
 }

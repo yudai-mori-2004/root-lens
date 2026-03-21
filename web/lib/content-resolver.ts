@@ -11,8 +11,8 @@ import type { SignedJson } from "@title-protocol/sdk";
 // 解決結果
 // ---------------------------------------------------------------------------
 
-/** cNFT + オフチェーンデータを統合した解決済みコンテンツ */
-export interface ResolvedContent {
+/** Extension NFT の個別レコード */
+export interface ExtensionNft {
   /** cNFT Asset ID (Solana mint address) */
   assetId: string;
   /** cNFT が属するコレクションアドレス */
@@ -21,11 +21,27 @@ export interface ResolvedContent {
   arweaveUri: string;
   /** cNFT の属性 (trait_type/value ペア) */
   attributes: { trait_type: string; value: string }[];
+  /** signed_json (Arweave から取得・パース済み) */
+  signedJson: SignedJson;
+  /** 所有者ウォレットアドレス */
+  ownerWallet: string;
+}
+
+/** cNFT + オフチェーンデータを統合した解決済みコンテンツ */
+export interface ResolvedContent {
+  /** Core cNFT Asset ID (Solana mint address) */
+  assetId: string;
+  /** Core cNFT が属するコレクションアドレス */
+  collectionAddress: string;
+  /** Core Arweave URI (off-chain metadata) */
+  arweaveUri: string;
+  /** Core cNFT の属性 (trait_type/value ペア) */
+  attributes: { trait_type: string; value: string }[];
   /** Core signed_json (Arweave から取得・パース済み) */
   coreSignedJson: SignedJson | null;
-  /** Extension signed_json 配列 (Arweave から取得・パース済み) */
-  extensionSignedJsons: SignedJson[];
-  /** 所有者ウォレットアドレス */
+  /** Extension NFT の個別レコード配列 */
+  extensionNfts: ExtensionNft[];
+  /** Core NFT の所有者ウォレットアドレス */
   ownerWallet: string;
 }
 
@@ -36,6 +52,8 @@ export interface ResolvedContent {
 export interface ContentResolver {
   /** content_hash trait から cNFT を検索し、オフチェーンデータを含むレコードを返す */
   resolveByContentHash(contentHash: string): Promise<ResolvedContent | null>;
+  /** content_hash trait から全 Core cNFT を返す（重複解決用） */
+  resolveAllByContentHash?(contentHash: string): Promise<ResolvedContent[]>;
 }
 
 // ---------------------------------------------------------------------------

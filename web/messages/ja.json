@@ -71,7 +71,7 @@
     "hero": {
       "title": "Prove it's real.",
       "tagline": "写真を撮る。改ざんできない記録が残る。リンクを共有すれば、誰でも確認できる。",
-      "description": "RootLensは撮影した瞬間にデジタル署名を付けるカメラアプリです。証明はファイルとは独立した永続的な記録として保存されるため、SNSがデータを削除しても残り続けます。",
+      "description": "RootLensは、カメラで撮られた写真・動画であることを証明するカメラアプリです。リンクを共有すれば、誰でもそれを確認できます。",
       "ctaDemo": "検証ページを開く",
       "ctaHow": "仕組みを見る"
     },
@@ -80,7 +80,7 @@
       "title": "使い方",
       "step1": { "label": "撮影", "text": "RootLensで写真や動画を撮影します。その場でデジタル署名が付きます。" },
       "step2": { "label": "証明", "text": "Title Protocolが署名を検証し、証明をファイルとは独立した永続的な記録として保存します。" },
-      "step3": { "label": "共有", "text": "リンクを取得し、どこにでも投稿できます。リンクを開けば、いつ・どこで・何のデバイスで撮影されたかを誰でも確認できます。" },
+      "step3": { "label": "共有", "text": "リンクを取得し、どこにでも投稿できます。リンクを開けば、カメラで実際に撮影されたコンテンツであることを誰でも確認できます。" },
       "editing": "共有前にクロップ、マスク、トリムの編集も可能です。RootLensはすべての編集を記録するため、閲覧者は何が変更されたかを確認し、元の写真が本物であることを検証できます。"
     },
 
@@ -138,7 +138,7 @@
       },
       "step3": {
         "label": "属性を抽出して記録",
-        "text": "検証済みの属性はSolanaブロックチェーン上の圧縮NFTに紐づけられます。コスト: 1件あたり約0.023円（約$0.00015）。月10万件の登録で約2,250円（約$15）。"
+        "text": "検証済みの属性はSolanaブロックチェーン上の圧縮NFTに紐づけられます。コスト: 1件あたり約0.023円（約$0.00015）。10万件の登録でも約2,250円（約$15）。"
       },
       "step4": {
         "label": "誰でも、どこからでも検証可能",
@@ -160,7 +160,7 @@
         },
         "cost": {
           "label": "圧縮NFTによるコスト最適化",
-          "text": "SolanaのBubblegum圧縮NFT規格により、現在のネットワーク条件で1件あたりのコストを約0.023円に抑制。月間10万件の登録を約2,250円で実現します。"
+          "text": "SolanaのBubblegum圧縮NFT規格により、現在のネットワーク条件で1件あたりのコストを約0.023円に抑制。10万件の登録でも約2,250円で実現します。"
         },
         "security": {
           "label": "セキュリティ上の考慮事項",
@@ -198,7 +198,7 @@
       "step2": "端末のセキュアハードウェアでC2PA署名を付与",
       "step3": "公開。Title Protocolが証明を抽出・記録",
       "step4": "リンクを共有。誰でも検証可能",
-      "permanence": "証明はアプリより長く残ります。RootLensが明日消えても、検証記録はブロックチェーン上に残ります。Title Protocol上の他のアプリケーションも同じ記録にアクセスできます。",
+      "permanence": "証明はアプリより長く残ります。RootLensが明日消えても、検証記録はオンチェーンのNFTに紐づいた形で残り続けます。Title Protocol上の他のアプリケーションも同じ記録にアクセスできます。",
       "targets": "AI生成の疑惑を受けるクリエイター、検証可能な証拠を必要とするジャーナリスト、そしてコンテンツが本物であることを証明する価値があるすべての人のために。"
     },
 
@@ -240,20 +240,20 @@
 
       "intro": {
         "title": "Title Protocolによる検証",
-        "desc": "Title Protocolは、C2PA署名付きコンテンツの来歴と真正性を、TEE（Trusted Execution Environment: 信頼された実行環境）内で検証し、その結果をSolanaブロックチェーンに記録するオープンプロトコルです。1つのコンテンツに対して、Core cNFT（来歴の記録）と、任意の数のExtension cNFT（属性の検証）が発行されます。",
-        "trustChain": "検証の信頼は以下の連鎖で成立します: ブロックチェーン上のGlobal Config（DAOが管理）が公式コレクションアドレスを定義 → cNFTが公式コレクションに所属していることを確認 → cNFTが指すURIからオフチェーンデータを取得 → TEE署名を検証しデータの改ざんがないことを確認。各ステップはこのブラウザ内で独立に実行されています。"
+        "desc": "Title Protocolは、C2PA署名付きコンテンツの来歴と真正性を、TEE（Trusted Execution Environment: 信頼された実行環境）内で検証し、その結果をSolanaブロックチェーンに記録するオープンプロトコルです。1つのコンテンツに対して、Core NFT（来歴の記録）と、任意の数のExtension NFT（属性の検証）が発行されます。",
+        "trustChain": "検証の信頼は以下の連鎖で成立します: ブロックチェーン上のGlobal Config（DAOが管理）が公式コレクションアドレスを定義 → NFTが公式コレクションに所属していることを確認 → NFTが指すURIからオフチェーンデータを取得 → TEE署名を検証しデータの改ざんがないことを確認。各ステップはこのブラウザ内で独立に実行されています。"
       },
 
       "core": {
-        "title": "Core cNFT — 来歴の記録",
-        "desc": "Core cNFTは、コンテンツに埋め込まれたC2PA署名チェーンの検証結果を、TEE内部で署名しブロックチェーンに記録したものです。「誰が・いつ・何のツールで撮影・編集したか」という来歴全体が、改ざん不可能な形で保存されています。",
+        "title": "Core NFT — 来歴の記録",
+        "desc": "Core NFTは、コンテンツに埋め込まれたC2PA署名チェーンの検証結果を、TEE内部で署名しブロックチェーンに記録したものです。「誰が・いつ・何のツールで撮影・編集したか」という来歴全体が、改ざん不可能な形で保存されています。",
         "verifyTitle": "検証結果",
-        "collection": "コレクション所属",
-        "collectionPass": "Title Protocol公式コレクションに所属を確認",
-        "collectionFail": "公式コレクションへの所属を確認できませんでした",
+        "collection": "コレクション所属確認",
+        "collectionPass": "このcNFTのコレクションアドレスが、GlobalConfigのCoreコレクションアドレスと一致し、所属が検証済みであることを確認。信頼されたTEEノードが発行した正規のcNFT",
+        "collectionFail": "このcNFTのコレクションアドレスが、GlobalConfigのCoreコレクションアドレスと一致しません",
         "teeSig": "TEE署名検証 (Ed25519)",
-        "teeSigPass": "TEEが生成した署名が有効 — データが改ざんされていないことを証明",
-        "teeSigFail": "TEE署名の検証に失敗しました",
+        "teeSigPass": "オフチェーンデータのペイロードと属性をシリアライズした値に対するEd25519署名を、TEE公開鍵で検証し有効を確認。TEEが生成した時点からデータが改ざんされていないことを証明",
+        "teeSigFail": "オフチェーンデータのEd25519署名がTEE公開鍵で検証できませんでした",
         "c2pa": "C2PA来歴チェーン",
         "c2paPass": "来歴ノードが{count}件記録済み",
         "c2paFail": "来歴チェーンの記録を確認できませんでした",
@@ -272,12 +272,14 @@
       },
 
       "ext": {
-        "title": "Extension cNFT — 属性の検証",
+        "title": "Extension NFT — 属性の検証",
         "desc": "Extensionは、コンテンツの生データからTEE内のWASMモジュールが算出した客観的な属性値です。CoreがC2PA来歴チェーン（コンテンツ間の権利構造）を扱うのに対し、Extensionは個々のコンテンツの性質（知覚ハッシュ、ハードウェア署名等）を扱います。Extensionの数に制限はなく、新たなWASMモジュールの追加により検証項目を自由に拡張できます。",
         "verifyTitle": "検証結果",
-        "teeSig": "TEE署名",
-        "teeSigPass": "Extension固有のTEE署名が有効",
-        "teeSigFail": "TEE署名の検証に失敗",
+        "collectionPass": "このcNFTのコレクションアドレスが、GlobalConfigのExtensionコレクションアドレスと一致し、所属が検証済みであることを確認。信頼されたTEEノードが発行した正規のExtension cNFT",
+        "collectionFail": "このcNFTのコレクションアドレスが、GlobalConfigのExtensionコレクションアドレスと一致しません",
+        "teeSig": "TEE署名検証 (Ed25519)",
+        "teeSigPass": "Extensionオフチェーンデータのペイロードと属性をシリアライズした値に対するEd25519署名を、TEE公開鍵で検証し有効を確認",
+        "teeSigFail": "ExtensionオフチェーンデータのEd25519署名がTEE公開鍵で検証できませんでした",
         "dataTitle": "データ"
       },
 
@@ -304,7 +306,7 @@
         "title": "オンチェーン参照",
         "contentHash": "Content Hash",
         "contentHashDesc": "SHA-256(Active Manifest署名)",
-        "assetId": "cNFT Asset ID",
+        "assetId": "NFT Asset ID",
         "offchainUri": "オフチェーンストレージURI",
         "teeType": "TEE Type",
         "sigAlgo": "署名アルゴリズム",
@@ -312,6 +314,22 @@
         "tsa": "TSA",
         "viewOnSolana": "Solana Explorer",
         "viewOnStorage": "表示"
+      },
+
+      "dyn": {
+        "protocolContext": "Program: {program} / GlobalConfig: {pda} / Network: {network}",
+        "coreSummary": "Content Hash {hash} ({type}) {signing}。来歴ノード{nodes}件{links}。",
+        "coreSigning": "— C2PA署名: {algo}",
+        "coreLinks": "、リンク{count}件",
+        "teeVerified": "TEE ({teeType}) がC2PA署名チェーンを検証し、Ed25519鍵 {pubkey} で結果に署名しました。署名済み結果は {uri} に保存され、NFT {assetId} に紐づけられています。",
+        "tsaCertified": "撮影時刻は {provider} により {time} に証明されています (RFC 3161)。",
+        "ownerSame": "登録者: {wallet} (現在の所有者、譲渡なし)。",
+        "ownerTransferred": "登録者: {creator}。現在の所有者: {owner}。",
+        "phashResult": "オンチェーンpHash: {hash}。{detail}。WASM: {wasmHash}",
+        "teeSigResult": "このコンテンツ: TEE署名 {pubkey} — {result}",
+        "teeSigValid": "有効 ✓",
+        "teeSigPending": "検証中",
+        "tsaResult": "このコンテンツ: {provider}、{time}"
       },
 
       "why": {
@@ -326,6 +344,72 @@
         "ossDesc": "Title ProtocolおよびRootLensのソースコードは全てGitHub上で公開されています。この公開ページの検証ロジック、プロトコルの仕様書と実装、TEE内で実行されるコード — すべてを自分の目で確認し、独立に検証を再現できます。"
       }
     }
+  },
+
+  "field": {
+    "content_hash": "Content Hash",
+    "content_type": "コンテンツ種別",
+    "creator_wallet": "登録者ウォレット",
+    "tsa_timestamp": "TSAタイムスタンプ",
+    "tsa_pubkey_hash": "TSA公開鍵ハッシュ",
+    "tsa_token_data": "TSAトークン",
+    "nodes": "来歴ノード",
+    "links": "来歴リンク",
+    "extension_id": "Extension ID",
+    "wasm_source": "WASMソース",
+    "wasm_hash": "WASMハッシュ",
+    "extension_input_hash": "Extension入力ハッシュ",
+    "protocol": "プロトコル",
+    "tee_type": "TEE種別",
+    "tee_pubkey": "TEE公開鍵",
+    "tee_signature": "TEE署名",
+    "tee_attestation": "TEEアテステーション",
+    "phash": "知覚ハッシュ",
+    "collection": "コレクション",
+    "owner": "所有者",
+    "currentOwner": "現在の所有者",
+    "program": "プログラム",
+    "globalConfigPda": "GlobalConfig PDA",
+    "authority": "管理者 (Authority)",
+    "coreCollection": "Coreコレクション",
+    "extCollection": "Extensionコレクション",
+    "trustedTeeNodes": "信頼済みTEEノード",
+    "trustedTsaKeys": "信頼済みTSA公開鍵",
+    "trustedWasmModules": "信頼済みWASMモジュール",
+    "network": "ネットワーク",
+    "none": "（なし）",
+    "phashThreshold": "pHash閾値",
+    "c2paSigning": "C2PA署名方式",
+    "teeSigning": "TEE署名方式",
+    "dimensions": "解像度",
+    "assetId": "NFT Asset ID",
+    "offchainUri": "オフチェーンURI",
+    "hammingDistance": "ハミング距離",
+    "download": "検証データをダウンロード (.csv)"
+  },
+
+  "check": {
+    "c2pa_chain": "C2PA来歴チェーン",
+    "c2pa_chain_pass": "C2PA署名チェーン内の来歴グラフ: ノード{nodes}件、リンク{links}件。撮影から現在までの編集履歴と素材関係が記録されている",
+    "c2pa_chain_fail": "C2PA署名チェーン内に来歴グラフが記録されていません",
+    "content_hash_match": "Content Hash一致確認",
+    "content_hash_match_pass": "検索に使用したContent Hashと、オフチェーンデータのペイロード内のContent Hashが一致。取得したデータがこのコンテンツに対する記録であることを確認",
+    "content_hash_match_fail": "検索に使用したContent Hashと、オフチェーンデータのペイロード内のContent Hashが不一致",
+    "original_check": "重複解決（オリジナル登録確認）",
+    "original_check_pass": "同一Content Hashを持つcNFTの中で、このcNFTが最古の登録。重複解決により正当なオリジナルと判定",
+    "original_check_fail": "同一Content Hashを持つ、より古いcNFTが存在します。このコンテンツは再登録の可能性があります",
+    "wasm_hash": "WASMモジュール検証",
+    "wasm_hash_pass": "TEEがWASMバイナリ実行直前に計算したSHA-256ハッシュ（WASMハッシュ）が、GlobalConfig（オンチェーンのプロトコル設定）の信頼済みWASMモジュールリストに登録されたハッシュと一致。未改変の正規モジュールが使用されたことを確認",
+    "wasm_hash_fail": "オフチェーンデータ内のWASMハッシュが、GlobalConfigの信頼済みWASMモジュールリストに含まれていません。未知または改変されたWASMモジュールが使用された可能性があります",
+    "wasm_hash_skip": "GlobalConfigの信頼済みWASMモジュールリストが空のため、比較をスキップ（devnetでは未設定の場合があります）",
+    "phash_identity": "pHash同一性検証",
+    "phash_identity_pass": "オンチェーンpHash（TEEがWASMで原画像から算出した64bit DCTハッシュ）と、ブラウザが表示画像から同一WASMで再計算したpHashのハミング距離: {distance}。{threshold}以下で同一画像と判定（0が完全一致、距離が小さいほど類似）",
+    "phash_identity_fail": "オンチェーンpHash（TEEがWASMで原画像から算出した64bit DCTハッシュ）と、ブラウザが表示画像から再計算したpHashのハミング距離: {distance}。閾値{threshold}を超過（0が完全一致、距離が大きいほど差異が大きい）",
+    "phash_identity_skip": "Extension NFTにpHashデータが含まれていません",
+    "phash_identity_error": "表示画像の読み込みに失敗したため、ブラウザ側のpHash再計算ができませんでした ({reason})",
+    "hardware_signing": "ハードウェア撮影証明",
+    "hardware_signing_pass": "C2PA署名チェーン内にハードウェアセキュアエレメント ({id}) の署名を検出。デバイスの物理的な撮影であることが証明されている",
+    "hardware_signing_fail": "ハードウェア署名の検証に失敗しました"
   },
 
   "notfound": {

@@ -71,7 +71,7 @@
     "hero": {
       "title": "Prove it's real.",
       "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
-      "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. The proof is saved as a permanent record, independent of the file. Even when social media strips the data, the proof remains.",
+      "description": "RootLens is a camera app that proves your photo or video was actually captured by a real camera. Share a link, and anyone can verify it.",
       "ctaDemo": "See a verified photo",
       "ctaHow": "How it works"
     },
@@ -80,7 +80,7 @@
       "title": "How it works",
       "step1": { "label": "Capture", "text": "Take a photo or video with RootLens. A digital signature is attached instantly." },
       "step2": { "label": "Prove", "text": "Title Protocol verifies the signature and saves the proof as a permanent record, separate from the file itself." },
-      "step3": { "label": "Share", "text": "Get a link. Post it anywhere. Anyone who opens it can see when, where, and on what device the content was captured." },
+      "step3": { "label": "Share", "text": "Get a link. Post it anywhere. Anyone who opens it can verify that the content was captured by a real camera." },
       "editing": "You can still crop, mask, or trim before sharing. RootLens tracks every edit, so viewers can see exactly what was changed and confirm the original is real."
     },
 
@@ -138,7 +138,7 @@
       },
       "step3": {
         "label": "Extract and record",
-        "text": "The verified attributes are extracted and linked to a compressed NFT on the Solana blockchain. Cost at current network conditions: ~$0.00015 per record. 100,000 records per month cost roughly $15."
+        "text": "The verified attributes are extracted and linked to a compressed NFT on the Solana blockchain. Cost at current network conditions: ~$0.00015 per record. 100,000 records cost roughly $15."
       },
       "step4": {
         "label": "Anyone can verify, anywhere",
@@ -160,7 +160,7 @@
         },
         "cost": {
           "label": "Compressed NFT cost optimization",
-          "text": "Using Solana's Bubblegum compressed NFT standard, per-record cost is ~¥0.023 (~$0.00015) at current network conditions. 100,000 monthly registrations cost roughly ¥2,250 (~$15)."
+          "text": "Using Solana's Bubblegum compressed NFT standard, per-record cost is ~¥0.023 (~$0.00015) at current network conditions. 100,000 registrations cost roughly ¥2,250 (~$15)."
         },
         "security": {
           "label": "Security considerations",
@@ -198,7 +198,7 @@
       "step2": "The app signs it with C2PA using the device's secure hardware",
       "step3": "Publish. Title Protocol extracts and records the proof",
       "step4": "Share the link anywhere. Anyone can verify it",
-      "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain on the blockchain. Other applications built on Title Protocol can access the same records.",
+      "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain linked to on-chain NFTs. Other applications built on Title Protocol can access the same records.",
       "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real."
     },
 
@@ -240,20 +240,20 @@
 
       "intro": {
         "title": "Verification via Title Protocol",
-        "desc": "Title Protocol is an open protocol that verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment) and records the results on the Solana blockchain. For each piece of content, a Core cNFT (provenance record) and any number of Extension cNFTs (attribute verification) are issued.",
-        "trustChain": "Trust is established through the following chain: Global Config on-chain (managed by DAO) defines the official collection address → confirm the cNFT belongs to the official collection → fetch off-chain data from the URI referenced by the cNFT → verify the TEE signature to confirm data integrity. Each step is independently executed in this browser."
+        "desc": "Title Protocol is an open protocol that verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment) and records the results on the Solana blockchain. For each piece of content, a Core NFT (provenance record) and any number of Extension NFTs (attribute verification) are issued.",
+        "trustChain": "Trust is established through the following chain: Global Config on-chain (managed by DAO) defines the official collection address → confirm the NFT belongs to the official collection → fetch off-chain data from the URI referenced by the NFT → verify the TEE signature to confirm data integrity. Each step is independently executed in this browser."
       },
 
       "core": {
-        "title": "Core cNFT — Provenance Record",
-        "desc": "The Core cNFT records the result of verifying the C2PA signature chain embedded in the content, signed by the TEE and stored on the blockchain. The entire provenance — who captured it, when, and with what tool — is preserved in a tamper-proof form.",
+        "title": "Core NFT — Provenance Record",
+        "desc": "The Core NFT records the result of verifying the C2PA signature chain embedded in the content, signed by the TEE and stored on the blockchain. The entire provenance — who captured it, when, and with what tool — is preserved in a tamper-proof form.",
         "verifyTitle": "Verification Results",
         "collection": "Collection Membership",
-        "collectionPass": "Confirmed membership in the official Title Protocol collection",
-        "collectionFail": "Could not confirm membership in the official collection",
+        "collectionPass": "This cNFT's Collection address matches the Core Collection address in GlobalConfig, and membership is verified. Confirmed as a legitimate cNFT issued by a trusted TEE node",
+        "collectionFail": "This cNFT's Collection address does not match the Core Collection address in GlobalConfig",
         "teeSig": "TEE Signature (Ed25519)",
-        "teeSigPass": "TEE-generated signature is valid — proves data has not been tampered with",
-        "teeSigFail": "TEE signature verification failed",
+        "teeSigPass": "Ed25519 signature over the serialized payload and attributes of the off-chain data verified against the TEE Public Key. Proves data has not been tampered with since TEE generation",
+        "teeSigFail": "Ed25519 signature on the off-chain data could not be verified against the TEE Public Key",
         "c2pa": "C2PA Provenance Chain",
         "c2paPass": "{count} provenance nodes recorded",
         "c2paFail": "Could not confirm provenance chain record",
@@ -272,12 +272,14 @@
       },
 
       "ext": {
-        "title": "Extension cNFTs — Attribute Verification",
+        "title": "Extension NFTs — Attribute Verification",
         "desc": "Extensions are objective attribute values computed by WASM modules inside the TEE from the raw content data. While Core handles the C2PA provenance chain (rights structure between content), Extensions handle properties of individual content (perceptual hash, hardware signing, etc.). There is no limit on the number of Extensions — new verification items can be freely added through new WASM modules.",
         "verifyTitle": "Verification Results",
-        "teeSig": "TEE Signature",
-        "teeSigPass": "Extension-specific TEE signature is valid",
-        "teeSigFail": "TEE signature verification failed",
+        "collectionPass": "This cNFT's Collection address matches the Extension Collection address in GlobalConfig, and membership is verified. Confirmed as a legitimate Extension cNFT issued by a trusted TEE node",
+        "collectionFail": "This cNFT's Collection address does not match the Extension Collection address in GlobalConfig",
+        "teeSig": "TEE Signature (Ed25519)",
+        "teeSigPass": "Ed25519 signature over the serialized payload and attributes of the Extension off-chain data verified against the TEE Public Key",
+        "teeSigFail": "Ed25519 signature on the Extension off-chain data could not be verified against the TEE Public Key",
         "dataTitle": "Data"
       },
 
@@ -304,7 +306,7 @@
         "title": "On-chain References",
         "contentHash": "Content Hash",
         "contentHashDesc": "SHA-256(Active Manifest Signature)",
-        "assetId": "cNFT Asset ID",
+        "assetId": "NFT Asset ID",
         "offchainUri": "Off-chain Storage URI",
         "teeType": "TEE Type",
         "sigAlgo": "Signing Algorithm",
@@ -312,6 +314,22 @@
         "tsa": "TSA",
         "viewOnSolana": "Solana Explorer",
         "viewOnStorage": "View"
+      },
+
+      "dyn": {
+        "protocolContext": "Program: {program} / GlobalConfig: {pda} / Network: {network}",
+        "coreSummary": "Content Hash {hash} ({type}) {signing}. {nodes} provenance node(s){links}.",
+        "coreSigning": "— C2PA signed with {algo}",
+        "coreLinks": ", {count} link(s)",
+        "teeVerified": "TEE ({teeType}) verified the C2PA signature chain and signed the result with Ed25519 key {pubkey}. The signed result is stored at {uri} and linked to NFT {assetId}.",
+        "tsaCertified": "Capture time certified by {provider} at {time} (RFC 3161).",
+        "ownerSame": "Registered by {wallet} (current owner, no transfer).",
+        "ownerTransferred": "Registered by {creator}. Current owner: {owner}.",
+        "phashResult": "On-chain pHash: {hash}. {detail}. WASM: {wasmHash}",
+        "teeSigResult": "This content: TEE signature by {pubkey} — {result}",
+        "teeSigValid": "valid ✓",
+        "teeSigPending": "verification pending",
+        "tsaResult": "This content: {provider}, {time}"
       },
 
       "why": {
@@ -326,6 +344,72 @@
         "ossDesc": "The source code for both Title Protocol and RootLens is fully published on GitHub. The verification logic running on this page, the protocol specification and implementation, the code executed inside the TEE — you can inspect everything yourself and independently reproduce the verification."
       }
     }
+  },
+
+  "field": {
+    "content_hash": "Content Hash",
+    "content_type": "Content Type",
+    "creator_wallet": "Registrant Wallet",
+    "tsa_timestamp": "TSA Timestamp",
+    "tsa_pubkey_hash": "TSA Public Key Hash",
+    "tsa_token_data": "TSA Token",
+    "nodes": "Provenance Nodes",
+    "links": "Provenance Links",
+    "extension_id": "Extension ID",
+    "wasm_source": "WASM Source",
+    "wasm_hash": "WASM Hash",
+    "extension_input_hash": "Extension Input Hash",
+    "protocol": "Protocol",
+    "tee_type": "TEE Type",
+    "tee_pubkey": "TEE Public Key",
+    "tee_signature": "TEE Signature",
+    "tee_attestation": "TEE Attestation",
+    "phash": "Perceptual Hash",
+    "collection": "Collection",
+    "owner": "Owner",
+    "currentOwner": "Current Owner",
+    "program": "Program",
+    "globalConfigPda": "GlobalConfig PDA",
+    "authority": "Authority",
+    "coreCollection": "Core Collection",
+    "extCollection": "Extension Collection",
+    "trustedTeeNodes": "Trusted TEE Nodes",
+    "trustedTsaKeys": "Trusted TSA Keys",
+    "trustedWasmModules": "Trusted WASM Modules",
+    "network": "Network",
+    "none": "(none)",
+    "phashThreshold": "pHash Threshold",
+    "c2paSigning": "C2PA Signing",
+    "teeSigning": "TEE Signing",
+    "dimensions": "Dimensions",
+    "assetId": "NFT Asset ID",
+    "offchainUri": "Off-chain URI",
+    "hammingDistance": "Hamming Distance",
+    "download": "Download verification data (.csv)"
+  },
+
+  "check": {
+    "c2pa_chain": "C2PA Provenance Chain",
+    "c2pa_chain_pass": "Provenance graph in C2PA signature chain: {nodes} node(s), {links} link(s). Records the edit history and material relationships from capture to present",
+    "c2pa_chain_fail": "No provenance graph found in the C2PA signature chain",
+    "content_hash_match": "Content Hash Match",
+    "content_hash_match_pass": "The query Content Hash matches the Content Hash in the off-chain data payload. Confirms the retrieved data is a record for this content",
+    "content_hash_match_fail": "The query Content Hash does not match the Content Hash in the off-chain data payload",
+    "original_check": "Duplicate Resolution",
+    "original_check_pass": "Among all cNFTs with the same Content Hash, this cNFT has the earliest registration. Determined as the legitimate original via duplicate resolution",
+    "original_check_fail": "An older cNFT with the same Content Hash exists. This content may be a re-registration",
+    "wasm_hash": "WASM Module Verification",
+    "wasm_hash_pass": "The SHA-256 hash of the WASM binary (WASM Hash, computed by the TEE immediately before execution) matches an entry in GlobalConfig's trusted WASM module list. Confirms an unmodified, authorized module was used",
+    "wasm_hash_fail": "The WASM Hash in the off-chain data does not appear in GlobalConfig's trusted WASM module list. An unknown or modified WASM module may have been used",
+    "wasm_hash_skip": "GlobalConfig's trusted WASM module list is empty — comparison skipped (may be unset on devnet)",
+    "phash_identity": "pHash Identity Verification",
+    "phash_identity_pass": "Hamming distance between on-chain pHash (64-bit DCT hash computed from the original image by WASM inside TEE) and browser-recomputed pHash (same WASM, from displayed image): {distance}. Pass: {threshold} or less (0 = identical, lower = more similar)",
+    "phash_identity_fail": "Hamming distance between on-chain pHash (64-bit DCT hash from TEE WASM) and browser-recomputed pHash (from displayed image): {distance}. Exceeds threshold of {threshold} (0 = identical, higher = more different)",
+    "phash_identity_skip": "No pHash data found in the Extension NFT",
+    "phash_identity_error": "Could not load the displayed image, so the browser-side pHash recomputation was not possible ({reason})",
+    "hardware_signing": "Hardware Capture Proof",
+    "hardware_signing_pass": "Hardware secure element signature ({id}) detected in the C2PA signature chain. Proves physical capture by the device",
+    "hardware_signing_fail": "Hardware signing verification failed"
   },
 
   "notfound": {

@@ -19,7 +19,7 @@
 | ネイティブモジュール (c2pa-rs FFI) | 実装済み（署名 + 読み取り） |
 | ネイティブモジュール (TEE) | 実装済み（鍵生成 + CSR + TEE署名コールバック。Android/iOS両対応） |
 | サーバー (Next.js API Routes) | 着手中（CA + 証明書発行 + CRL） |
-| 公開ページ (rootlens.io) | 着手中（UI + モックデータ。Title Protocol接続は後続） |
+| 公開ページ (rootlens.io) | 実装済み（LP + 検証ページ。TP §5.2準拠のクライアントサイド検証） |
 | データベース (Supabase) | 未着手 |
 | ストレージ (R2) | 未着手 |
 
@@ -102,9 +102,9 @@
 | 仕様の要素 | 対応コンポーネント | 状態 |
 |-----------|------------------|------|
 | §7.1 URL構造 | Public Page | 実装済み（/p/[shortId] ルーティング） |
-| §7.2 コンテンツページの表示内容 | Public Page | 実装済み（デバイス情報・検証カード・技術詳細。モックデータで動作） |
+| §7.2 コンテンツページの表示内容 | Public Page | 実装済み（Trust row + NFTトグル + GlobalConfig全フィールド + CSVダウンロード） |
 | §7.3 OGP | Public Page | 実装済み（generateMetadata でOGタグ + Twitterカード設定） |
-| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 型のみ（検証IF定義済み。Title Protocol接続は後続タスク） |
+| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 実装済み（TP仕様§5.2 Step 1-6準拠。DAS API → Arweave → Ed25519署名検証 → pHash再計算。GlobalConfig/コレクション/TEE署名/Content Hash一致/重複解決/WASMハッシュ/pHash同一性） |
 | §7.5 データの削除・非公開 | App / Server | 未着手 |
 
 ---

@@ -1,278 +1,273 @@
 /**
- * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
+ * 仕様書 §5.2 クライアントサイド検証フロー
  *
  * ブラウザ内でトラストレス検証を完結させる。
  * RootLens サーバーには一切問い合わせない。
  *
- * 検証ステップ:
- *  1. cNFT が正規コレクションに属するか
- *  2. Arweave オフチェーンデータの TEE 署名 (Ed25519) 検証
- *  3. pHash 照合 (表示画像から再計算 → オンチェーン値と比較)
- *  4. content_hash 一致確認
+ * 全NFT共通ステップ:
+ *  1. コレクション所属確認
+ *  2. TEE署名検証 (Ed25519)
+ *
+ * NFT固有ステップ (specificChecks):
+ *  Core (c2pa): C2PA来歴チェーン確認, content_hash一致, 重複解決
+ *  Extension (image-phash): pHash同一性検証
+ *  Extension (hardware-*): ハードウェア署名検出
+ *  Extension (その他): WASMハッシュ検証
  */
 
 import type { SignedJson, CorePayload, ExtensionPayload } from "@title-protocol/sdk";
 import type { ResolvedContent } from "./content-resolver";
-import type { VerificationResult, VerifyStepStatus, ExtensionVerification } from "./types";
+import type { VerificationResult, VerifyStepStatus, NftVerification, SpecificCheck } from "./types";
 import {
-  getCollectionMints,
+  getGlobalConfigData,
+  type GlobalConfigData,
   PHASH_THRESHOLD,
 } from "./config";
+import { contentResolver } from "./content-resolver";
 import { computePHashWasm } from "./phash-wasm";
 
 // ---------------------------------------------------------------------------
 // メインの検証関数
 // ---------------------------------------------------------------------------
 
+/** 翻訳関数の型。check.* キーを解決する。存在しないキーはキー名をそのまま返す */
+export type CheckTranslator = (key: string, params?: Record<string, string | number>) => string;
+
 export async function verifyContentOnChain(
   resolved: ResolvedContent,
-  thumbnailUrl: string
+  thumbnailUrl: string,
+  queryContentHash: string,
+  tc: CheckTranslator,
 ): Promise<VerificationResult> {
   const result: VerificationResult = {
-    collectionVerified: "pending",
-    teeSignatureVerified: "pending",
-    c2paChainVerified: "pending",
-    phashMatched: "pending",
-    hardwareVerified: "skipped",
-    extensions: [],
+    nfts: [],
     overall: "pending",
     assetId: resolved.assetId,
     arweaveUri: resolved.arweaveUri,
   };
 
-  console.group("[RootLens Verification]");
+  console.group("[RootLens Verification] §5.2");
 
-  // Step 1: コレクション検証
-  console.log("Step 1: Verifying collection membership...");
-  const collections = await getCollectionMints();
-  result.collectionVerified = verifyCollectionWith(resolved, collections);
-  console.log(
-    `  → Collection: ${resolved.collectionAddress}`
-  );
-  console.log(
-    `  → Expected core: ${collections.core}`
-  );
-  console.log(
-    `  → Result: ${result.collectionVerified === "verified" ? "verified ✓" : "FAILED ✗"}`
-  );
+  // Step 1 (global): GlobalConfig取得
+  console.log("Fetching Global Config...");
+  const globalConfig = await getGlobalConfigData();
 
-  // Step 2: TEE署名検証
-  console.log("Step 2: Verifying TEE signature (Ed25519)...");
+  // =====================================================================
+  // Core NFT 検証
+  // =====================================================================
+  const coreNft: NftVerification = {
+    id: "c2pa",
+    collectionVerified: "pending",
+    teeSignatureVerified: "pending",
+    specificChecks: [],
+  };
+
+  // 共通ステップ1: コレクション
+  coreNft.collectionVerified = resolved.collectionAddress === globalConfig.core
+    ? "verified" : "failed";
+  console.log(`Core collection: ${coreNft.collectionVerified}`);
+
+  // 共通ステップ2: TEE署名
   if (resolved.coreSignedJson) {
-    result.teeSignatureVerified = await verifyTeeSignature(
-      resolved.coreSignedJson
-    );
-    console.log(`  → TEE pubkey: ${resolved.coreSignedJson.tee_pubkey}`);
-    console.log(
-      `  → Result: ${result.teeSignatureVerified === "verified" ? "valid ✓" : "FAILED ✗"}`
-    );
+    coreNft.teeSignatureVerified = await verifyTeeSignature(resolved.coreSignedJson);
   } else {
-    result.teeSignatureVerified = "failed";
-    console.log("  → No signed_json found ✗");
+    coreNft.teeSignatureVerified = "failed";
   }
+  console.log(`Core TEE sig: ${coreNft.teeSignatureVerified}`);
 
-  // Step 3: C2PA チェーン (Core signed_json の存在確認)
-  console.log("Step 3: Checking C2PA chain record...");
+  // Core固有: C2PA来歴チェーン
   if (resolved.coreSignedJson) {
     const payload = resolved.coreSignedJson.payload as CorePayload;
-    if (payload.nodes && payload.nodes.length > 0) {
-      result.c2paChainVerified = "verified";
-      console.log(`  → Provenance nodes: ${payload.nodes.length}`);
-      console.log("  → C2PA chain: recorded ✓");
-    } else {
-      result.c2paChainVerified = "failed";
-      console.log("  → No provenance nodes ✗");
-    }
+    const hasNodes = payload.nodes && payload.nodes.length > 0;
+    coreNft.specificChecks.push({
+      label: tc("c2pa_chain"),
+      status: hasNodes ? "verified" : "failed",
+      detail: hasNodes
+        ? tc("c2pa_chain_pass", { nodes: payload.nodes.length, links: payload.links?.length ?? 0 })
+        : tc("c2pa_chain_fail"),
+    });
   } else {
-    result.c2paChainVerified = "failed";
-    console.log("  → No core data ✗");
+    coreNft.specificChecks.push({
+      label: tc("c2pa_chain"),
+      status: "failed",
+      detail: tc("c2pa_chain_fail"),
+    });
   }
 
-  // Step 4: pHash 照合
-  console.log("Step 4: Verifying content identity via pHash...");
-  const phashResult = await verifyPHash(resolved, thumbnailUrl);
-  result.phashMatched = phashResult.status;
-  result.phashDistance = phashResult.distance;
-  if (phashResult.onchainHash && phashResult.computedHash) {
-    console.log(`  → On-chain pHash: ${phashResult.onchainHash}`);
-    console.log(`  → Computed pHash: ${phashResult.computedHash}`);
-    console.log(
-      `  → Hamming distance: ${phashResult.distance} ${result.phashMatched === "verified" ? "✓" : "✗"} (threshold: ${PHASH_THRESHOLD})`
-    );
+  // Core固有: content_hash一致
+  if (resolved.coreSignedJson) {
+    const payload = resolved.coreSignedJson.payload as CorePayload;
+    const matched = payload.content_hash === queryContentHash;
+    coreNft.specificChecks.push({
+      label: tc("content_hash_match"),
+      status: matched ? "verified" : "failed",
+      detail: matched ? tc("content_hash_match_pass") : tc("content_hash_match_fail"),
+    });
   } else {
-    console.log(`  → pHash: ${phashResult.reason || "skipped"}`);
+    coreNft.specificChecks.push({
+      label: tc("content_hash_match"),
+      status: "failed",
+      detail: tc("content_hash_match_fail"),
+    });
   }
 
-  // Step 5: Extension cNFT 個別検証
-  console.log("Step 5: Verifying extension cNFTs...");
-  for (const extSj of resolved.extensionSignedJsons) {
+  // Core固有: オリジナルチェック（自分が最古の登録か）
+  if (contentResolver.resolveAllByContentHash) {
+    const allResolved = await contentResolver.resolveAllByContentHash(queryContentHash);
+    const isOriginal = allResolved.length === 0 || allResolved[0].assetId === resolved.assetId;
+    coreNft.specificChecks.push({
+      label: tc("original_check"),
+      status: isOriginal ? "verified" : "failed",
+      detail: isOriginal ? tc("original_check_pass") : tc("original_check_fail"),
+    });
+  }
+
+  result.nfts.push(coreNft);
+
+  // =====================================================================
+  // Extension NFT 検証（全extensionを同じ枠組みで処理）
+  // =====================================================================
+  for (const extNft of resolved.extensionNfts) {
+    const extSj = extNft.signedJson;
     const extPayload = extSj.payload as ExtensionPayload;
     const extId = extPayload.extension_id || "unknown";
 
-    const extVerif: ExtensionVerification = {
-      extensionId: extId,
+    const nftVerif: NftVerification = {
+      id: extId,
       collectionVerified: "pending",
       teeSignatureVerified: "pending",
-      wasmHashVerified: "pending",
+      specificChecks: [],
     };
 
-    // 5a: ext_collection に属するか（ResolvedContentに情報がないのでskip — 将来対応）
-    // TODO: extAssetごとのcollectionAddressをResolvedContentに持たせる
-    extVerif.collectionVerified = "skipped";
+    // 共通ステップ1: コレクション
+    nftVerif.collectionVerified = extNft.collectionAddress === globalConfig.ext
+      ? "verified" : "failed";
 
-    // 5b: TEE署名検証
-    extVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
-    console.log(`  → Extension [${extId}] TEE sig: ${extVerif.teeSignatureVerified}`);
+    // 共通ステップ2: TEE署名
+    nftVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
+    console.log(`[${extId}] collection: ${nftVerif.collectionVerified}, TEE sig: ${nftVerif.teeSignatureVerified}`);
 
-    // 5c: wasm_hash が Global Config に含まれるか
-    // TODO: GlobalConfig.trusted_wasm_ids と照合（SDK 0.1.5: trusted_wasm_ids: string[]）
-    // NOTE: SDK 0.1.5ではWASMハッシュはWasmModuleAccount PDAに格納。完全な検証にはPDA読み取りが必要
-    extVerif.wasmHashVerified = "skipped";
-
-    // 5d: ハードウェア署名検出
-    if (extId === "hardware-google" || extId.startsWith("hardware-")) {
-      result.hardwareVerified = extVerif.teeSignatureVerified;
-      extVerif.detail = `Hardware: ${extId}`;
-      console.log(`  → Hardware signing detected: ${extId} → ${result.hardwareVerified}`);
+    // Extension固有: WASMハッシュ検証
+    const wasmHash = (extPayload as Record<string, unknown>).wasm_hash as string | undefined;
+    if (wasmHash && globalConfig.trustedWasmModules.length > 0) {
+      const trusted = globalConfig.trustedWasmModules.find(
+        (m) => m.extension_id === extId && m.wasm_hash === wasmHash
+      );
+      nftVerif.specificChecks.push({
+        label: tc("wasm_hash"),
+        status: trusted ? "verified" : "failed",
+        detail: trusted ? tc("wasm_hash_pass") : tc("wasm_hash_fail"),
+      });
+    } else if (wasmHash) {
+      nftVerif.specificChecks.push({
+        label: tc("wasm_hash"),
+        status: "skipped",
+        detail: tc("wasm_hash_skip"),
+      });
     }
 
-    result.extensions.push(extVerif);
+    // Extension固有: image-phash → pHash同一性検証
+    if (extId === "image-phash") {
+      const phashPayload = extPayload as ExtensionPayload & { phash?: string };
+      if (phashPayload.phash) {
+        const phashResult = await verifyPHashWithImage(phashPayload.phash, thumbnailUrl);
+        if (phashResult.distance !== undefined) {
+          nftVerif.specificChecks.push({
+            label: tc("phash_identity"),
+            status: phashResult.status,
+            detail: tc(phashResult.status === "verified" ? "phash_identity_pass" : "phash_identity_fail", { distance: phashResult.distance, threshold: PHASH_THRESHOLD }),
+          });
+        } else {
+          // 画像取得失敗（CORSなど）
+          nftVerif.specificChecks.push({
+            label: tc("phash_identity"),
+            status: "skipped",
+            detail: tc("phash_identity_error", { reason: phashResult.reason || "unknown" }),
+          });
+        }
+      } else {
+        nftVerif.specificChecks.push({
+          label: tc("phash_identity"),
+          status: "skipped",
+          detail: tc("phash_identity_skip"),
+        });
+      }
+    }
+
+    // Extension固有: hardware-* → ハードウェア署名検出
+    if (extId.startsWith("hardware-")) {
+      nftVerif.specificChecks.push({
+        label: tc("hardware_signing"),
+        status: nftVerif.teeSignatureVerified,
+        detail: nftVerif.teeSignatureVerified === "verified"
+          ? tc("hardware_signing_pass", { id: extId })
+          : tc("hardware_signing_fail"),
+      });
+    }
+
+    result.nfts.push(nftVerif);
   }
 
-  // ハードウェア署名 extension が見つからなかった場合
-  if (result.hardwareVerified === "skipped" && resolved.extensionSignedJsons.length > 0) {
-    console.log("  → No hardware signing extension (software-signed content)");
+  // =====================================================================
+  // 全体判定
+  // =====================================================================
+  const allChecks: VerifyStepStatus[] = [];
+  for (const nft of result.nfts) {
+    allChecks.push(nft.collectionVerified);
+    allChecks.push(nft.teeSignatureVerified);
+    for (const sc of nft.specificChecks) {
+      allChecks.push(sc.status);
+    }
   }
+  const active = allChecks.filter((s) => s !== "skipped");
+  const allVerified = active.length > 0 && active.every((s) => s === "verified");
+  const anyFailed = active.some((s) => s === "failed");
+  result.overall = allVerified ? "verified" : anyFailed ? "failed" : "pending";
 
-  // 全体判定 — skipped は除外して判定（データがない検証項目は合否に影響しない）
-  const steps = [
-    result.collectionVerified,
-    result.teeSignatureVerified,
-    result.c2paChainVerified,
-    result.phashMatched,
-  ];
-  const activeSteps = steps.filter((s) => s !== "skipped");
-  const allVerified = activeSteps.length > 0 && activeSteps.every((s) => s === "verified");
-  const anyFailed = activeSteps.some((s) => s === "failed");
-  result.overall = allVerified
-    ? "verified"
-    : anyFailed
-      ? "failed"
-      : "pending";
-
-  console.log(
-    `\nOverall: ${result.overall === "verified" ? "All verification passed ✓" : "Verification incomplete or failed ✗"}`
-  );
-  console.log(
-    "All verification performed client-side. No RootLens server involved."
-  );
+  console.log(`Overall: ${result.overall}`);
   console.groupEnd();
 
   return result;
 }
 
 // ---------------------------------------------------------------------------
-// Step 1: コレクション検証
-// ---------------------------------------------------------------------------
-
-function verifyCollectionWith(
-  resolved: ResolvedContent,
-  collections: { core: string; ext: string },
-): VerifyStepStatus {
-  const addr = resolved.collectionAddress;
-  if (addr === collections.core || addr === collections.ext) {
-    return "verified";
-  }
-  return "failed";
-}
-
-// ---------------------------------------------------------------------------
-// Step 2: TEE署名検証 (Ed25519)
+// TEE署名検証 (Ed25519)
 // ---------------------------------------------------------------------------
 
 async function verifyTeeSignature(
   signedJson: SignedJson
 ): Promise<VerifyStepStatus> {
   try {
-    const { tee_pubkey, tee_signature, payload, protocol, tee_type, attributes } = signedJson;
-
-    // 署名対象データを再構築: payload + attributes の正規化 JSON
+    const { tee_pubkey, tee_signature, payload, attributes } = signedJson;
     const signatureTarget = JSON.stringify({ payload, attributes });
     const data = new TextEncoder().encode(signatureTarget);
-
-    // Ed25519 公開鍵 (Base58 → bytes)
     const pubkeyBytes = base58Decode(tee_pubkey);
-
-    // 署名 (Base64 → bytes)
     const sigBytes = base64ToBytes(tee_signature);
 
-    // Web Crypto API で Ed25519 検証
     const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      pubkeyBytes.buffer as ArrayBuffer,
-      { name: "Ed25519" },
-      false,
-      ["verify"]
+      "raw", pubkeyBytes.buffer as ArrayBuffer,
+      { name: "Ed25519" }, false, ["verify"]
     );
-
     const valid = await crypto.subtle.verify(
-      { name: "Ed25519" },
-      cryptoKey,
-      sigBytes.buffer as ArrayBuffer,
-      data.buffer as ArrayBuffer
+      { name: "Ed25519" }, cryptoKey,
+      sigBytes.buffer as ArrayBuffer, data.buffer as ArrayBuffer
     );
-
     return valid ? "verified" : "failed";
   } catch (e) {
     console.warn("  → Ed25519 verification error:", e);
-    // ブラウザが Ed25519 未対応の場合は skipped
-    if (e instanceof Error && e.message.includes("not supported")) {
-      return "skipped";
-    }
+    if (e instanceof Error && e.message.includes("not supported")) return "skipped";
     return "failed";
   }
 }
 
 // ---------------------------------------------------------------------------
-// Step 3: pHash 照合
+// pHash 照合
 // ---------------------------------------------------------------------------
 
 interface PHashResult {
   status: VerifyStepStatus;
   distance?: number;
-  onchainHash?: string;
-  computedHash?: string;
   reason?: string;
-}
-
-async function verifyPHash(
-  resolved: ResolvedContent,
-  thumbnailUrl: string
-): Promise<PHashResult> {
-  // Extension signed_json から image-phash の結果を探す
-  const phashExtension = resolved.extensionSignedJsons.find((sj) => {
-    const p = sj.payload as ExtensionPayload;
-    return p.extension_id === "image-phash";
-  });
-
-  if (phashExtension) {
-    // image-phash extension: payload.phash に直接ハッシュ値が入っている
-    const payload = phashExtension.payload as ExtensionPayload & { phash?: string };
-    const onchainHash = payload.phash;
-    if (onchainHash) {
-      return verifyPHashWithImage(onchainHash, thumbnailUrl);
-    }
-  }
-
-  // フォールバック: attributes から探す
-  const phashAttr = resolved.attributes.find(
-    (a) => a.trait_type === "phash"
-  );
-  if (phashAttr) {
-    return verifyPHashWithImage(phashAttr.value, thumbnailUrl);
-  }
-
-  return { status: "skipped", reason: "No pHash data in on-chain record" };
 }
 
 async function verifyPHashWithImage(
@@ -282,12 +277,9 @@ async function verifyPHashWithImage(
   try {
     const computedHash = await computePHashWasm(thumbnailUrl);
     const distance = hammingDistance(onchainHash, computedHash);
-
     return {
       status: distance <= PHASH_THRESHOLD ? "verified" : "failed",
       distance,
-      onchainHash,
-      computedHash,
     };
   } catch (e) {
     console.warn("  → pHash computation error:", e);
@@ -295,18 +287,6 @@ async function verifyPHashWithImage(
   }
 }
 
-// ---------------------------------------------------------------------------
-// pHash 計算 (DCT 64-bit) — 仕様書 §6.3.1
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// ハミング距離
-// ---------------------------------------------------------------------------
-
-/**
- * 16進数文字列の pHash 間のハミング距離を算出する。
- */
 export function hammingDistance(a: string, b: string): number {
   const x = BigInt("0x" + a) ^ BigInt("0x" + b);
   let dist = 0;
@@ -322,8 +302,7 @@ export function hammingDistance(a: string, b: string): number {
 // エンコーディングユーティリティ
 // ---------------------------------------------------------------------------
 
-const BASE58_ALPHABET =
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 function base58Decode(str: string): Uint8Array {
   const bytes: number[] = [];
@@ -341,7 +320,6 @@ function base58Decode(str: string): Uint8Array {
       carry >>= 8;
     }
   }
-  // leading zeros
   for (const c of str) {
     if (c !== "1") break;
     bytes.push(0);

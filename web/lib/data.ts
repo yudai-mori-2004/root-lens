@@ -147,21 +147,17 @@ export async function fetchContentRecord(
  * cNFT が見つからない場合は全ステップ failed を返す。
  */
 export async function verifyContent(
-  _contentHash: string,
+  contentHash: string,
   thumbnailUrl: string,
-  resolved: ResolvedContent | null
+  resolved: ResolvedContent | null,
+  tc: (key: string, params?: Record<string, string | number>) => string,
 ): Promise<VerificationResult> {
   if (!resolved) {
     return {
-      collectionVerified: "failed",
-      teeSignatureVerified: "failed",
-      c2paChainVerified: "failed",
-      phashMatched: "skipped",
-      hardwareVerified: "skipped",
-      extensions: [],
+      nfts: [],
       overall: "failed",
     };
   }
 
-  return verifyContentOnChain(resolved, thumbnailUrl);
+  return verifyContentOnChain(resolved, thumbnailUrl, contentHash, tc);
 }

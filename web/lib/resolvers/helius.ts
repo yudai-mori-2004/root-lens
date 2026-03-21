@@ -11,7 +11,7 @@
  */
 
 import type { SignedJson } from "@title-protocol/sdk";
-import type { ContentResolver, ResolvedContent } from "../content-resolver";
+import type { ContentResolver, ResolvedContent, ExtensionNft } from "../content-resolver";
 import { DAS_RPC_URL, getCollectionMints } from "../config";
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,21 @@ export class DasContentResolver implements ContentResolver {
       ]);
 
       const coreSignedJson = coreSj && isCorePayload(coreSj.payload) ? coreSj : null;
-      const extensionSignedJsons = extSjs.filter((sj): sj is SignedJson => sj !== null);
+
+      // Extension NFT の個別レコードを構築
+      const extensionNfts: ExtensionNft[] = [];
+      for (let i = 0; i < extAssets.length; i++) {
+        const sj = extSjs[i];
+        if (!sj) continue;
+        extensionNfts.push({
+          assetId: extAssets[i].id,
+          collectionAddress: getCollectionAddress(extAssets[i]),
+          arweaveUri: extAssets[i].content.json_uri,
+          attributes: extAssets[i].content.metadata.attributes ?? [],
+          signedJson: sj,
+          ownerWallet: extAssets[i].ownership.owner,
+        });
+      }
 
       return {
         assetId: coreAsset.id,
@@ -194,12 +208,43 @@ export class DasContentResolver implements ContentResolver {
         arweaveUri: coreAsset.content.json_uri,
         attributes: coreAsset.content.metadata.attributes ?? [],
         coreSignedJson,
-        extensionSignedJsons,
+        extensionNfts,
         ownerWallet: coreAsset.ownership.owner,
       };
     } catch (e) {
       console.error("[DasContentResolver] resolveByContentHash failed:", e);
       return null;
+    }
+  }
+
+  /**
+   * オリジナルチェック用: 同一content_hashの全Core cNFTのassetIdを返す。
+   * Arweaveデータは取得しない（assetIdの順序比較のみに使う）。
+   */
+  async resolveAllByContentHash(
+    contentHash: string
+  ): Promise<ResolvedContent[]> {
+    try {
+      const collections = await getCollectionMints();
+      const coreResult = await searchAssetsByCollection(collections.core);
+
+      const coreAssets = coreResult.items.filter(
+        (item) => getAttribute(item, "content_hash") === contentHash
+      );
+
+      // 軽量: assetIdとcollectionだけ返す（Arweave取得なし）
+      return coreAssets.map((asset) => ({
+        assetId: asset.id,
+        collectionAddress: getCollectionAddress(asset),
+        arweaveUri: asset.content.json_uri,
+        attributes: asset.content.metadata.attributes ?? [],
+        coreSignedJson: null,
+        extensionNfts: [],
+        ownerWallet: asset.ownership.owner,
+      }));
+    } catch (e) {
+      console.error("[DasContentResolver] resolveAllByContentHash failed:", e);
+      return [];
     }
   }
 }

@@ -7,7 +7,7 @@ export const metadata = {
     "How Title Protocol separates verified attributes from content and records them as independent, trustworthy records.",
 };
 
-export default function Technology() {
+export default async function Technology() {
   return (
     <SiteLayout>
       <TechnologyPage />

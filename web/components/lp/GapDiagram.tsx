@@ -1,14 +1,12 @@
-"use client";
-
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
 
 const STEPS_KEYS = ["step1", "step2", "step3", "step4"] as const;
 const PASS_MAP_C2PA = [true, false, false, false];
 const PASS_MAP_TP = [true, true, true, true];
 
-export default function GapDiagram() {
-  const t = useTranslations("diagram");
+export default async function GapDiagram() {
+  const t = await getTranslations("diagram");
   const labels = STEPS_KEYS.map((key) => t(key));
 
   return (

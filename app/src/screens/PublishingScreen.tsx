@@ -22,7 +22,6 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
 import { config } from '../config';
 import { registerOnTitleProtocol } from '../services/titleProtocol';
-import { stampOgp } from '../native/c2paBridge';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
 
@@ -98,9 +97,7 @@ export default function PublishingScreen() {
           { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
         ),
       ]);
-      const stampedOgpPath = await stampOgp(ogp.uri);
-      const stampedUri = stampedOgpPath.startsWith('file://') ? stampedOgpPath : `file://${stampedOgpPath}`;
-      return { displayUri: display.uri, ogpUri: stampedUri };
+      return { displayUri: display.uri, ogpUri: ogp.uri };
     }
 
     if (mediaType === 'video') {
@@ -117,9 +114,7 @@ export default function PublishingScreen() {
           { compress: 0.80, format: ImageManipulator.SaveFormat.JPEG },
         ),
       ]);
-      const stampedOgpPath = await stampOgp(ogp.uri);
-      const stampedUri = stampedOgpPath.startsWith('file://') ? stampedOgpPath : `file://${stampedOgpPath}`;
-      return { displayUri: display.uri, ogpUri: stampedUri };
+      return { displayUri: display.uri, ogpUri: ogp.uri };
     }
 
     // audio等: サムネイルなし（プレースホルダー）

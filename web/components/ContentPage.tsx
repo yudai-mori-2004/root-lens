@@ -9,12 +9,11 @@ import type {
   VerifyStepStatus,
   ExtensionVerification,
 } from "@/lib/types";
-import type { ResolvedContent } from "@/lib/content-resolver";
-import type { CorePayload, ExtensionPayload, GraphNode } from "@title-protocol/sdk";
+import type { ResolvedContent, ExtensionNft } from "@/lib/content-resolver";
+import type { CorePayload, ExtensionPayload, GraphNode, SignedJson } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
+import { PHASH_THRESHOLD, getProtocolAddresses, getGlobalConfigData, type GlobalConfigData } from "@/lib/config";
 import styles from "./ContentPage.module.css";
-
-const PHASH_THRESHOLD = 5;
 
 interface Props {
   page: PageMeta;
@@ -22,19 +21,29 @@ interface Props {
 
 export default function ContentPage({ page }: Props) {
   const t = useTranslations("content");
+  const tField = useTranslations("field");
+  const tCheck = useTranslations("check");
   const tFooter = useTranslations("footer");
   const [activeIndex, setActiveIndex] = useState(0);
   const [records, setRecords] = useState<(ContentRecord | null)[]>([]);
   const [resolvedList, setResolvedList] = useState<(ResolvedContent | null)[]>([]);
   const [verifications, setVerifications] = useState<VerificationResult[]>([]);
   const [techOpen, setTechOpen] = useState(false);
+  const [protocolAddr] = useState(() => getProtocolAddresses());
+  const [globalConfig, setGlobalConfig] = useState<GlobalConfigData | null>(null);
+
+  useEffect(() => {
+    getGlobalConfigData().then(setGlobalConfig);
+  }, []);
 
   useEffect(() => {
     // 全コンテンツを並列取得・検証
     Promise.all(
       page.contents.map(async (c) => {
         const { record: r, resolved: res } = await fetchContentRecord(c.contentHash);
-        const v = await verifyContent(c.contentHash, c.thumbnailUrl, res);
+        const tc = (key: string, params?: Record<string, string | number>) =>
+          tCheck.has(key) ? tCheck(key, params) : key;
+        const v = await verifyContent(c.contentHash, c.thumbnailUrl, res, tc);
         return { record: r, resolved: res, verification: v };
       })
     ).then((results) => {
@@ -49,38 +58,31 @@ export default function ContentPage({ page }: Props) {
   const record = records[activeIndex] ?? null;
   const resolved = resolvedList[activeIndex] ?? null;
   const verification = verifications[activeIndex] ?? {
-    collectionVerified: "pending" as const,
-    teeSignatureVerified: "pending" as const,
-    c2paChainVerified: "pending" as const,
-    phashMatched: "pending" as const,
-    hardwareVerified: "skipped" as const,
-    extensions: [],
+    nfts: [],
     overall: "pending" as const,
   };
 
   // Core payload
   const corePayload = resolved?.coreSignedJson?.payload as CorePayload | undefined;
-  const coreSj = resolved?.coreSignedJson;
+  const coreSj = resolved?.coreSignedJson ?? null;
 
-  // 日付ソース: TSA認証時刻があればそれを使う。なければrecord.capturedAt（nullの可能性あり）
+  // 日付ソース
   const hasTsa = corePayload?.tsa_timestamp != null;
   const capturedDate = hasTsa
     ? formatTimestamp(corePayload!.tsa_timestamp!)
     : record?.capturedAt ? formatDate(record.capturedAt) : null;
 
-  // スコア — core + 全extensionのTEE署名を含む
-  const coreSteps = [
-    verification.collectionVerified,
-    verification.teeSignatureVerified,
-    verification.c2paChainVerified,
-  ];
-  const extSteps = [
-    verification.phashMatched,
-    verification.hardwareVerified,
-    ...verification.extensions.map(e => e.teeSignatureVerified),
-  ];
-  const allSteps = [...coreSteps, ...extSteps];
-  const active = allSteps.filter(s => s !== "skipped" && s !== "pending");
+  // NFT検証結果のヘルパー
+  const coreVerif = verification.nfts.find(n => n.id === "c2pa");
+  const findExtVerif = (id: string) => verification.nfts.find(n => n.id === id);
+
+  // スコア — 全NFTの全検証ステップから算出
+  const allChecks: VerifyStepStatus[] = [];
+  for (const nft of verification.nfts) {
+    allChecks.push(nft.collectionVerified, nft.teeSignatureVerified);
+    for (const sc of nft.specificChecks) allChecks.push(sc.status);
+  }
+  const active = allChecks.filter(s => s !== "skipped" && s !== "pending");
   const passed = active.filter(s => s === "verified").length;
   const total = active.length;
 
@@ -124,6 +126,28 @@ export default function ContentPage({ page }: Props) {
 
       {/* ===== 一般向け ===== */}
       <div className={styles.infoSection}>
+        {/* Trust status — first thing the user sees after the image */}
+        <div className={styles.trustRow}>
+          {verification.overall === "pending" ? (
+            <>
+              <LoadingDots />
+              <span className={styles.trustPending}>{t("trust.verifying")}</span>
+            </>
+          ) : verification.overall === "verified" ? (
+            <>
+              <ShieldIcon verified />
+              <span className={styles.trustVerified}>{t("trust.verified")}</span>
+              <span className={styles.trustScore}>{passed}/{total}</span>
+            </>
+          ) : (
+            <>
+              <ShieldIcon verified={false} />
+              <span className={styles.trustFailed}>{t("trust.failed")}</span>
+              <span className={styles.trustScore}>{passed}/{total}</span>
+            </>
+          )}
+        </div>
+
         {record ? (
           <>
             <h1 className={styles.headline}>
@@ -145,28 +169,6 @@ export default function ContentPage({ page }: Props) {
             <div className={styles.skeletonLine} style={{ width: "40%", height: 14 }} />
           </div>
         )}
-
-        {/* Trust status — inline row, no card */}
-        <div className={styles.trustRow}>
-          {verification.overall === "pending" ? (
-            <>
-              <LoadingDots />
-              <span className={styles.trustPending}>{t("trust.verifying")}</span>
-            </>
-          ) : verification.overall === "verified" ? (
-            <>
-              <ShieldIcon verified />
-              <span className={styles.trustVerified}>{t("trust.verified")}</span>
-              <span className={styles.trustScore}>{passed}/{total}</span>
-            </>
-          ) : (
-            <>
-              <ShieldIcon verified={false} />
-              <span className={styles.trustFailed}>{t("trust.failed")}</span>
-              <span className={styles.trustScore}>{passed}/{total}</span>
-            </>
-          )}
-        </div>
       </div>
 
       {/* ===== 技術者向け詳細 ===== */}
@@ -181,178 +183,282 @@ export default function ContentPage({ page }: Props) {
         </button>
 
         {techOpen && (
+          <>
+          {/* ===== Primary data ===== */}
+          <div className={styles.primaryData}>
+            {/* GlobalConfig (信頼の原点) */}
+            <div className={styles.dataBlock}>
+              <DataField label="program" value={truncate(protocolAddr.programId, 12)} full={protocolAddr.programId} />
+              <DataField label="globalConfigPda" value={truncate(protocolAddr.globalConfigPda, 12)} full={protocolAddr.globalConfigPda} />
+              <DataField label="network" value="Solana devnet" />
+              {globalConfig && (
+                <>
+                  <DataField label="authority" value={truncate(globalConfig.authority, 12)} full={globalConfig.authority} />
+                  <DataField label="coreCollection" value={truncate(globalConfig.core, 12)} full={globalConfig.core} />
+                  <DataField label="extCollection" value={truncate(globalConfig.ext, 12)} full={globalConfig.ext} />
+                  <DataField label="trustedTeeNodes" value={`${globalConfig.trustedTeeNodes.length}`} />
+                  <DataField label="trustedTsaKeys" value={globalConfig.trustedTsaKeys.length > 0 ? `${globalConfig.trustedTsaKeys.length}` : tField("none")} />
+                  <DataField label="trustedWasmModules" value={globalConfig.trustedWasmModules.map(m => m.extension_id).join(", ") || tField("none")} />
+                </>
+              )}
+            </div>
+
+            {/* Content-level (NFT-independent) */}
+            <div className={styles.dataBlock}>
+              <DataField label="content_hash" value={truncate(currentContent.contentHash, 16)} full={currentContent.contentHash} />
+              <DataField label="content_type" value={corePayload?.content_type || record?.mediaType || ""} />
+              {record?.signingAlgorithm && <DataField label="c2paSigning" value={record.signingAlgorithm} />}
+              {record?.sourceDimensions && record.sourceDimensions.width > 0 && (
+                <DataField label="dimensions" value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
+              )}
+              {record?.tsaProvider && (
+                <DataField label="tsa_timestamp" value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
+              )}
+              {corePayload?.nodes && (
+                <DataField label="nodes" value={String(corePayload.nodes.length)} />
+              )}
+              {corePayload?.links !== undefined && (
+                <DataField label="links" value={corePayload.links.length > 0 ? String(corePayload.links.length) : "0"} />
+              )}
+            </div>
+
+            {/* NFT toggles */}
+            {/* NFT toggles — unified structure for Core and Extensions */}
+            {verification.nfts.map((nftVerif, nftIdx) => {
+              const isCore = nftVerif.id === "c2pa";
+              const label = isCore ? `Core: C2PA` : `Extension: ${nftVerif.id}`;
+
+              // Resolve the NFT data source
+              const sj = isCore
+                ? resolved?.coreSignedJson
+                : resolved?.extensionNfts.find(n => {
+                    const p = n.signedJson.payload as Record<string, unknown>;
+                    return p.extension_id === nftVerif.id;
+                  })?.signedJson;
+              const nftData = isCore ? resolved : resolved?.extensionNfts.find(n => {
+                const p = n.signedJson.payload as Record<string, unknown>;
+                return p.extension_id === nftVerif.id;
+              });
+              const nftAssetId = isCore ? resolved?.assetId : (nftData as ExtensionNft | undefined)?.assetId;
+              const nftArweaveUri = isCore ? resolved?.arweaveUri : (nftData as ExtensionNft | undefined)?.arweaveUri;
+              const nftCollection = isCore ? resolved?.collectionAddress : (nftData as ExtensionNft | undefined)?.collectionAddress;
+              const nftOwner = isCore ? resolved?.ownerWallet : (nftData as ExtensionNft | undefined)?.ownerWallet;
+              const payloadEntries = !isCore && sj
+                ? Object.entries(sj.payload as Record<string, unknown>)
+                : [];
+
+              return (
+                <NftToggle key={nftVerif.id + nftIdx} label={label} defaultOpen={isCore}>
+                  {/* Verification: common 2 steps + specific checks */}
+                  <div className={styles.verifyList}>
+                    <VerifyItem
+                      status={nftVerif.collectionVerified}
+                      label={t("tech.core.collection")}
+                      detail={nftVerif.collectionVerified === "verified"
+                        ? (isCore ? t("tech.core.collectionPass") : t("tech.ext.collectionPass"))
+                        : (isCore ? t("tech.core.collectionFail") : t("tech.ext.collectionFail"))}
+                    />
+                    <VerifyItem
+                      status={nftVerif.teeSignatureVerified}
+                      label={t("tech.core.teeSig")}
+                      detail={nftVerif.teeSignatureVerified === "verified"
+                        ? (isCore ? t("tech.core.teeSigPass") : t("tech.ext.teeSigPass"))
+                        : (isCore ? t("tech.core.teeSigFail") : t("tech.ext.teeSigFail"))}
+                    />
+                    {nftVerif.specificChecks.map((sc, scIdx) => (
+                      <VerifyItem key={scIdx} status={sc.status} label={sc.label} detail={sc.detail} />
+                    ))}
+                  </div>
+
+                  {/* Recorded data */}
+                  <div className={styles.dataBlock}>
+                    {nftCollection && <DataField label="collection" value={truncate(nftCollection, 16)} full={nftCollection} />}
+                    {nftAssetId && <DataField label="assetId" value={truncate(nftAssetId, 16)} full={nftAssetId} />}
+                    {nftArweaveUri && <DataField label="offchainUri" value={truncate(nftArweaveUri, 20)} full={nftArweaveUri} />}
+                    {sj && (
+                      <>
+                        <DataField label="protocol" value={sj.protocol} />
+                        <DataField label="tee_type" value={sj.tee_type || ""} />
+                        <DataField label="teeSigning" value="Ed25519" />
+                        <DataField label="tee_pubkey" value={truncate(sj.tee_pubkey, 16)} full={sj.tee_pubkey} />
+                        <DataField label="tee_signature" value={truncate(sj.tee_signature, 16)} full={sj.tee_signature} />
+                        {sj.tee_attestation && (
+                          <DataField label="tee_attestation" value={truncate(sj.tee_attestation, 16)} full={sj.tee_attestation} />
+                        )}
+                      </>
+                    )}
+                    {nftOwner && <DataField label="owner" value={truncate(nftOwner, 12)} full={nftOwner} />}
+                    {/* Core-specific fields */}
+                    {isCore && corePayload && (
+                      <>
+                        <DataField label="creator_wallet" value={corePayload.creator_wallet ? truncate(corePayload.creator_wallet, 12) : "\u2014"} full={corePayload.creator_wallet} />
+                        {(corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash && (
+                          <DataField label="tsa_pubkey_hash" value={truncate(String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash), 16)} full={String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash)} />
+                        )}
+                        {(corePayload as unknown as Record<string, unknown>).tsa_token_data && (
+                          <DataField label="tsa_token_data" value={truncate(String((corePayload as unknown as Record<string, unknown>).tsa_token_data), 16)} full={String((corePayload as unknown as Record<string, unknown>).tsa_token_data)} />
+                        )}
+                      </>
+                    )}
+                    {/* Extension payload fields */}
+                    {!isCore && payloadEntries.map(([k, v]) => (
+                      <DataField key={k} label={k} value={typeof v === "string" ? truncate(String(v), 20) : String(v)} full={typeof v === "string" && String(v).length > 20 ? String(v) : undefined} />
+                    ))}
+                  </div>
+                </NftToggle>
+              );
+            })}
+
+            {/* Download */}
+            <button
+              className={styles.downloadButton}
+              onClick={() => downloadVerificationData({
+                contentHash: currentContent.contentHash,
+                record,
+                resolved,
+                verification,
+                coreSignedJson: coreSj,
+                corePayload,
+                protocolAddr,
+                globalConfig,
+              })}
+            >
+              {tField("download")}
+            </button>
+          </div>
+
           <div className={styles.techContent}>
-            {/* --- 1. Title Protocol 導入 --- */}
+            {/* --- 1. Title Protocol 導入 + このコンテンツの検証コンテキスト --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.intro.title")}</h3>
               <p className={styles.techDesc}>{t("tech.intro.desc")}</p>
               <p className={styles.techDesc}>{t("tech.intro.trustChain")}</p>
+              <p className={styles.techDescSmall}>
+                {t("tech.dyn.protocolContext", { program: truncate(protocolAddr.programId, 8), pda: truncate(protocolAddr.globalConfigPda, 8), network: "Solana devnet" })}
+              </p>
             </section>
 
-            {/* --- 2. Core cNFT --- */}
+            {/* --- 2. Core NFT — このコンテンツの来歴 --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.core.title")}</h3>
               <p className={styles.techDesc}>{t("tech.core.desc")}</p>
-
-              <h4 className={styles.techSubTitle}>{t("tech.core.verifyTitle")}</h4>
-              <div className={styles.verifyList}>
-                <VerifyItem
-                  status={verification.collectionVerified}
-                  label={t("tech.core.collection")}
-                  detail={verification.collectionVerified === "verified" ? t("tech.core.collectionPass") : t("tech.core.collectionFail")}
-                />
-                <VerifyItem
-                  status={verification.teeSignatureVerified}
-                  label={t("tech.core.teeSig")}
-                  detail={verification.teeSignatureVerified === "verified" ? t("tech.core.teeSigPass") : t("tech.core.teeSigFail")}
-                />
-                <VerifyItem
-                  status={verification.c2paChainVerified}
-                  label={t("tech.core.c2pa")}
-                  detail={
-                    verification.c2paChainVerified === "verified" && corePayload?.nodes
-                      ? t("tech.core.c2paPass", { count: corePayload.nodes.length })
-                      : t("tech.core.c2paFail")
-                  }
-                />
-              </div>
-
-              {/* Off-chain data structure */}
-              {coreSj && (
+              {coreSj && corePayload && (
                 <>
-                  <h4 className={styles.techSubTitle}>{t("tech.core.offchainTitle")}</h4>
-                  <p className={styles.techDescSmall}>{t("tech.core.offchainDesc")}</p>
-                  <div className={styles.dataBlock}>
-                    <DataField label="protocol" value={coreSj.protocol} />
-                    <DataField label="tee_type" value={coreSj.tee_type} />
-                    <DataField label="tee_pubkey" value={truncate(coreSj.tee_pubkey, 12)} full={coreSj.tee_pubkey} />
-                    {corePayload && (
-                      <>
-                        <DataField label="payload.content_hash" value={truncate(corePayload.content_hash, 12)} full={corePayload.content_hash} />
-                        <DataField label="payload.content_type" value={corePayload.content_type} />
-                        {corePayload.tsa_timestamp != null && (
-                          <DataField label="payload.tsa_timestamp" value={formatTimestamp(corePayload.tsa_timestamp)} />
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Provenance graph */}
-                  {corePayload?.nodes && (
-                    <>
-                      <h4 className={styles.techSubTitle}>{t("tech.core.provenanceTitle")}</h4>
-                      <div className={styles.dataBlock}>
-                        <DataField label={t("tech.core.nodes")} value={t("tech.core.nodesCount", { count: corePayload.nodes.length }) + nodeBreakdown(corePayload.nodes)} />
-                        <DataField
-                          label={t("tech.core.links")}
-                          value={corePayload.links && corePayload.links.length > 0
-                            ? t("tech.core.linksCount", { count: corePayload.links.length })
-                            : t("tech.core.noLinks")}
-                        />
-                      </div>
-                    </>
+                  <p className={styles.techDesc}>
+                    {t("tech.dyn.coreSummary", {
+                      hash: truncate(currentContent.contentHash, 10),
+                      type: corePayload.content_type,
+                      signing: record?.signingAlgorithm ? t("tech.dyn.coreSigning", { algo: record.signingAlgorithm }) : "",
+                      nodes: String(corePayload.nodes?.length ?? 0),
+                      links: corePayload.links && corePayload.links.length > 0 ? t("tech.dyn.coreLinks", { count: String(corePayload.links.length) }) : "",
+                    })}
+                  </p>
+                  <p className={styles.techDesc}>
+                    {t("tech.dyn.teeVerified", {
+                      teeType: coreSj.tee_type,
+                      pubkey: truncate(coreSj.tee_pubkey, 8),
+                      uri: truncate(resolved?.arweaveUri ?? "", 16),
+                      assetId: truncate(resolved?.assetId ?? "", 8),
+                    })}
+                  </p>
+                  {record?.tsaProvider && (
+                    <p className={styles.techDescSmall}>
+                      {t("tech.dyn.tsaCertified", {
+                        provider: record.tsaProvider,
+                        time: record.tsaTimestamp ? formatDateShort(record.tsaTimestamp) : "",
+                      })}
+                    </p>
                   )}
-
-                  {/* Owner info */}
-                  <h4 className={styles.techSubTitle}>{t("tech.core.ownerTitle")}</h4>
-                  <div className={styles.dataBlock}>
-                    <DataField
-                      label={t("tech.core.creator")}
-                      value={corePayload?.creator_wallet ? truncate(corePayload.creator_wallet, 8) : "—"}
-                      full={corePayload?.creator_wallet}
-                    />
-                    <DataField
-                      label={t("tech.core.currentOwner")}
-                      value={
-                        resolved?.ownerWallet
-                          ? truncate(resolved.ownerWallet, 8) +
-                            (corePayload?.creator_wallet === resolved.ownerWallet ? ` ${t("tech.core.sameOwner")}` : "")
-                          : "—"
-                      }
-                      full={resolved?.ownerWallet}
-                    />
-                  </div>
+                  <p className={styles.techDescSmall}>
+                    {resolved?.ownerWallet && corePayload.creator_wallet === resolved.ownerWallet
+                      ? t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 8) })
+                      : resolved?.ownerWallet
+                        ? t("tech.dyn.ownerTransferred", { creator: truncate(corePayload.creator_wallet, 8), owner: truncate(resolved.ownerWallet, 8) })
+                        : t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 8) })}
+                  </p>
+                  <p className={styles.techDescSmall}>{t("tech.core.offchainDesc")}</p>
                 </>
               )}
             </section>
 
-            {/* --- 3. Extensions --- */}
+            {/* --- 3. Extension NFT — このコンテンツの属性検証 --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.ext.title")}</h3>
               <p className={styles.techDesc}>{t("tech.ext.desc")}</p>
 
-              {/* 各 extension を動的にレンダリング */}
-              {verification.extensions.map((ext, i) => (
-                <ExtensionBlock
-                  key={ext.extensionId + i}
-                  ext={ext}
-                  verification={verification}
-                  resolved={resolved}
-                  t={t}
-                />
-              ))}
+              {/* pHash */}
+              {(() => {
+                const phashNft = resolved?.extensionNfts.find(n => {
+                  const p = n.signedJson.payload as Record<string, unknown>;
+                  return p.extension_id === "image-phash";
+                });
+                const phashVerif = verification.nfts.find(n => n.id === "image-phash");
+                const phashCheck = phashVerif?.specificChecks.find(s => s.label === tCheck("phash_identity"));
+                const phashPayload = phashNft?.signedJson.payload as Record<string, unknown> | undefined;
 
-              {/* hardware extension が1つも検出されなかった場合 */}
-              {!verification.extensions.some(e => e.extensionId.startsWith("hardware-")) && (
-                <div className={styles.extBlock}>
-                  <h5 className={styles.extTitle}>{t("tech.hardware.titleDefault")}</h5>
-                  <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
-                  <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
-                </div>
-              )}
+                return phashNft ? (
+                  <div className={styles.extBlock}>
+                    <h5 className={styles.extTitle}>{t("tech.phash.title")}</h5>
+                    <p className={styles.techDescSmall}>{t("tech.phash.desc")}</p>
+                    {!!phashPayload?.phash && (
+                      <p className={styles.techDesc}>
+                        {t("tech.dyn.phashResult", {
+                          hash: String(phashPayload.phash),
+                          detail: phashCheck?.detail ?? "",
+                          wasmHash: truncate(String(phashPayload.wasm_hash ?? ""), 10),
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : null;
+              })()}
+
+              {/* Hardware */}
+              {(() => {
+                const hwVerif = verification.nfts.find(n => n.id.startsWith("hardware-"));
+                return (
+                  <div className={styles.extBlock}>
+                    <h5 className={styles.extTitle}>{t("tech.hardware.titleDefault")}</h5>
+                    <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
+                    {hwVerif ? (
+                      <p className={styles.techDesc}>
+                        {hwVerif.specificChecks.find(s => true)?.detail ?? ""}
+                      </p>
+                    ) : (
+                      <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
+                    )}
+                  </div>
+                );
+              })()}
             </section>
 
-            {/* --- 4. オンチェーン参照 --- */}
-            <section className={styles.techGroup}>
-              <h3 className={styles.techGroupTitle}>{t("tech.refs.title")}</h3>
-              <div className={styles.refsBlock}>
-                <RefRow label={t("tech.refs.contentHash")} sub={t("tech.refs.contentHashDesc")} value={currentContent.contentHash} mono />
-                {verification.assetId && (
-                  <RefRow
-                    label={t("tech.refs.assetId")}
-                    value={verification.assetId}
-                    mono
-                    link={solanaExplorerUrl(verification.assetId)}
-                    linkLabel={t("tech.refs.viewOnSolana")}
-                  />
-                )}
-                {verification.arweaveUri && (
-                  <RefRow
-                    label={t("tech.refs.offchainUri")}
-                    value={verification.arweaveUri}
-                    mono
-                    link={arweaveHttpUrl(verification.arweaveUri)}
-                    linkLabel={t("tech.refs.viewOnStorage")}
-                  />
-                )}
-                {record && (
-                  <>
-                    <RefRow label={t("tech.refs.teeType")} value={record.teeType} />
-                    <RefRow label={t("tech.refs.sigAlgo")} value={record.signingAlgorithm} />
-                    {record.sourceDimensions.width > 0 && (
-                      <RefRow label={t("tech.refs.dimensions")} value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
-                    )}
-                    {record.tsaProvider && (
-                      <RefRow label={t("tech.refs.tsa")} value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
-                    )}
-                  </>
-                )}
-              </div>
-            </section>
-
-            {/* --- 5. なぜ信頼できるのか --- */}
+            {/* --- 4. なぜ信頼できるのか — 実結果を交えて --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.why.title")}</h3>
 
               <div className={styles.whyItem}>
                 <h4 className={styles.whyItemTitle}>{t("tech.why.trustless")}</h4>
                 <p className={styles.techDesc}>{t("tech.why.trustlessDesc")}</p>
+                {coreSj && (
+                  <p className={styles.techDescSmall}>
+                    {t("tech.dyn.teeSigResult", {
+                      pubkey: truncate(coreSj.tee_pubkey, 8),
+                      result: (coreVerif?.teeSignatureVerified ?? "pending") === "verified" ? t("tech.dyn.teeSigValid") : t("tech.dyn.teeSigPending"),
+                    })}
+                  </p>
+                )}
               </div>
 
               {record?.tsaProvider && (
                 <div className={styles.whyItem}>
                   <h4 className={styles.whyItemTitle}>{t("tech.why.tsa")}</h4>
                   <p className={styles.techDesc}>{t("tech.why.tsaDesc")}</p>
+                  <p className={styles.techDescSmall}>
+                    {t("tech.dyn.tsaResult", {
+                      provider: record.tsaProvider,
+                      time: record.tsaTimestamp ? formatDateShort(record.tsaTimestamp) : "",
+                    })}
+                  </p>
                 </div>
               )}
 
@@ -375,6 +481,7 @@ export default function ContentPage({ page }: Props) {
               </div>
             </section>
           </div>
+          </>
         )}
       </div>
 
@@ -405,14 +512,15 @@ function ExtensionBlock({
   resolved: ResolvedContent | null;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const isPhash = ext.extensionId === "image-phash";
-  const isHardware = ext.extensionId.startsWith("hardware-");
+  const isPhash = ext.id === "image-phash";
+  const isHardware = ext.id.startsWith("hardware-");
 
-  // 対応する signed_json を検索
-  const extSj = resolved?.extensionSignedJsons.find(sj => {
-    const p = sj.payload as ExtensionPayload;
-    return p.extension_id === ext.extensionId;
+  // 対応する extension NFT を検索
+  const extNft = resolved?.extensionNfts.find(n => {
+    const p = n.signedJson.payload as ExtensionPayload;
+    return p.extension_id === ext.id;
   });
+  const extSj = extNft?.signedJson;
   const extPayload = extSj?.payload as ExtensionPayload | undefined;
 
   if (isPhash) {
@@ -422,17 +530,14 @@ function ExtensionBlock({
         <p className={styles.techDescSmall}>{t("tech.phash.desc")}</p>
 
         <div className={styles.verifyList}>
-          <VerifyItem
-            status={verification.phashMatched}
-            label={t("tech.phash.match")}
-            detail={
-              verification.phashMatched === "verified" && verification.phashDistance !== undefined
-                ? t("tech.phash.matchPass", { distance: verification.phashDistance, threshold: PHASH_THRESHOLD })
-                : verification.phashMatched === "failed" && verification.phashDistance !== undefined
-                  ? t("tech.phash.matchFail", { distance: verification.phashDistance, threshold: PHASH_THRESHOLD })
-                  : t("tech.phash.matchSkip")
-            }
-          />
+          {(() => {
+            const phashCheck = verification.nfts.find(n => n.id === "image-phash")?.specificChecks.find(s => s.label === "phash_identity");
+            return phashCheck ? (
+              <VerifyItem status={phashCheck.status} label={t("tech.phash.match")} detail={phashCheck.detail} />
+            ) : (
+              <VerifyItem status="skipped" label={t("tech.phash.match")} detail={t("tech.phash.matchSkip")} />
+            );
+          })()}
           <VerifyItem
             status={ext.teeSignatureVerified}
             label={t("tech.ext.teeSig")}
@@ -458,7 +563,7 @@ function ExtensionBlock({
   if (isHardware) {
     return (
       <div className={styles.extBlock}>
-        <h5 className={styles.extTitle}>{t("tech.hardware.title", { id: ext.extensionId })}</h5>
+        <h5 className={styles.extTitle}>{t("tech.hardware.title", { id: ext.id })}</h5>
         <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
         <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
       </div>
@@ -468,7 +573,7 @@ function ExtensionBlock({
   // Generic extension
   return (
     <div className={styles.extBlock}>
-      <h5 className={styles.extTitle}>{ext.extensionId}</h5>
+      <h5 className={styles.extTitle}>{ext.id}</h5>
       <div className={styles.verifyList}>
         <VerifyItem
           status={ext.teeSignatureVerified}
@@ -478,7 +583,7 @@ function ExtensionBlock({
       </div>
       {extPayload && (
         <div className={styles.dataBlock}>
-          <DataField label="extension_id" value={ext.extensionId} />
+          <DataField label="extension_id" value={ext.id} />
           {extPayload.wasm_hash && (
             <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
           )}
@@ -503,12 +608,45 @@ function VerifyItem({ status, label, detail }: { status: VerifyStepStatus; label
 }
 
 function DataField({ label, value, full, mono }: { label: string; value: string; full?: string; mono?: boolean }) {
+  const tF = useTranslations("field");
+  const raw = full || value;
+  const href = dataFieldHref(label, raw);
+  // Use i18n label if a translation exists, otherwise show raw label
+  const displayLabel = tF.has(label) ? tF(label) : label;
   return (
     <div className={styles.dataRow}>
-      <span className={styles.dataLabel}>{label}</span>
-      <span className={`${styles.dataValue} ${mono ? styles.mono : ""}`} title={full || value}>{value}</span>
+      <span className={styles.dataLabel}>{displayLabel}</span>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`${styles.dataValue} ${styles.dataLink} ${mono ? styles.mono : ""}`} title={raw}>{value}</a>
+      ) : (
+        <span className={`${styles.dataValue} ${mono ? styles.mono : ""}`} title={raw}>{value}</span>
+      )}
     </div>
   );
+}
+
+/** Generate a link for known data field types */
+function dataFieldHref(label: string, value: string): string | null {
+  const l = label.toLowerCase();
+  // Solana addresses (program, PDA, collections, assets, wallets, keys)
+  const solanaLabels = ["program", "globalconfigpda", "corecollection", "extcollection", "collection", "tee_pubkey", "assetid", "creator_wallet", "currentowner"];
+  if (solanaLabels.includes(l) || l.includes("wallet") || l.includes("owner") || l.includes("creator") || l.includes("asset")) {
+    return solanaExplorerUrl(value);
+  }
+  // Arweave / HTTP URIs
+  if (value.startsWith("https://") || value.startsWith("http://")) {
+    return value;
+  }
+  if (value.startsWith("ar://")) {
+    return `https://arweave.net/${value.slice(5)}`;
+  }
+  // Off-chain URI / WASM source
+  if (l === "offchainuri" || l === "wasm_source") {
+    if (value.startsWith("https://") || value.startsWith("ar://")) {
+      return value.startsWith("ar://") ? `https://arweave.net/${value.slice(5)}` : value;
+    }
+  }
+  return null;
 }
 
 function RefRow({ label, sub, value, mono, link, linkLabel }: {
@@ -554,6 +692,29 @@ function StatusIcon({ status, size = 16 }: { status: VerifyStepStatus; size?: nu
     <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconFailed}>
       <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function NftToggle({ label, defaultOpen, children }: { label: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <div className={styles.nftToggle}>
+      <button className={styles.nftToggleHeader} onClick={() => setOpen(!open)}>
+        <span>{label}</span>
+        <ChevronIcon open={open} />
+      </button>
+      {open && <div className={styles.nftToggleContent}>{children}</div>}
+    </div>
+  );
+}
+
+function VerifySummaryRow({ label, status }: { label: string; status: VerifyStepStatus }) {
+  if (status === "skipped") return null;
+  return (
+    <div className={styles.summaryRow}>
+      <StatusIcon status={status} size={14} />
+      <span className={styles.summaryLabel}>{label}</span>
+    </div>
   );
 }
 
@@ -625,4 +786,141 @@ function formatDateShort(iso: string): string {
 function formatTimestamp(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")} (RFC 3161)`;
+}
+
+function downloadVerificationData(data: {
+  contentHash: string;
+  record: ContentRecord | null;
+  resolved: ResolvedContent | null;
+  verification: VerificationResult;
+  coreSignedJson: SignedJson | null;
+  corePayload: CorePayload | undefined;
+  protocolAddr: { programId: string; globalConfigPda: string };
+  globalConfig: GlobalConfigData | null;
+}) {
+  // CSV 3列: Display Name, Spec Field Path, Value
+  const rows: string[][] = [["Display Name", "Field Path", "Value"]];
+  const add = (display: string, path: string, value: string | undefined | null) => {
+    if (value != null) rows.push([display, path, value]);
+  };
+
+  // --- GlobalConfig ---
+  rows.push(["# GlobalConfig", "", ""]);
+  add("Program", "TITLE_CONFIG_PROGRAM_ID", data.protocolAddr.programId);
+  add("GlobalConfig PDA", "PDA: seeds=[b\"global-config\"]", data.protocolAddr.globalConfigPda);
+  add("Network", "", "Solana devnet");
+  if (data.globalConfig) {
+    add("Authority", "GlobalConfigAccount.authority", data.globalConfig.authority);
+    add("Core Collection", "GlobalConfigAccount.core_collection_mint", data.globalConfig.core);
+    add("Extension Collection", "GlobalConfigAccount.ext_collection_mint", data.globalConfig.ext);
+    add("Trusted TEE Nodes", "GlobalConfigAccount.trusted_node_keys → TeeNodeAccount[]", String(data.globalConfig.trustedTeeNodes.length));
+    for (const node of data.globalConfig.trustedTeeNodes) {
+      add(`  TEE Node (${node.tee_type})`, "TeeNodeAccount.signing_pubkey", node.signing_pubkey);
+    }
+    add("Trusted TSA Keys", "GlobalConfigAccount.trusted_tsa_keys", data.globalConfig.trustedTsaKeys.length > 0 ? data.globalConfig.trustedTsaKeys.join(", ") : "(empty)");
+    add("Trusted WASM Modules", "GlobalConfigAccount.trusted_wasm_ids → WasmModuleAccount[]", String(data.globalConfig.trustedWasmModules.length));
+    for (const m of data.globalConfig.trustedWasmModules) {
+      add(`  ${m.extension_id}`, "WasmModuleAccount.wasm_hash", m.wasm_hash);
+      add(`  ${m.extension_id} source`, "WasmModuleAccount.wasm_source", m.wasm_source);
+    }
+  }
+  add("pHash Threshold", "PHASH_THRESHOLD (client constant)", String(PHASH_THRESHOLD));
+
+  // --- Content ---
+  rows.push(["# Content", "", ""]);
+  add("Content Hash", "query content_hash = SHA-256(Active Manifest Signature)", data.contentHash);
+  add("Content Type", "signed_json.payload.content_type", data.corePayload?.content_type);
+  add("Dimensions", "cNFT attributes: source_dimensions", data.record?.sourceDimensions ? `${data.record.sourceDimensions.width}x${data.record.sourceDimensions.height}` : undefined);
+  add("C2PA Signing", "cNFT attributes: signing_algorithm", data.record?.signingAlgorithm);
+  add("Device", "cNFT attributes: device_name", data.record?.deviceName);
+  add("TSA Provider", "signed_json.payload.tsa_pubkey_hash → provider", data.record?.tsaProvider);
+  add("TSA Timestamp", "signed_json.payload.tsa_timestamp", data.record?.tsaTimestamp);
+  add("Provenance Nodes", "signed_json.payload.nodes.length", data.corePayload?.nodes ? String(data.corePayload.nodes.length) : undefined);
+  add("Provenance Links", "signed_json.payload.links.length", data.corePayload?.links ? String(data.corePayload.links.length) : undefined);
+
+  // --- Verification Results ---
+  rows.push(["# Verification Results", "", ""]);
+  add("Overall", "§5.2 all steps aggregated", data.verification.overall);
+  for (const nft of data.verification.nfts) {
+    rows.push([`## ${nft.id}`, "", ""]);
+    add("Collection Membership", "§5.2 Step 2: cNFT.collection.address == GlobalConfig.*_collection_mint", nft.collectionVerified);
+    add("TEE Signature (Ed25519)", "§5.2 Step 4: verify(tee_pubkey, tee_signature, serialize(payload, attributes))", nft.teeSignatureVerified);
+    for (const sc of nft.specificChecks) {
+      add(sc.label, `§5.2 Step ${sc.label.includes("Content Hash") ? "5" : sc.label.includes("重複") || sc.label.includes("Duplicate") ? "6" : "ext"}`, `${sc.status} — ${sc.detail}`);
+    }
+  }
+
+  // --- Core NFT Raw Data ---
+  if (data.resolved) {
+    rows.push(["# Core NFT (c2pa)", "", ""]);
+    add("NFT Asset ID", "cNFT.id", data.resolved.assetId);
+    add("Collection", "cNFT.collection.address", data.resolved.collectionAddress);
+    add("Off-chain URI", "cNFT.content.json_uri", data.resolved.arweaveUri);
+    add("Owner", "cNFT.owner", data.resolved.ownerWallet);
+    if (data.coreSignedJson) {
+      add("Protocol", "signed_json.protocol", data.coreSignedJson.protocol);
+      add("TEE Type", "signed_json.tee_type", data.coreSignedJson.tee_type);
+      add("TEE Public Key", "signed_json.tee_pubkey", data.coreSignedJson.tee_pubkey);
+      add("TEE Signature", "signed_json.tee_signature", data.coreSignedJson.tee_signature);
+      if (data.coreSignedJson.tee_attestation) {
+        add("TEE Attestation", "signed_json.tee_attestation", data.coreSignedJson.tee_attestation);
+      }
+    }
+    if (data.corePayload) {
+      add("Registrant Wallet", "signed_json.payload.creator_wallet", data.corePayload.creator_wallet);
+      const cp = data.corePayload as unknown as Record<string, unknown>;
+      if (cp.tsa_pubkey_hash) {
+        add("TSA Public Key Hash", "signed_json.payload.tsa_pubkey_hash", String(cp.tsa_pubkey_hash));
+      }
+      if (cp.tsa_token_data) {
+        add("TSA Token", "signed_json.payload.tsa_token_data", String(cp.tsa_token_data));
+      }
+    }
+
+    // --- Extension NFTs Raw Data ---
+    for (const extNft of data.resolved.extensionNfts) {
+      const p = extNft.signedJson.payload as Record<string, unknown>;
+      const extId = (p.extension_id as string) || "unknown";
+      rows.push([`# Extension NFT (${extId})`, "", ""]);
+      add("NFT Asset ID", "cNFT.id", extNft.assetId);
+      add("Collection", "cNFT.collection.address", extNft.collectionAddress);
+      add("Off-chain URI", "cNFT.content.json_uri", extNft.arweaveUri);
+      add("Owner", "cNFT.owner", extNft.ownerWallet);
+      add("Protocol", "signed_json.protocol", extNft.signedJson.protocol);
+      add("TEE Type", "signed_json.tee_type", extNft.signedJson.tee_type);
+      add("TEE Public Key", "signed_json.tee_pubkey", extNft.signedJson.tee_pubkey);
+      add("TEE Signature", "signed_json.tee_signature", extNft.signedJson.tee_signature);
+      if (extNft.signedJson.tee_attestation) {
+        add("TEE Attestation", "signed_json.tee_attestation", extNft.signedJson.tee_attestation);
+      }
+      add("Extension ID", "signed_json.payload.extension_id", extId);
+      for (const [k, v] of Object.entries(p)) {
+        if (!["extension_id", "content_hash", "protocol", "creator_wallet"].includes(k)) {
+          add(k, `signed_json.payload.${k}`, String(v));
+        }
+      }
+    }
+  }
+
+  // --- Metadata ---
+  rows.push(["# Export Metadata", "", ""]);
+  add("Generated", "", new Date().toISOString());
+  add("Source", "", "https://github.com/yudai-mori-2004/title-protocol");
+
+  const csv = rows.map(r => r.map(c => csvEscape(c)).join(",")).join("\n");
+  const bom = "\uFEFF"; // UTF-8 BOM for Excel compatibility
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `rootlens-${data.contentHash.slice(0, 12)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }

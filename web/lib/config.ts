@@ -6,7 +6,7 @@
  * 参照することで、サーバーに依存しない検証の信頼チェーンを維持する。
  */
 
-import { fetchGlobalConfig } from '@title-protocol/sdk';
+import { fetchGlobalConfig, findGlobalConfigPDA, TITLE_CONFIG_PROGRAM_ID, type TrustedTeeNode, type TrustedWasmModule } from '@title-protocol/sdk';
 import { Connection } from '@solana/web3.js';
 
 /** DAS (Digital Asset Standard) API エンドポイント */
@@ -17,13 +17,44 @@ export const DAS_RPC_URL = process.env.NEXT_PUBLIC_DAS_RPC_URL!;
  * TEE側でEXIF orientation適用済み（Title Protocol修正済み）。 */
 export const PHASH_THRESHOLD = 5;
 
-/** Title Protocol コレクションアドレスをオンチェーンから取得 */
-export async function getCollectionMints(): Promise<{ core: string; ext: string }> {
+/** プロトコル定数（PDA導出で動的に取得） */
+export function getProtocolAddresses() {
+  const programId = TITLE_CONFIG_PROGRAM_ID.toBase58();
+  const [globalConfigPda] = findGlobalConfigPDA();
+  return {
+    programId,
+    globalConfigPda: globalConfigPda.toBase58(),
+  };
+}
+
+/** GlobalConfig の全フィールドをオンチェーンから取得 */
+export interface GlobalConfigData {
+  authority: string;
+  core: string;
+  ext: string;
+  trustedTeeNodes: TrustedTeeNode[];
+  trustedTsaKeys: string[];
+  trustedWasmModules: TrustedWasmModule[];
+}
+
+export type { TrustedTeeNode, TrustedWasmModule };
+
+export async function getGlobalConfigData(): Promise<GlobalConfigData> {
   const connection = new Connection(DAS_RPC_URL);
   const config = await fetchGlobalConfig(connection, 'devnet');
 
   return {
+    authority: config.authority,
     core: config.core_collection_mint,
     ext: config.ext_collection_mint,
+    trustedTeeNodes: config.trusted_tee_nodes ?? [],
+    trustedTsaKeys: config.trusted_tsa_keys ?? [],
+    trustedWasmModules: config.trusted_wasm_modules ?? [],
   };
+}
+
+/** @deprecated getCollectionMints — getGlobalConfigData を使用 */
+export async function getCollectionMints(): Promise<{ core: string; ext: string }> {
+  const data = await getGlobalConfigData();
+  return { core: data.core, ext: data.ext };
 }

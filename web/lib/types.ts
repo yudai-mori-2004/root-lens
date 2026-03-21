@@ -63,44 +63,39 @@ export interface EditOperation {
   label: string;
 }
 
-/** Extension 検証結果 */
-export interface ExtensionVerification {
-  extensionId: string;
-  /** ext_collection_mint に属するか */
-  collectionVerified: VerifyStepStatus;
-  /** TEE署名検証 */
-  teeSignatureVerified: VerifyStepStatus;
-  /** wasm_hash が Global Config に含まれるか */
-  wasmHashVerified: VerifyStepStatus;
-  /** extension固有の検証結果 */
-  detail?: string;
+/** NFT固有の検証ステップ（共通2ステップ以外） */
+export interface SpecificCheck {
+  /** キー名（check.* で翻訳、フォールバックはそのまま表示） */
+  label: string;
+  status: VerifyStepStatus;
+  /** 英語の詳細文（表示側で check.{label}_pass/fail で翻訳を試みる） */
+  detail: string;
 }
 
-/** クライアントサイド検証の各ステップ結果 */
-export interface VerificationResult {
-  // --- Core cNFT ---
-  /** cNFT が正規 core_collection に属するか */
+/** 1つのNFT（CoreでもExtensionでも）の検証結果 */
+export interface NftVerification {
+  /** NFTの種別ラベル（"c2pa", "image-phash", "hardware-google" など） */
+  id: string;
+  /** コレクション所属（共通ステップ1） */
   collectionVerified: VerifyStepStatus;
-  /** Core Arweave off-chain データの TEE 署名検証 */
+  /** TEE署名（共通ステップ2） */
   teeSignatureVerified: VerifyStepStatus;
-  /** C2PA 署名チェーン検証 */
-  c2paChainVerified: VerifyStepStatus;
+  /** このNFT固有の検証ステップ */
+  specificChecks: SpecificCheck[];
+}
 
-  // --- Extension cNFTs ---
-  /** pHash が一致するか（image-phash extension） */
-  phashMatched: VerifyStepStatus;
-  /** pHash の Hamming distance */
-  phashDistance?: number;
-  /** ハードウェア署名検証（hardware-google 等） */
-  hardwareVerified: VerifyStepStatus;
-  /** 各 Extension の個別検証結果 */
-  extensions: ExtensionVerification[];
+/** @deprecated 後方互換。NftVerification を使用 */
+export type ExtensionVerification = NftVerification;
 
-  // --- 全体 ---
+/** クライアントサイド検証の全体結果 */
+export interface VerificationResult {
+  /** 全NFTの検証結果（Core + Extension） */
+  nfts: NftVerification[];
+  /** 全体判定 */
   overall: VerifyStepStatus;
-  /** cNFT Asset ID */
+  /** Core cNFT Asset ID */
   assetId?: string;
-  /** Arweave URI */
+  /** Core Arweave URI */
   arweaveUri?: string;
 }
 
