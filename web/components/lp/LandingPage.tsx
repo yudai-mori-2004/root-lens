@@ -8,8 +8,7 @@ import { PhoneMockup, ImagePlaceholder } from "./Placeholder";
 
 const GITHUB_TP = "https://github.com/yudai-mori-2004/title-protocol";
 const GITHUB_RL = "https://github.com/yudai-mori-2004/root-lens";
-// TODO: Replace with a real verified content page URL
-const DEMO_URL = "/p/demo";
+const DEMO_URL = "/p/BatH5xy";
 
 /* ---- SVG Icons ---- */
 function GitHubIcon({ className }: { className?: string }) {

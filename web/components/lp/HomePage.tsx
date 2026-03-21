@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
 import { PhoneMockup } from "./Placeholder";
 
-const DEMO_URL = "/p/demo";
+const DEMO_URL = "/p/BatH5xy";
 
 export default async function HomePage() {
   const t = await getTranslations("lp.hero");
