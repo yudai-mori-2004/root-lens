@@ -3,11 +3,15 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import s from "./lp.module.css";
+import GapDiagram from "./GapDiagram";
+import { PhoneMockup, ImagePlaceholder } from "./Placeholder";
 
 const GITHUB_TP = "https://github.com/yudai-mori-2004/title-protocol";
 const GITHUB_RL = "https://github.com/yudai-mori-2004/root-lens";
+// TODO: Replace with a real verified content page URL
+const DEMO_URL = "/p/demo";
 
-/* ---- SVG Icons (inline, minimal) ---- */
+/* ---- SVG Icons ---- */
 function GitHubIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="currentColor">
@@ -16,41 +20,46 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-/* ---- Section components ---- */
-
+/* =================================================================
+   SECTION 1: Hero (split layout — text left, phone mockup right)
+   ================================================================= */
 function Hero() {
   const t = useTranslations("lp.hero");
   return (
-    <section className={s.hero}>
-      <div className={s.heroInner}>
-        <h1 className={s.heroTitle}>{t("title")}</h1>
-        <p className={s.heroTagline}>{t("tagline")}</p>
-        <p className={s.heroDescription}>{t("description")}</p>
-        <div className={s.heroCtas}>
-          <a href="#app-flow" className={s.ctaPrimary}>
-            {t("ctaHow")}
-          </a>
-          <a
-            href={GITHUB_TP}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={s.ctaSecondary}
-          >
-            <GitHubIcon className={s.repoIcon} />
-            {t("ctaGithub")}
-          </a>
+    <section className={s.heroSplit}>
+      <div className={s.heroSplitInner}>
+        <div>
+          <h1 className={s.heroTitle}>{t("title")}</h1>
+          <p className={s.heroTagline}>{t("tagline")}</p>
+          <p className={s.heroDescription}>{t("description")}</p>
+          <div className={s.heroCtas}>
+            <a href={DEMO_URL} className={s.ctaPrimary}>
+              {t("ctaDemo")}
+            </a>
+            <a href="#how-it-works" className={s.ctaSecondary}>
+              {t("ctaHow")} &darr;
+            </a>
+          </div>
         </div>
+        {/* TODO: Replace with real app screenshot */}
+        <PhoneMockup
+          label="App screenshot"
+          sublabel="Camera → Verify → Share link"
+        />
       </div>
     </section>
   );
 }
 
+/* =================================================================
+   SECTION 2: How it works (3 steps + editing note)
+   ================================================================= */
 function AppFlow() {
   const t = useTranslations("lp.appFlow");
   const steps = ["step1", "step2", "step3"] as const;
 
   return (
-    <section id="app-flow" className={s.section}>
+    <section id="how-it-works" className={s.section}>
       <div className={s.sectionInner}>
         <h2 className={s.sectionTitle}>{t("title")}</h2>
         <div className={s.steps}>
@@ -67,11 +76,17 @@ function AppFlow() {
         <p className={s.prose} style={{ marginTop: 24 }}>
           <span className={s.emphasis}>{t("editing")}</span>
         </p>
+        <a href={DEMO_URL} className={s.demoLink}>
+          See a verified photo in action &rarr;
+        </a>
       </div>
     </section>
   );
 }
 
+/* =================================================================
+   SECTION 3: Why this matters (4 condensed issues)
+   ================================================================= */
 function SocialIssues() {
   const t = useTranslations("lp.issues");
   const issues = ["sns", "media", "insurance", "ai"] as const;
@@ -94,42 +109,52 @@ function SocialIssues() {
   );
 }
 
-function C2PASection() {
-  const t = useTranslations("lp.c2pa");
-  return (
-    <section className={s.section}>
-      <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.prose}>{t("p1")}</p>
-        <p className={s.prose}>{t("p2")}</p>
-        <p className={s.prose}>{t("p3")}</p>
-        <p className={s.prose}>
-          <span className={s.emphasis}>{t("p4")}</span>
-        </p>
-        <p className={s.prose}>{t("p5")}</p>
-      </div>
-    </section>
-  );
-}
-
+/* =================================================================
+   SECTION 4: The gap — visual diagram replaces prose wall
+   C2PA → Gap → TP condensed into: short intro + diagram + short outro
+   ================================================================= */
 function GapSection() {
-  const t = useTranslations("lp.gap");
+  const tC2pa = useTranslations("lp.c2pa");
+  const tGap = useTranslations("lp.gap");
+
   return (
     <section className={s.section}>
       <div className={s.sectionInner}>
-        <h2 className={s.sectionTitle}>{t("title")}</h2>
-        <p className={s.prose}>{t("p1")}</p>
-        <p className={s.prose}>{t("p2")}</p>
-        <p className={s.prose}>{t("p3")}</p>
-        <p className={s.prose}>{t("p4")}</p>
+        <h2 className={s.sectionTitle}>{tC2pa("title")}</h2>
+        <p className={s.prose}>{tC2pa("p1")}</p>
+        <p className={s.prose}>{tC2pa("p3")}</p>
         <p className={s.prose}>
-          <span className={s.emphasis}>{t("p5")}</span>
+          <span className={s.emphasis}>{tC2pa("p4")}</span>
+        </p>
+        <p className={s.prose}>{tC2pa("p5")}</p>
+      </div>
+
+      {/* Visual diagram — full width */}
+      <div className={s.diagramInner} style={{ marginTop: 48 }}>
+        <h3
+          className={s.sectionTitle}
+          style={{ fontSize: "clamp(1.2rem, 3vw, 1.5rem)", marginBottom: 16 }}
+        >
+          {tGap("title")}
+        </h3>
+        <p className={s.prose} style={{ maxWidth: 680, marginBottom: 32 }}>
+          {tGap("p1")} {tGap("p2")}
+        </p>
+        <GapDiagram />
+        <p
+          className={s.prose}
+          style={{ maxWidth: 680, marginTop: 32 }}
+        >
+          <span className={s.emphasis}>{tGap("p5")}</span>
         </p>
       </div>
     </section>
   );
 }
 
+/* =================================================================
+   SECTION 5: Title Protocol — how it works (4 steps + tech details)
+   ================================================================= */
 function TitleProtocolSection() {
   const t = useTranslations("lp.tp");
   const [techOpen, setTechOpen] = useState(false);
@@ -191,6 +216,9 @@ function TitleProtocolSection() {
   );
 }
 
+/* =================================================================
+   SECTION 6: Comparison
+   ================================================================= */
 function ComparisonSection() {
   const t = useTranslations("lp.comparison");
   const scenarios = [
@@ -218,12 +246,15 @@ function ComparisonSection() {
   );
 }
 
+/* =================================================================
+   SECTION 7: RootLens — visually distinct (navy bg, the "climax")
+   ================================================================= */
 function RootLensSection() {
   const t = useTranslations("lp.rootlens");
   const flowSteps = ["step1", "step2", "step3", "step4"] as const;
 
   return (
-    <section className={s.section}>
+    <section className={s.sectionHighlight}>
       <div className={s.sectionInner}>
         <h2 className={s.sectionTitle}>{t("title")}</h2>
         <p className={s.sectionSubtitle}>{t("subtitle")}</p>
@@ -249,6 +280,9 @@ function RootLensSection() {
   );
 }
 
+/* =================================================================
+   SECTION 8: Open Source
+   ================================================================= */
 function OpenSourceSection() {
   const t = useTranslations("lp.openSource");
 
@@ -286,6 +320,39 @@ function OpenSourceSection() {
   );
 }
 
+/* =================================================================
+   SECTION 9: Closing CTA — clear action for each audience
+   ================================================================= */
+function ClosingCTA() {
+  return (
+    <section className={s.closingCta}>
+      <div className={s.closingCtaInner}>
+        <div className={s.closingCtaTitle}>Try it yourself</div>
+        <div className={s.closingCtaDesc}>
+          See a real verified photo. Read the source code. Run a node.
+        </div>
+        <div className={s.closingCtaButtons}>
+          <a href={DEMO_URL} className={s.ctaPrimary}>
+            See a verified photo
+          </a>
+          <a
+            href={GITHUB_TP}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={s.ctaSecondary}
+          >
+            <GitHubIcon className={s.repoIcon} />
+            View source code
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* =================================================================
+   SECTION 10: Footer
+   ================================================================= */
 function Footer() {
   const t = useTranslations("lp.footer");
 
@@ -309,19 +376,33 @@ function Footer() {
   );
 }
 
-/* ---- Main ---- */
+/* =================================================================
+   MAIN COMPOSITION
+
+   New order (vs old):
+   1. Hero (with phone mockup)        — product visible in 3 seconds
+   2. How it works (3 steps + demo)    — immediate understanding
+   3. Why this matters (4 issues)      — stakes/motivation
+   4. Gap (C2PA + diagram)             — diagram replaces prose wall
+   5. Title Protocol (4 steps + tech)  — the how
+   6. Comparison (4 items)             — vs existing
+   7. RootLens (navy bg = climax)      — the product, visually distinct
+   8. Open Source                      — trust signal
+   9. Closing CTA                      — clear action
+   10. Footer
+   ================================================================= */
 export default function LandingPage() {
   return (
     <div className={s.page}>
       <Hero />
       <AppFlow />
       <SocialIssues />
-      <C2PASection />
       <GapSection />
       <TitleProtocolSection />
       <ComparisonSection />
       <RootLensSection />
       <OpenSourceSection />
+      <ClosingCTA />
       <Footer />
     </div>
   );

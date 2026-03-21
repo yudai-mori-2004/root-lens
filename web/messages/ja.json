@@ -4,8 +4,8 @@
       "title": "Prove it's real.",
       "tagline": "写真を撮る。改ざんできない記録が残る。リンクを共有すれば、誰でも確認できる。",
       "description": "RootLensは撮影した瞬間にデジタル署名を付けるカメラアプリです。Title Protocolはその証明を独立した永続的な記録として保存します。SNSがファイルからデータを削除しても、証明は残り続けます。",
-      "ctaHow": "なぜ必要なのか",
-      "ctaGithub": "GitHubで見る"
+      "ctaDemo": "検証済み写真を見る",
+      "ctaHow": "使い方を見る"
     },
 
     "appFlow": {

@@ -4,8 +4,8 @@
       "title": "Prove it's real.",
       "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
       "description": "RootLens is a camera app that attaches a digital signature the moment you take a photo. Title Protocol saves that proof as a permanent, independent record. Even when social media strips the data from your file, the proof still exists.",
-      "ctaHow": "Why this matters",
-      "ctaGithub": "View on GitHub"
+      "ctaDemo": "See a verified photo",
+      "ctaHow": "How it works"
     },
 
     "appFlow": {
