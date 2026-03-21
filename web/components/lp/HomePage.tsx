@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
+import PhoneCarousel from "./PhoneCarousel";
 
 const DEMO_URL = "/p/BatH5xy";
 
@@ -31,8 +32,13 @@ export default async function HomePage() {
               </a>
             </div>
           </div>
-          <div className={s.heroPhone}>
-            <img src="/app-verify.png" alt="RootLens verification page" className={s.heroPhoneImg} />
+          <div className={s.heroPhoneWrap}>
+            <div className={s.phoneFrame}>
+              <div className={s.phoneNotch} />
+              <div className={s.phoneScreen}>
+                <img src="/app-verify.png" alt="RootLens verification page" className={s.phoneSlide} style={{ opacity: 1 }} />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -41,20 +47,11 @@ export default async function HomePage() {
       <section className={s.section}>
         <div className={s.sectionInner}>
           <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
-          <div className={s.appScreenshots}>
-            <div className={s.appScreenshot}>
-              <img src="/app-camera.png" alt="RootLens camera" className={s.appScreenshotImg} />
-              <span className={s.appScreenshotLabel}>{tFlow("step1.label")}</span>
-            </div>
-            <div className={s.appScreenshot}>
-              <img src="/app-verify.png" alt="Verified content" className={s.appScreenshotImg} />
-              <span className={s.appScreenshotLabel}>{tFlow("step2.label")}</span>
-            </div>
-            <div className={s.appScreenshot}>
-              <img src="/app-gallery.png" alt="Published gallery" className={s.appScreenshotImg} />
-              <span className={s.appScreenshotLabel}>{tFlow("step3.label")}</span>
-            </div>
-          </div>
+          <PhoneCarousel slides={[
+            { src: "/app-camera.png", alt: "RootLens camera", label: tFlow("step1.label") },
+            { src: "/app-verify.png", alt: "Verified content", label: tFlow("step2.label") },
+            { src: "/app-gallery.png", alt: "Published gallery", label: tFlow("step3.label") },
+          ]} />
           <div className={s.steps}>
             {flowSteps.map((key, i) => (
               <div key={key} className={s.step}>
