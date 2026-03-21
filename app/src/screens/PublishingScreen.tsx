@@ -139,7 +139,7 @@ export default function PublishingScreen() {
     const [tpResult, r2Urls] = await Promise.all([
       (async () => {
         lap('TP register start');
-        const r = await registerOnTitleProtocol(fileUri);
+        const r = await registerOnTitleProtocol(fileUri, address);
         lap('TP register done');
         advanceToStep('recording');
         return r;

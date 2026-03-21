@@ -16,8 +16,6 @@ import { nativeCryptoProvider } from './nativeCryptoProvider';
 
 const { AesGcmBridge } = NativeModules;
 
-// devnet MVP: Privy未実装のためオペレーターウォレットを使用
-const OWNER_WALLET = 'wrVwsTuRzbsDutybqqpf9tBE7JUqRPYzJ3iPUgcFmna';
 const SOLANA_RPC_URL = 'https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1';
 
 export interface TitleProtocolResult {
@@ -41,6 +39,7 @@ function toBase64(bytes: Uint8Array): string {
  */
 export async function registerOnTitleProtocol(
   contentFilePath: string,
+  ownerWallet: string,
 ): Promise<TitleProtocolResult> {
   const t0 = Date.now();
   const lap = (l: string) => console.log(`[TP] ${l}: ${Date.now() - t0}ms`);
@@ -66,7 +65,7 @@ export async function registerOnTitleProtocol(
   // ネイティブで暗号化（コンテンツがBridgeを通過しない）
   const payloadPath = `${FileSystem.cacheDirectory}tp_payload_${Date.now()}.bin`.replace('file://', '');
   const contentPath = contentFilePath.replace('file://', '');
-  const metadata = JSON.stringify({ owner_wallet: OWNER_WALLET });
+  const metadata = JSON.stringify({ owner_wallet: ownerWallet });
 
   await AesGcmBridge.buildAndEncryptPayload(
     contentPath,
