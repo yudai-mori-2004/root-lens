@@ -34,7 +34,7 @@ export default async function HomePage() {
           </div>
           <div className={s.heroPhoneWrap}>
             <div className={s.phoneFrame}>
-              <div className={s.phoneNotch} />
+              <div className={s.phoneDynamicIsland} />
               <div className={s.phoneScreen}>
                 <img src="/app-verify.png" alt="RootLens verification page" className={s.phoneSlide} style={{ opacity: 1 }} />
               </div>

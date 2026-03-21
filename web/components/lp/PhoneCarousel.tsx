@@ -15,7 +15,7 @@ export default function PhoneCarousel({ slides }: { slides: Slide[] }) {
   return (
     <div className={s.phoneCarousel}>
       <div className={s.phoneFrame}>
-        <div className={s.phoneNotch} />
+        <div className={s.phoneDynamicIsland} />
         <div className={s.phoneScreen}>
           {slides.map((slide, i) => (
             <img
