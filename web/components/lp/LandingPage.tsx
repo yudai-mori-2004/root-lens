@@ -122,6 +122,7 @@ function GapSection() {
       <div className={s.sectionInner}>
         <h2 className={s.sectionTitle}>{tC2pa("title")}</h2>
         <p className={s.prose}>{tC2pa("p1")}</p>
+        <p className={s.prose}>{tC2pa("p2")}</p>
         <p className={s.prose}>{tC2pa("p3")}</p>
         <p className={s.prose}>
           <span className={s.emphasis}>{tC2pa("p4")}</span>
@@ -137,8 +138,11 @@ function GapSection() {
         >
           {tGap("title")}
         </h3>
+        <p className={s.prose} style={{ maxWidth: 680, marginBottom: 16 }}>
+          {tGap("p1")}
+        </p>
         <p className={s.prose} style={{ maxWidth: 680, marginBottom: 32 }}>
-          {tGap("p1")} {tGap("p2")}
+          {tGap("p2")}
         </p>
         <GapDiagram />
         <p

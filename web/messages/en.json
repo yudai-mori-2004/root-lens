@@ -48,11 +48,11 @@
 
     "gap": {
       "title": "But proof dies when shared",
-      "p1": "C2PA binds provenance data tightly to the content file itself. The proof and the content are inseparable. This is by design.",
-      "p2": "This creates a fundamental problem: nearly every social media platform, messaging app, and CDN strips metadata on upload. Facebook, Instagram, X, and YouTube all remove C2PA data. The World Privacy Forum calls this \"the primary obstacle to C2PA interoperability.\"",
-      "p3": "Even when C2PA data survives, the verified attributes inside (hardware capture proof, timestamp, edit history) can only be accessed by parsing the full manifest from the original file. There is no way for a third party to independently query those attributes without having the file in hand.",
-      "p4": "Existing solutions try to recover the full manifest through watermarks or centralized cloud storage. But these approaches either rely on a single company's infrastructure or attempt to reconstruct what was lost, rather than ensuring it was never lost in the first place.",
-      "p5": "To build an app where proof of authenticity actually reaches people on social media, we needed to solve a different problem: separating verified attributes from the content itself, so the proof exists independently and survives no matter what happens to the file."
+      "p1": "C2PA verification requires two things: the full manifest data (a JUMBF container holding the signature chain, certificates, and edit history) and the complete original binary of the content itself. For a photo, that means the full-resolution capture. For a video, the entire original file. The cryptographic hash must match byte-for-byte. This tight coupling is how C2PA guarantees integrity.",
+      "p2": "The problem: nearly every social media platform, messaging app, and CDN strips the manifest and recompresses the content on upload. Facebook, Instagram, X, and YouTube all remove C2PA data and alter the binary. Once that happens, verification becomes impossible. The World Privacy Forum calls this \"the primary obstacle to C2PA interoperability.\"",
+      "p3": "Even when C2PA data survives, the verified attributes inside (hardware capture proof, timestamp, edit history) can only be accessed by parsing the full manifest together with the original binary. There is no way for a third party to independently query those attributes without having the complete original file.",
+      "p4": "Existing solutions try to recover the full manifest through watermarks or centralized cloud storage. But these approaches either rely on a single company's infrastructure or attempt to reconstruct what was lost, rather than solving the underlying coupling.",
+      "p5": "To build an app where proof of authenticity actually reaches people on social media, we needed to solve a different problem: separating verified attributes from the content, so the proof remains accessible even without the complete original file."
     },
 
     "tp": {
