@@ -20,6 +20,7 @@ import type { ResolvedContent } from "./content-resolver";
 import type { VerificationResult, VerifyStepStatus, NftVerification, SpecificCheck } from "./types";
 import {
   getGlobalConfigData,
+  findWasmVersionByHash,
   type GlobalConfigData,
   PHASH_THRESHOLD,
 } from "./config";
@@ -147,16 +148,14 @@ export async function verifyContentOnChain(
     nftVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
     console.log(`[${extId}] collection: ${nftVerif.collectionVerified}, TEE sig: ${nftVerif.teeSignatureVerified}`);
 
-    // Extension固有: WASMハッシュ検証
+    // Extension固有: WASMハッシュ検証（NFTのwasm_hashに一致するバージョンがあるか）
     const wasmHash = (extPayload as Record<string, unknown>).wasm_hash as string | undefined;
     if (wasmHash && globalConfig.trustedWasmModules.length > 0) {
-      const trusted = globalConfig.trustedWasmModules.find(
-        (m) => m.extension_id === extId && m.wasm_hash === wasmHash
-      );
+      const matchedVersion = findWasmVersionByHash(globalConfig.trustedWasmModules, extId, wasmHash);
       nftVerif.specificChecks.push({
         label: tc("wasm_hash"),
-        status: trusted ? "verified" : "failed",
-        detail: trusted ? tc("wasm_hash_pass") : tc("wasm_hash_fail"),
+        status: matchedVersion ? "verified" : "failed",
+        detail: matchedVersion ? tc("wasm_hash_pass") : tc("wasm_hash_fail"),
       });
     } else if (wasmHash) {
       nftVerif.specificChecks.push({
@@ -170,7 +169,7 @@ export async function verifyContentOnChain(
     if (extId === "image-phash") {
       const phashPayload = extPayload as ExtensionPayload & { phash?: string };
       if (phashPayload.phash) {
-        const phashResult = await verifyPHashWithImage(phashPayload.phash, thumbnailUrl);
+        const phashResult = await verifyPHashWithImage(phashPayload.phash, thumbnailUrl, wasmHash);
         if (phashResult.distance !== undefined) {
           nftVerif.specificChecks.push({
             label: tc("phash_identity"),
@@ -272,10 +271,11 @@ interface PHashResult {
 
 async function verifyPHashWithImage(
   onchainHash: string,
-  thumbnailUrl: string
+  thumbnailUrl: string,
+  wasmHash?: string,
 ): Promise<PHashResult> {
   try {
-    const computedHash = await computePHashWasm(thumbnailUrl);
+    const computedHash = await computePHashWasm(thumbnailUrl, wasmHash);
     const distance = hammingDistance(onchainHash, computedHash);
     return {
       status: distance <= PHASH_THRESHOLD ? "verified" : "failed",

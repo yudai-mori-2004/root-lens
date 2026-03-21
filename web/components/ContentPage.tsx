@@ -820,8 +820,11 @@ function downloadVerificationData(data: {
     add("Trusted TSA Keys", "GlobalConfigAccount.trusted_tsa_keys", data.globalConfig.trustedTsaKeys.length > 0 ? data.globalConfig.trustedTsaKeys.join(", ") : "(empty)");
     add("Trusted WASM Modules", "GlobalConfigAccount.trusted_wasm_ids → WasmModuleAccount[]", String(data.globalConfig.trustedWasmModules.length));
     for (const m of data.globalConfig.trustedWasmModules) {
-      add(`  ${m.extension_id}`, "WasmModuleAccount.wasm_hash", m.wasm_hash);
-      add(`  ${m.extension_id} source`, "WasmModuleAccount.wasm_source", m.wasm_source);
+      for (const v of m.versions) {
+        add(`  ${m.extension_id} v${v.version}`, "WasmModuleAccount.versions[].wasm_hash", v.wasm_hash);
+        add(`  ${m.extension_id} v${v.version} source`, "WasmModuleAccount.versions[].wasm_source", v.wasm_source);
+        add(`  ${m.extension_id} v${v.version} status`, "WasmModuleAccount.versions[].status", v.status === 0 ? "active" : "deprecated");
+      }
     }
   }
   add("pHash Threshold", "PHASH_THRESHOLD (client constant)", String(PHASH_THRESHOLD));

@@ -10,54 +10,69 @@
  * 改ざんされていないことを確認してから実行する。
  */
 
-import { getGlobalConfigData } from "./config";
+import { getGlobalConfigData, findWasmVersionByHash } from "./config";
 
-let wasmCache: { buf: ArrayBuffer; hash: string } | null = null;
+// wasm_hash → { buf, hash } のキャッシュ（バージョンごとにキャッシュ）
+const wasmCache = new Map<string, ArrayBuffer>();
 
-async function loadWasm(): Promise<ArrayBuffer> {
-  if (wasmCache) return wasmCache.buf;
+/**
+ * 指定されたwasm_hashに一致するWASMバイナリをGlobalConfigから取得する。
+ * SHA-256照合で改ざんがないことを確認してからキャッシュ・返却。
+ */
+async function loadWasmByHash(wasmHash: string): Promise<ArrayBuffer> {
+  const normalized = wasmHash.replace(/^0x/, "");
+  const cached = wasmCache.get(normalized);
+  if (cached) return cached;
 
   const globalConfig = await getGlobalConfigData();
-  const phashModule = globalConfig.trustedWasmModules.find(
-    (m) => m.extension_id === "image-phash"
-  );
+  const version = findWasmVersionByHash(globalConfig.trustedWasmModules, "image-phash", wasmHash);
 
-  if (!phashModule) {
-    throw new Error("image-phash module not found in GlobalConfig trusted_wasm_modules");
+  if (!version) {
+    throw new Error(`image-phash WASM version with hash ${normalized.slice(0, 16)}... not found in GlobalConfig`);
   }
 
-  // wasm_source からバイナリを取得
-  const res = await fetch(phashModule.wasm_source);
+  const res = await fetch(version.wasm_source);
   if (!res.ok) {
-    throw new Error(`Failed to fetch WASM from ${phashModule.wasm_source}: ${res.status}`);
+    throw new Error(`Failed to fetch WASM from ${version.wasm_source}: ${res.status}`);
   }
   const buf = await res.arrayBuffer();
 
-  // SHA-256 ハッシュを計算して wasm_hash と照合
+  // SHA-256 照合
   const hashBuf = await crypto.subtle.digest("SHA-256", buf);
   const hashHex = Array.from(new Uint8Array(hashBuf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  const expectedHash = phashModule.wasm_hash.replace(/^0x/, "");
-  if (hashHex !== expectedHash) {
+  if (hashHex !== normalized) {
     throw new Error(
-      `WASM hash mismatch: expected ${expectedHash}, got ${hashHex}. Binary may be tampered.`
+      `WASM hash mismatch: expected ${normalized}, got ${hashHex}. Binary may be tampered.`
     );
   }
 
-  console.log("[phash-wasm] Loaded from GlobalConfig wasm_source, hash verified:", hashHex.slice(0, 16) + "...");
-  wasmCache = { buf, hash: hashHex };
+  console.log("[phash-wasm] Loaded version from GlobalConfig, hash verified:", hashHex.slice(0, 16) + "...");
+  wasmCache.set(normalized, buf);
   return buf;
 }
 
 /**
- * 画像URLからpHashを計算する（image-phash.wasm使用）。
- * TEEと完全に同一のバイナリでDCTを実行するため、一致が保証される。
+ * 画像URLからpHashを計算する。
+ * onchainWasmHashが指定された場合、そのハッシュに一致するバージョンのWASMを使用。
+ * 未指定の場合はGlobalConfigのimage-phashモジュールの最新activeバージョンを使用。
  */
-export async function computePHashWasm(imageUrl: string): Promise<string> {
+export async function computePHashWasm(imageUrl: string, onchainWasmHash?: string): Promise<string> {
+  let wasmHashToUse = onchainWasmHash;
+
+  // wasm_hashが未指定の場合、最新activeバージョンを使用
+  if (!wasmHashToUse) {
+    const globalConfig = await getGlobalConfigData();
+    const mod = globalConfig.trustedWasmModules.find(m => m.extension_id === "image-phash");
+    const active = mod?.versions.find(v => v.status === 0);
+    if (!active) throw new Error("No active image-phash WASM version in GlobalConfig");
+    wasmHashToUse = active.wasm_hash;
+  }
+
   const [wasmBuf, gray32] = await Promise.all([
-    loadWasm(),
+    loadWasmByHash(wasmHashToUse),
     loadAndResizeImage(imageUrl),
   ]);
   return runWasmPHash(wasmBuf, gray32);

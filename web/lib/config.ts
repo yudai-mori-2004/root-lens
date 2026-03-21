@@ -6,7 +6,7 @@
  * 参照することで、サーバーに依存しない検証の信頼チェーンを維持する。
  */
 
-import { fetchGlobalConfig, findGlobalConfigPDA, TITLE_CONFIG_PROGRAM_ID, type TrustedTeeNode, type TrustedWasmModule } from '@title-protocol/sdk';
+import { fetchGlobalConfig, findGlobalConfigPDA, TITLE_CONFIG_PROGRAM_ID, type TrustedTeeNode, type WasmModuleInfo, type WasmVersionInfo } from '@title-protocol/sdk';
 import { Connection } from '@solana/web3.js';
 
 /** DAS (Digital Asset Standard) API エンドポイント */
@@ -34,10 +34,10 @@ export interface GlobalConfigData {
   ext: string;
   trustedTeeNodes: TrustedTeeNode[];
   trustedTsaKeys: string[];
-  trustedWasmModules: TrustedWasmModule[];
+  trustedWasmModules: WasmModuleInfo[];
 }
 
-export type { TrustedTeeNode, TrustedWasmModule };
+export type { TrustedTeeNode, WasmModuleInfo, WasmVersionInfo };
 
 export async function getGlobalConfigData(): Promise<GlobalConfigData> {
   const connection = new Connection(DAS_RPC_URL);
@@ -51,6 +51,21 @@ export async function getGlobalConfigData(): Promise<GlobalConfigData> {
     trustedTsaKeys: config.trusted_tsa_keys ?? [],
     trustedWasmModules: config.trusted_wasm_modules ?? [],
   };
+}
+
+/**
+ * wasm_hashからWASMバージョン情報を検索する。
+ * NFTに記録されたwasm_hashに一致するバージョンを全モジュールから探す。
+ */
+export function findWasmVersionByHash(
+  modules: WasmModuleInfo[],
+  extensionId: string,
+  wasmHash: string,
+): WasmVersionInfo | null {
+  const mod = modules.find(m => m.extension_id === extensionId);
+  if (!mod) return null;
+  const normalized = wasmHash.replace(/^0x/, "");
+  return mod.versions.find(v => v.wasm_hash.replace(/^0x/, "") === normalized) ?? null;
 }
 
 /** @deprecated getCollectionMints — getGlobalConfigData を使用 */
