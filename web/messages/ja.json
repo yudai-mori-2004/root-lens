@@ -1,7 +1,8 @@
 {
   "common": {
     "seeVerifiedPhoto": "検証済み写真を見る",
-    "demoLink": "検証済み写真を確認する"
+    "demoLink": "検証済み写真を確認する",
+    "comingSoon": "近日公開"
   },
 
   "diagram": {

@@ -663,6 +663,43 @@
   opacity: 0.4;
 }
 
+/* ---- Store Badges ---- */
+
+.storeBadges {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.storeBadge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 1.5px solid var(--lp-border);
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  min-width: 170px;
+}
+
+.storeBadgeLabel {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--lp-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
+.storeBadgeName {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+}
+
 /* ---- Closing CTA (homepage only) ---- */
 .closingCta {
   padding: 80px 24px;
