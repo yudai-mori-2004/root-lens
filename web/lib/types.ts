@@ -18,10 +18,18 @@ export interface ContentMeta {
   mediaType: string;
 }
 
+/** 投稿者のプロフィール */
+export interface UserProfile {
+  displayName: string;
+  bio: string;
+  avatarUrl: string | null;
+}
+
 /** サーバーが shortId から解決するページ情報 */
 export interface PageMeta {
   shortId: string;
   contents: ContentMeta[];
+  user: UserProfile | null;
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

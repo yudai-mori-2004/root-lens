@@ -86,9 +86,41 @@ export default function ContentPage({ page }: Props) {
   const passed = active.filter(s => s === "verified").length;
   const total = active.length;
 
+  const deviceLabel = record?.deviceName
+    ? t("shotOn", { device: record.deviceName })
+    : record ? t("shotOnDefault") : null;
+
   return (
     <div className={styles.container}>
-      {/* Hero */}
+      {/* User header — above image, like Instagram */}
+      {(page.user?.displayName || resolved?.ownerWallet) && (
+        <div className={styles.userHeader}>
+          {page.user?.avatarUrl ? (
+            <img src={page.user.avatarUrl} alt="" className={styles.userAvatar} />
+          ) : page.user?.displayName ? (
+            <div className={styles.userAvatarPlaceholder}>
+              {page.user.displayName.charAt(0).toUpperCase()}
+            </div>
+          ) : null}
+          <div className={styles.userInfo}>
+            <div className={styles.userNameRow}>
+              {page.user?.displayName && <span className={styles.userName}>{page.user.displayName}</span>}
+              {resolved?.ownerWallet && (
+                <button
+                  className={styles.walletCopy}
+                  onClick={() => { navigator.clipboard.writeText(resolved.ownerWallet); }}
+                  title={resolved.ownerWallet}
+                >
+                  <span className={styles.walletAddr}>{truncate(resolved.ownerWallet, 4)}</span>
+                  <CopyIcon />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image */}
       <div className={styles.imageWrapper}>
         {currentContent?.mediaType === 'video' && currentContent.mediaUrl ? (
           <video
@@ -124,9 +156,9 @@ export default function ContentPage({ page }: Props) {
         )}
       </div>
 
-      {/* ===== 一般向け ===== */}
+      {/* ===== Below image ===== */}
       <div className={styles.infoSection}>
-        {/* Trust status — first thing the user sees after the image */}
+        {/* Trust status — the primary message */}
         <div className={styles.trustRow}>
           {verification.overall === "pending" ? (
             <>
@@ -148,18 +180,14 @@ export default function ContentPage({ page }: Props) {
           )}
         </div>
 
+        {/* Device + date metadata */}
         {record ? (
           <>
-            <h1 className={styles.headline}>
-              {record.deviceName
-                ? t("shotOn", { device: record.deviceName })
-                : t("shotOnDefault")}
-            </h1>
+            {deviceLabel && <p className={styles.deviceLine}>{deviceLabel}</p>}
             {capturedDate && (
               <div className={styles.meta}>
                 <time className={styles.timestamp} dateTime={record.capturedAt || undefined}>{capturedDate}</time>
-                <span className={styles.separator} />
-                <span className={styles.dateSource}>{hasTsa ? t("dateTsa") : t("dateRegistration")}</span>
+                {hasTsa && <span className={styles.metaBadge}>{t("dateTsa")}</span>}
               </div>
             )}
           </>
@@ -734,6 +762,15 @@ function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>
       <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" style={{ display: "inline", verticalAlign: "middle" }}>
+      <rect x="4" y="4" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M8 4V2.5A1.5 1.5 0 006.5 1H2.5A1.5 1.5 0 001 2.5v4A1.5 1.5 0 002.5 8H4" fill="none" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }
