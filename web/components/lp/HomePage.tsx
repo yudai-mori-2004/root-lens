@@ -31,21 +31,8 @@ export default async function HomePage() {
                 {t("ctaHow")}
               </a>
             </div>
-            <div className={s.storeBadges} style={{ marginTop: 24 }}>
-              <div className={s.storeBadge}>
-                <AppleIcon />
-                <div>
-                  <div className={s.storeBadgeLabel}>{tc("comingSoon")}</div>
-                  <div className={s.storeBadgeName}>App Store</div>
-                </div>
-              </div>
-              <div className={s.storeBadge}>
-                <PlayIcon />
-                <div>
-                  <div className={s.storeBadgeLabel}>{tc("comingSoon")}</div>
-                  <div className={s.storeBadgeName}>Google Play</div>
-                </div>
-              </div>
+            <div className={s.storeHint}>
+              <AppleIcon /> App Store <span className={s.storeHintSep}>&</span> <PlayIcon /> Google Play — {tc("comingSoon")}
             </div>
           </div>
           <div className={s.heroPhoneWrap}>
