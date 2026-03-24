@@ -58,14 +58,14 @@ export interface PerceptualInputs {
 
 const S = {
   header: "background:#1E3A5F;color:#fff;padding:6px 12px;font-size:14px;font-weight:bold;border-radius:4px;",
-  section: "color:#1E3A5F;font-weight:bold;font-size:12px;",
-  label: "color:#888;",
-  value: "color:#333;",
-  pass: "color:#16a34a;font-weight:bold;",
-  fail: "color:#dc2626;font-weight:bold;",
-  skip: "color:#a3a3a3;",
-  muted: "color:#a3a3a3;font-style:italic;",
-  link: "color:#2563eb;text-decoration:underline;",
+  section: "color:#5b9bd5;font-weight:bold;font-size:12px;",
+  label: "color:#9ca3af;",
+  value: "color:inherit;",
+  pass: "color:#4ade80;font-weight:bold;",
+  fail: "color:#f87171;font-weight:bold;",
+  skip: "color:#6b7280;",
+  muted: "color:#6b7280;font-style:italic;",
+  link: "color:#60a5fa;text-decoration:underline;",
   result: "background:#16a34a;color:#fff;padding:4px 10px;font-size:13px;font-weight:bold;border-radius:3px;",
   resultFail: "background:#dc2626;color:#fff;padding:4px 10px;font-size:13px;font-weight:bold;border-radius:3px;",
 } as const;
