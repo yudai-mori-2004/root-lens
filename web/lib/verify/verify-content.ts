@@ -52,8 +52,29 @@ export interface PerceptualInputs {
   videoUrl?: string;
 }
 
-/** ログ用マーク */
-const mark = (s: VerifyStepStatus) => s === "verified" ? "\u2713" : s === "failed" ? "\u2717" : "-";
+// ---------------------------------------------------------------------------
+// コンソールスタイル（%c CSS）
+// ---------------------------------------------------------------------------
+
+const S = {
+  header: "background:#1E3A5F;color:#fff;padding:6px 12px;font-size:14px;font-weight:bold;border-radius:4px;",
+  section: "color:#1E3A5F;font-weight:bold;font-size:12px;",
+  label: "color:#888;",
+  value: "color:#333;",
+  pass: "color:#16a34a;font-weight:bold;",
+  fail: "color:#dc2626;font-weight:bold;",
+  skip: "color:#a3a3a3;",
+  muted: "color:#a3a3a3;font-style:italic;",
+  link: "color:#2563eb;text-decoration:underline;",
+  result: "background:#16a34a;color:#fff;padding:4px 10px;font-size:13px;font-weight:bold;border-radius:3px;",
+  resultFail: "background:#dc2626;color:#fff;padding:4px 10px;font-size:13px;font-weight:bold;border-radius:3px;",
+} as const;
+
+const stepLog = (status: VerifyStepStatus, label: string) => {
+  const icon = status === "verified" ? "\u2713" : status === "failed" ? "\u2717" : "-";
+  const style = status === "verified" ? S.pass : status === "failed" ? S.fail : S.skip;
+  console.log(`%c${icon} ${label}`, style);
+};
 
 export async function verifyContentOnChain(
   resolved: ResolvedContent,
@@ -71,46 +92,37 @@ export async function verifyContentOnChain(
   const hashShort = queryContentHash.slice(0, 10) + "..." + queryContentHash.slice(-4);
 
   // --- console.groupCollapsed: 並列実行でもコンテンツ間でログが混ざらない ---
-  console.groupCollapsed(`Content: ${hashShort}`);
+  console.groupCollapsed(`%cContent: ${hashShort}`, S.section);
 
   // INPUT
-  console.log(
-    `  INPUT (from RootLens page metadata \u2014 not verified)\n` +
-    `  \u251c\u2500 Content Hash: ${queryContentHash}\n` +
-    `  \u2502  (SHA-256 of C2PA Active Manifest Signature)\n` +
-    (perceptual.imageUrl ? `  \u251c\u2500 Display image: ${perceptual.imageUrl}\n` : "") +
-    (perceptual.videoUrl ? `  \u251c\u2500 Display video: ${perceptual.videoUrl}\n` : "") +
-    `  \u2514\u2500 content_hash only used below\n`
-  );
+  console.log("%cINPUT%c (from RootLens page metadata — not verified)", S.section, S.muted);
+  console.log("%cContent Hash: %c%s", S.label, S.value, queryContentHash);
+  console.log("%c  SHA-256 of C2PA Active Manifest Signature", S.muted);
+  if (perceptual.imageUrl) console.log("%cDisplay image: %c%s", S.label, S.value, perceptual.imageUrl);
+  if (perceptual.videoUrl) console.log("%cDisplay video: %c%s", S.label, S.value, perceptual.videoUrl);
 
-  // Title Protocol box
+  // Title Protocol
   const globalConfig = await getGlobalConfigData();
-  const extNftIds = resolved.extensionNfts.map(e => {
+  console.log("");
+  console.log("%cTitle Protocol", S.section);
+  console.log("%chttps://github.com/yudai-mori-2004/title-protocol", S.link);
+  console.log("%cSolana RPC: %c%s", S.label, S.value, DAS_RPC_URL);
+  console.log("%cCore cNFT:  %c%s %c(oldest by leaf_id)", S.label, S.value, resolved.assetId, S.muted);
+  for (const e of resolved.extensionNfts) {
     const p = e.signedJson.payload as ExtensionPayload;
-    return p.extension_id || "unknown";
-  });
-  console.log(
-    `  \u250c\u2500 Title Protocol \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n` +
-    `  \u2502  https://github.com/yudai-mori-2004/title-protocol\n` +
-    `  \u2502\n` +
-    `  \u2502  Solana RPC: ${DAS_RPC_URL}\n` +
-    `  \u2502  \u251c\u2500 Core cNFT: ${resolved.assetId} (oldest by leaf_id)\n` +
-    resolved.extensionNfts.map((e, i) => {
-      const p = e.signedJson.payload as ExtensionPayload;
-      return `  \u2502  ${i === resolved.extensionNfts.length - 1 ? "\u2514" : "\u251c"}\u2500 Ext  cNFT: ${e.assetId} (${p.extension_id || "unknown"})`;
-    }).join("\n") + "\n" +
-    `  \u2502\n` +
-    `  \u2502  Off-chain storage (TEE-signed data)\n` +
-    `  \u2502  \u251c\u2500 Core: ${resolved.arweaveUri}\n` +
-    resolved.extensionNfts.map((e, i) =>
-      `  \u2502  ${i === resolved.extensionNfts.length - 1 ? "\u2514" : "\u251c"}\u2500 Ext:  ${e.arweaveUri}`
-    ).join("\n") + "\n" +
-    `  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`
-  );
+    console.log("%cExt  cNFT:  %c%s %c(%s)", S.label, S.value, e.assetId, S.muted, p.extension_id || "unknown");
+  }
+  console.log("");
+  console.log("%cOff-chain storage (TEE-signed data)", S.section);
+  console.log("%cCore: %c%s", S.label, S.value, resolved.arweaveUri);
+  for (const e of resolved.extensionNfts) {
+    console.log("%cExt:  %c%s", S.label, S.value, e.arweaveUri);
+  }
 
-  // SIGNATURE VERIFICATION header
+  // SIGNATURE VERIFICATION
+  console.log("");
+  console.log("%cSignature Verification", S.section);
   const corePubkey = resolved.coreSignedJson?.tee_pubkey?.slice(0, 8) || "?";
-  console.log(`  SIGNATURE VERIFICATION`);
 
   // =====================================================================
   // Core NFT 検証
@@ -129,10 +141,11 @@ export async function verifyContentOnChain(
   // 共通ステップ2: TEE署名
   if (resolved.coreSignedJson) {
     coreNft.teeSignatureVerified = await verifyTeeSignature(resolved.coreSignedJson);
-    console.log(`  verify(pubkey: ${corePubkey}..., core_data) = ${mark(coreNft.teeSignatureVerified)}`);
+    const coreStyle = coreNft.teeSignatureVerified === "verified" ? S.pass : S.fail;
+    console.log(`%cverify(pubkey: ${corePubkey}..., core_data) = %c${coreNft.teeSignatureVerified === "verified" ? "\u2713" : "\u2717"}`, S.value, coreStyle);
   } else {
     coreNft.teeSignatureVerified = "failed";
-    console.log(`  verify(core_data) = \u2717 (no signed_json)`);
+    console.log(`%cverify(core_data) = %c\u2717 (no signed_json)`, S.value, S.fail);
   }
 
   // Core固有: C2PA来歴チェーン
@@ -222,7 +235,8 @@ export async function verifyContentOnChain(
     // 共通ステップ2: TEE署名
     nftVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
     const extPubkey = extSj.tee_pubkey?.slice(0, 8) || "?";
-    console.log(`  verify(pubkey: ${extPubkey}..., ${extId}_data) = ${mark(nftVerif.teeSignatureVerified)}`);
+    const extSigStyle = nftVerif.teeSignatureVerified === "verified" ? S.pass : S.fail;
+    console.log(`%cverify(pubkey: ${extPubkey}..., ${extId}_data) = %c${nftVerif.teeSignatureVerified === "verified" ? "\u2713" : "\u2717"}`, S.value, extSigStyle);
 
     // Extension固有: WASMハッシュ検証（NFTのwasm_hashに一致するバージョンがあるか）
     const wasmHash = (extPayload as Record<string, unknown>).wasm_hash as string | undefined;
@@ -309,30 +323,29 @@ export async function verifyContentOnChain(
   result.overall = allVerified ? "verified" : anyFailed ? "failed" : "pending";
 
   // リアルタイムステップログ（各NFTの全チェックを列挙）
-  console.log(`\n  VERIFICATION STEPS`);
+  console.log("");
+  console.log("%cVerification Steps", S.section);
   for (const nft of result.nfts) {
     const nftLabel = nft.id === "c2pa" ? "Core" : `Ext (${nft.id})`;
-    console.log(`  ${mark(nft.collectionVerified)} ${nftLabel} collection membership`);
-    console.log(`  ${mark(nft.teeSignatureVerified)} ${nftLabel} TEE signature (Ed25519)`);
+    stepLog(nft.collectionVerified, `${nftLabel} collection membership`);
+    stepLog(nft.teeSignatureVerified, `${nftLabel} TEE signature (Ed25519)`);
     for (const sc of nft.specificChecks) {
-      let line = `  ${mark(sc.status)} ${sc.label}`;
-      if (sc.detail) line += `: ${sc.detail}`;
-      console.log(line);
+      stepLog(sc.status, sc.label);
     }
   }
 
   // Owner
-  console.log(`  ${mark("verified")} Owner: ${resolved.ownerWallet}`);
+  console.log("%cOwner: %c%s", S.label, S.value, resolved.ownerWallet);
 
   // サマリー
+  console.log("");
   const passed = active.filter((s) => s === "verified").length;
-  console.log(
-    `\n  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
-    `  ${mark(result.overall)} ${result.overall.toUpperCase()} (${passed}/${active.length})\n` +
-    `  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
-    `  RootLens server was NOT consulted.\n` +
-    `  Verify: https://solana.fm/address/${resolved.assetId}`
-  );
+  const overall = result.overall === "verified"
+    ? `%c \u2713 VERIFIED (${passed}/${active.length}) `
+    : `%c \u2717 FAILED (${passed}/${active.length}) `;
+  console.log(overall, result.overall === "verified" ? S.result : S.resultFail);
+  console.log("%cRootLens server was NOT consulted for any verification data.", S.muted);
+  console.log("%cVerify independently: %chttps://solana.fm/address/${resolved.assetId}", S.muted, S.link);
   console.groupEnd();
 
   return result;

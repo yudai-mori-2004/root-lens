@@ -41,11 +41,12 @@ export default function ContentPage({ page }: Props) {
 
     // ヘッダー
     console.log(
-      `\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n` +
-      `\u2502              RootLens Verification                  \u2502\n` +
-      `\u2502  ${n} content${n > 1 ? "s" : ""} \u00b7 All steps performed client-side.      \u2502\n` +
-      `\u2502  No RootLens server involved.                      \u2502\n` +
-      `\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518`,
+      "%c RootLens Verification ",
+      "background:#1E3A5F;color:#fff;padding:8px 16px;font-size:16px;font-weight:bold;border-radius:4px;",
+    );
+    console.log(
+      `%c${n} content${n > 1 ? "s" : ""} \u00b7 All steps performed client-side. No RootLens server involved.`,
+      "color:#888;font-style:italic;",
     );
 
     // 全コンテンツを並列取得・検証（各コンテンツは console.groupCollapsed 内にログ）
@@ -64,11 +65,12 @@ export default function ContentPage({ page }: Props) {
 
       // フッター
       const passed = results.filter((r) => r.verification.overall === "verified").length;
-      const m = passed === n ? "\u2713" : "\u2717";
+      const allOk = passed === n;
       console.log(
-        `\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
-        `${m} ALL CONTENTS: ${passed}/${n} verified\n` +
-        `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550`,
+        allOk ? `%c \u2713 ALL CONTENTS: ${passed}/${n} verified ` : `%c \u2717 ${passed}/${n} verified `,
+        allOk
+          ? "background:#16a34a;color:#fff;padding:6px 14px;font-size:14px;font-weight:bold;border-radius:4px;"
+          : "background:#dc2626;color:#fff;padding:6px 14px;font-size:14px;font-weight:bold;border-radius:4px;",
       );
     });
   }, [page.contents]);
