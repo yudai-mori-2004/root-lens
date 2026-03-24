@@ -39,7 +39,7 @@ function daysUntilExpiry(expiryIso: string): number {
 /** サーバーに証明書を要求する共通処理 */
 async function requestCertificate(
   url: string,
-): Promise<{ device_certificate: string; root_ca_certificate: string; device_id: string }> {
+): Promise<{ device_certificate: string; intermediate_ca_certificate: string; root_ca_certificate: string; device_id: string }> {
   // §4.4.1: TEE鍵生成 + CSR作成
   const credentials = await generateDeviceCredentials();
 
@@ -90,9 +90,10 @@ export function useCertificateProvisioning(): CertState & { retry: () => void } 
     try {
       const result = await requestCertificate(config.deviceCertificateUrl);
 
-      // §4.4.1 ステップ7: 証明書保存
+      // §4.4.1 ステップ7: 証明書保存（Device + Intermediate CA + Root CA）
       await storeDeviceCertificate(
         result.device_certificate,
+        result.intermediate_ca_certificate,
         result.root_ca_certificate,
       );
 
@@ -121,6 +122,7 @@ export function useCertificateProvisioning(): CertState & { retry: () => void } 
 
       await storeDeviceCertificate(
         result.device_certificate,
+        result.intermediate_ca_certificate,
         result.root_ca_certificate,
       );
 

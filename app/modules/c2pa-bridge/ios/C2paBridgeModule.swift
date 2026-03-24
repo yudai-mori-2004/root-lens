@@ -13,6 +13,7 @@ public class C2paBridgeModule: Module {
   // 仕様書 §4.4 TEE鍵管理用定数
   private static let teeKeyTag = "io.rootlens.c2pa.signing.key"
   private static let deviceCertKey = "io.rootlens.c2pa.device.cert"
+  private static let intermediateCaCertKey = "io.rootlens.c2pa.intermediate.cert"
   private static let rootCaCertKey = "io.rootlens.c2pa.rootca.cert"
 
   public func definition() -> ModuleDefinition {
@@ -345,16 +346,18 @@ public class C2paBridgeModule: Module {
     }
 
     // 仕様書 §4.4.1 ステップ7: Device Certificate + Root CA Certificate保存
-    AsyncFunction("storeDeviceCertificate") { (deviceCertBase64: String, rootCaCertBase64: String, promise: Promise) in
+    AsyncFunction("storeDeviceCertificate") { (deviceCertBase64: String, intermediateCaCertBase64: String, rootCaCertBase64: String, promise: Promise) in
       guard let deviceCertData = Data(base64Encoded: deviceCertBase64),
+            let intermediateCaData = Data(base64Encoded: intermediateCaCertBase64),
             let rootCaCertData = Data(base64Encoded: rootCaCertBase64) else {
         promise.reject("ARG_ERROR", "Base64デコードに失敗しました")
         return
       }
       let defaults = UserDefaults.standard
       defaults.set(deviceCertData, forKey: Self.deviceCertKey)
+      defaults.set(intermediateCaData, forKey: Self.intermediateCaCertKey)
       defaults.set(rootCaCertData, forKey: Self.rootCaCertKey)
-      NSLog("[C2paBridge] Certificates stored: device=\(deviceCertData.count), rootCA=\(rootCaCertData.count)")
+      NSLog("[C2paBridge] Certificates stored: device=\(deviceCertData.count), intermediate=\(intermediateCaData.count), rootCA=\(rootCaCertData.count)")
       promise.resolve(true)
     }
 
@@ -463,14 +466,15 @@ public class C2paBridgeModule: Module {
       return -10
     }
     guard let deviceCert = UserDefaults.standard.data(forKey: deviceCertKey),
+          let intermediateCaCert = UserDefaults.standard.data(forKey: intermediateCaCertKey),
           let rootCaCert = UserDefaults.standard.data(forKey: rootCaCertKey) else {
       NSLog("[C2paBridge] Stored certificates not found")
       return -11
     }
 
-    // DER証明書を連結、サイズ配列を構築
-    var allCerts = [UInt8](deviceCert) + [UInt8](rootCaCert)
-    var certSizes: [UInt32] = [UInt32(deviceCert.count), UInt32(rootCaCert.count)]
+    // DER証明書を連結、サイズ配列を構築（Device + Intermediate CA + Root CA）
+    var allCerts = [UInt8](deviceCert) + [UInt8](intermediateCaCert) + [UInt8](rootCaCert)
+    var certSizes: [UInt32] = [UInt32(deviceCert.count), UInt32(intermediateCaCert.count), UInt32(rootCaCert.count)]
     let certCount = UInt32(certSizes.count)
 
     // コンテキストとしてSecKeyのポインタを渡す（retain して callback 完了後に release）

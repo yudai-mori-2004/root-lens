@@ -185,15 +185,16 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
      * 仕様書 §4.4.1 ステップ7
      */
     @ReactMethod
-    fun storeDeviceCertificate(deviceCertBase64: String, rootCaCertBase64: String, promise: Promise) {
+    fun storeDeviceCertificate(deviceCertBase64: String, intermediateCaCertBase64: String, rootCaCertBase64: String, promise: Promise) {
         try {
             val context = reactApplicationContext
             val prefs = context.getSharedPreferences("rootlens_certs", 0)
             prefs.edit()
                 .putString("device_cert_der", deviceCertBase64)
+                .putString("intermediate_ca_cert_der", intermediateCaCertBase64)
                 .putString("root_ca_cert_der", rootCaCertBase64)
                 .apply()
-            Log.d(TAG, "Device certificate stored")
+            Log.d(TAG, "Device certificate stored (3-layer chain)")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "storeDeviceCertificate failed", e)
@@ -264,15 +265,18 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
         val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
         val deviceCertBase64 = prefs.getString("device_cert_der", null)
             ?: throw IllegalStateException("Device certificate not found")
+        val intermediateCaBase64 = prefs.getString("intermediate_ca_cert_der", null)
+            ?: throw IllegalStateException("Intermediate CA certificate not found")
         val rootCaBase64 = prefs.getString("root_ca_cert_der", null)
             ?: throw IllegalStateException("Root CA certificate not found")
 
         val deviceCertDer = Base64.decode(deviceCertBase64, Base64.NO_WRAP)
+        val intermediateCaDer = Base64.decode(intermediateCaBase64, Base64.NO_WRAP)
         val rootCaDer = Base64.decode(rootCaBase64, Base64.NO_WRAP)
 
-        // DER証明書を連結
-        val certsDer = deviceCertDer + rootCaDer
-        val certSizes = intArrayOf(deviceCertDer.size, rootCaDer.size)
+        // DER証明書を連結（Device + Intermediate CA + Root CA）
+        val certsDer = deviceCertDer + intermediateCaDer + rootCaDer
+        val certSizes = intArrayOf(deviceCertDer.size, intermediateCaDer.size, rootCaDer.size)
 
         // 仕様書 §4.5.3: RFC 3161 TSAタイムスタンプ（短期証明書には必須）
         val tsaUrl = "http://timestamp.digicert.com"
@@ -282,7 +286,7 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             outputFile.absolutePath,
             certsDer,
             certSizes,
-            2,
+            3,
             tsaUrl
         )
     }
@@ -366,13 +370,16 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val prefs = context.getSharedPreferences("rootlens_certs", 0)
             val deviceCertBase64 = prefs.getString("device_cert_der", null)
                 ?: run { promise.reject("CERT_ERROR", "Device Certificate未取得"); return }
+            val intermediateCaBase64 = prefs.getString("intermediate_ca_cert_der", null)
+                ?: run { promise.reject("CERT_ERROR", "Intermediate CA未取得"); return }
             val rootCaBase64 = prefs.getString("root_ca_cert_der", null)
                 ?: run { promise.reject("CERT_ERROR", "Root CA未取得"); return }
 
             val deviceCertDer = android.util.Base64.decode(deviceCertBase64, android.util.Base64.NO_WRAP)
+            val intermediateCaDer = android.util.Base64.decode(intermediateCaBase64, android.util.Base64.NO_WRAP)
             val rootCaDer = android.util.Base64.decode(rootCaBase64, android.util.Base64.NO_WRAP)
-            val certsDer = deviceCertDer + rootCaDer
-            val certSizes = intArrayOf(deviceCertDer.size, rootCaDer.size)
+            val certsDer = deviceCertDer + intermediateCaDer + rootCaDer
+            val certSizes = intArrayOf(deviceCertDer.size, intermediateCaDer.size, rootCaDer.size)
             val tsaUrl = "http://timestamp.digicert.com"
 
             val result = nativeSignImageTeeWithParent(
@@ -380,7 +387,7 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
                 outputFile.absolutePath,
                 certsDer,
                 certSizes,
-                2,
+                3,
                 tsaUrl,
                 parentFile.absolutePath
             )

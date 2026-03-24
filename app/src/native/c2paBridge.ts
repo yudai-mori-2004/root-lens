@@ -54,7 +54,7 @@ interface C2paBridgeInterface {
   getVersion(): Promise<string>;
   // §4.4 TEE鍵管理
   generateDeviceCredentials(): Promise<DeviceCredentials>;
-  storeDeviceCertificate(deviceCertBase64: string, rootCaCertBase64: string): Promise<boolean>;
+  storeDeviceCertificate(deviceCertBase64: string, intermediateCaCertBase64: string, rootCaCertBase64: string): Promise<boolean>;
   hasDeviceCertificate(): Promise<boolean>;
   getDeviceCertificateExpiry(): Promise<string | null>;
 }
