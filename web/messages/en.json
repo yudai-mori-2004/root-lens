@@ -229,6 +229,7 @@
     "shotOnDefault": "Shot on RootLens",
     "dateTsa": "TSA certified",
     "dateRegistration": "Registration time",
+    "owner": "Owner",
 
     "trust": {
       "verifying": "Verifying...",

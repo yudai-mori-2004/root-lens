@@ -229,6 +229,7 @@
     "shotOnDefault": "RootLens で撮影",
     "dateTsa": "TSA認証時刻",
     "dateRegistration": "登録時刻",
+    "owner": "所有者",
 
     "trust": {
       "verifying": "検証中...",

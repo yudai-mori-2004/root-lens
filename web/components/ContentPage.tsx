@@ -204,7 +204,7 @@ export default function ContentPage({ page }: Props) {
             )}
             {resolved?.ownerWallet && (
               <div className={styles.meta}>
-                <span className={styles.ownerLabel}>Owner</span>
+                <span className={styles.ownerLabel}>{t("owner")}</span>
                 <button
                   className={styles.walletCopy}
                   onClick={() => { navigator.clipboard.writeText(resolved.ownerWallet); }}
