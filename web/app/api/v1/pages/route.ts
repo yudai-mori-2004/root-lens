@@ -1,7 +1,7 @@
 /**
  * 仕様書 §6.4 公開ページ生成・リンク発行
  *
- * GET  /api/v1/pages?address=xxx — 自分のコンテンツ一覧取得
+ * GET  /api/v1/pages?address=xxx — ウォレットアドレスでコンテンツ一覧取得
  * POST /api/v1/pages — ページレコード作成
  */
 
@@ -15,9 +15,20 @@ const supabase = createClient(
 );
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get("user_id");
-  if (!userId) {
-    return NextResponse.json({ error: "user_id is required" }, { status: 400 });
+  const address = request.nextUrl.searchParams.get("address");
+  if (!address) {
+    return NextResponse.json({ error: "address is required" }, { status: 400 });
+  }
+
+  // address → user_id 解決（サーバー内部）
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("address", address)
+    .single();
+
+  if (!user) {
+    return NextResponse.json([], { status: 200 });
   }
 
   const { data, error } = await supabase
@@ -32,7 +43,7 @@ export async function GET(request: NextRequest) {
         ogp_image_url
       )
     `)
-    .eq("user_id", userId)
+    .eq("user_id", user.id)
     .eq("status", "published")
     .order("created_at", { ascending: false });
 

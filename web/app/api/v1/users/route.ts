@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, address, display_name, bio, avatar_url, device_name, created_at")
+    .select("address, display_name, bio, avatar_url, device_name, created_at")
     .eq("address", address)
     .single();
 
@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    id: data.id,
     address: data.address,
     displayName: data.display_name,
     bio: data.bio,
@@ -60,7 +59,7 @@ export async function POST(request: NextRequest) {
       },
       { onConflict: "address" },
     )
-    .select("id, address, display_name, bio, device_name, created_at")
+    .select("address, display_name, bio, device_name, created_at")
     .single();
 
   if (error) {
@@ -71,7 +70,6 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    id: data.id,
     address: data.address,
     displayName: data.display_name,
     bio: data.bio,

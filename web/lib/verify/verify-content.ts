@@ -1,5 +1,5 @@
 /**
- * 仕様書 §5.2 クライアントサイド検証フロー
+ * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
  *
  * ブラウザ内でトラストレス検証を完結させる。
  * RootLens サーバーには一切問い合わせない。
@@ -17,12 +17,13 @@
 
 import type { SignedJson, CorePayload, ExtensionPayload } from "@title-protocol/sdk";
 import type { ResolvedContent } from "./content-resolver";
-import type { VerificationResult, VerifyStepStatus, NftVerification, SpecificCheck } from "./types";
+import type { VerificationResult, VerifyStepStatus, NftVerification, SpecificCheck } from "../types";
 import {
   getGlobalConfigData,
   findWasmVersionByHash,
   type GlobalConfigData,
   PHASH_THRESHOLD,
+  DAS_RPC_URL,
 } from "./config";
 import { contentResolver } from "./content-resolver";
 import { computePHashWasm } from "./phash-wasm";
@@ -34,9 +35,29 @@ import { computePHashWasm } from "./phash-wasm";
 /** 翻訳関数の型。check.* キーを解決する。存在しないキーはキー名をそのまま返す */
 export type CheckTranslator = (key: string, params?: Record<string, string | number>) => string;
 
+/**
+ * ユーザーが手元で知覚しているメディアへの参照。
+ * オンチェーンに記録された知覚特徴量（pHash等）との同一性検証に使用する。
+ *
+ * これらはRootLensサーバー由来であり、信頼境界の外にある。
+ * 検証結果は「この表示データがオンチェーン記録と一致するか」を示すものであり、
+ * 表示データ自体の真正性を保証するものではない。
+ *
+ * 全フィールドはURL形式。ローカルデータは URL.createObjectURL(blob) で変換可能。
+ */
+export interface PerceptualInputs {
+  /** 画像pHash比較対象。image-phash Extension の検証に使用 */
+  imageUrl?: string;
+  /** 動画pHash比較対象。video-phash Extension の検証に使用（将来） */
+  videoUrl?: string;
+}
+
+/** ログ用マーク */
+const mark = (s: VerifyStepStatus) => s === "verified" ? "\u2713" : s === "failed" ? "\u2717" : "-";
+
 export async function verifyContentOnChain(
   resolved: ResolvedContent,
-  thumbnailUrl: string,
+  perceptual: PerceptualInputs,
   queryContentHash: string,
   tc: CheckTranslator,
 ): Promise<VerificationResult> {
@@ -47,11 +68,49 @@ export async function verifyContentOnChain(
     arweaveUri: resolved.arweaveUri,
   };
 
-  console.group("[RootLens Verification] §5.2");
+  const hashShort = queryContentHash.slice(0, 10) + "..." + queryContentHash.slice(-4);
 
-  // Step 1 (global): GlobalConfig取得
-  console.log("Fetching Global Config...");
+  // --- console.groupCollapsed: 並列実行でもコンテンツ間でログが混ざらない ---
+  console.groupCollapsed(`Content: ${hashShort}`);
+
+  // INPUT
+  console.log(
+    `  INPUT (from RootLens page metadata \u2014 not verified)\n` +
+    `  \u251c\u2500 Content Hash: ${queryContentHash}\n` +
+    `  \u2502  (SHA-256 of C2PA Active Manifest Signature)\n` +
+    (perceptual.imageUrl ? `  \u251c\u2500 Display image: ${perceptual.imageUrl}\n` : "") +
+    (perceptual.videoUrl ? `  \u251c\u2500 Display video: ${perceptual.videoUrl}\n` : "") +
+    `  \u2514\u2500 content_hash only used below\n`
+  );
+
+  // Title Protocol box
   const globalConfig = await getGlobalConfigData();
+  const extNftIds = resolved.extensionNfts.map(e => {
+    const p = e.signedJson.payload as ExtensionPayload;
+    return p.extension_id || "unknown";
+  });
+  console.log(
+    `  \u250c\u2500 Title Protocol \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n` +
+    `  \u2502  https://github.com/yudai-mori-2004/title-protocol\n` +
+    `  \u2502\n` +
+    `  \u2502  Solana RPC: ${DAS_RPC_URL}\n` +
+    `  \u2502  \u251c\u2500 Core cNFT: ${resolved.assetId} (oldest by leaf_id)\n` +
+    resolved.extensionNfts.map((e, i) => {
+      const p = e.signedJson.payload as ExtensionPayload;
+      return `  \u2502  ${i === resolved.extensionNfts.length - 1 ? "\u2514" : "\u251c"}\u2500 Ext  cNFT: ${e.assetId} (${p.extension_id || "unknown"})`;
+    }).join("\n") + "\n" +
+    `  \u2502\n` +
+    `  \u2502  Off-chain storage (TEE-signed data)\n` +
+    `  \u2502  \u251c\u2500 Core: ${resolved.arweaveUri}\n` +
+    resolved.extensionNfts.map((e, i) =>
+      `  \u2502  ${i === resolved.extensionNfts.length - 1 ? "\u2514" : "\u251c"}\u2500 Ext:  ${e.arweaveUri}`
+    ).join("\n") + "\n" +
+    `  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`
+  );
+
+  // SIGNATURE VERIFICATION header
+  const corePubkey = resolved.coreSignedJson?.tee_pubkey?.slice(0, 8) || "?";
+  console.log(`  SIGNATURE VERIFICATION`);
 
   // =====================================================================
   // Core NFT 検証
@@ -66,15 +125,15 @@ export async function verifyContentOnChain(
   // 共通ステップ1: コレクション
   coreNft.collectionVerified = resolved.collectionAddress === globalConfig.core
     ? "verified" : "failed";
-  console.log(`Core collection: ${coreNft.collectionVerified}`);
 
   // 共通ステップ2: TEE署名
   if (resolved.coreSignedJson) {
     coreNft.teeSignatureVerified = await verifyTeeSignature(resolved.coreSignedJson);
+    console.log(`  verify(pubkey: ${corePubkey}..., core_data) = ${mark(coreNft.teeSignatureVerified)}`);
   } else {
     coreNft.teeSignatureVerified = "failed";
+    console.log(`  verify(core_data) = \u2717 (no signed_json)`);
   }
-  console.log(`Core TEE sig: ${coreNft.teeSignatureVerified}`);
 
   // Core固有: C2PA来歴チェーン
   if (resolved.coreSignedJson) {
@@ -162,7 +221,8 @@ export async function verifyContentOnChain(
 
     // 共通ステップ2: TEE署名
     nftVerif.teeSignatureVerified = await verifyTeeSignature(extSj);
-    console.log(`[${extId}] collection: ${nftVerif.collectionVerified}, TEE sig: ${nftVerif.teeSignatureVerified}`);
+    const extPubkey = extSj.tee_pubkey?.slice(0, 8) || "?";
+    console.log(`  verify(pubkey: ${extPubkey}..., ${extId}_data) = ${mark(nftVerif.teeSignatureVerified)}`);
 
     // Extension固有: WASMハッシュ検証（NFTのwasm_hashに一致するバージョンがあるか）
     const wasmHash = (extPayload as Record<string, unknown>).wasm_hash as string | undefined;
@@ -193,7 +253,9 @@ export async function verifyContentOnChain(
     if (extId === "image-phash") {
       const phashPayload = extPayload as ExtensionPayload & { phash?: string };
       if (phashPayload.phash) {
-        const phashResult = await verifyPHashWithImage(phashPayload.phash, thumbnailUrl, wasmHash);
+        const phashResult = perceptual.imageUrl
+          ? await verifyPHashWithImage(phashPayload.phash, perceptual.imageUrl, wasmHash)
+          : { status: "skipped" as const, reason: "No image URL provided for pHash comparison" };
         if (phashResult.distance !== undefined) {
           nftVerif.specificChecks.push({
             label: tc("phash_identity"),
@@ -201,7 +263,6 @@ export async function verifyContentOnChain(
             detail: tc(phashResult.status === "verified" ? "phash_identity_pass" : "phash_identity_fail", { distance: phashResult.distance, threshold: PHASH_THRESHOLD }),
           });
         } else {
-          // 画像取得失敗（CORSなど）
           nftVerif.specificChecks.push({
             label: tc("phash_identity"),
             status: "skipped",
@@ -232,7 +293,7 @@ export async function verifyContentOnChain(
   }
 
   // =====================================================================
-  // 全体判定
+  // 全体判定 + リアルタイムログ
   // =====================================================================
   const allChecks: VerifyStepStatus[] = [];
   for (const nft of result.nfts) {
@@ -247,7 +308,31 @@ export async function verifyContentOnChain(
   const anyFailed = active.some((s) => s === "failed");
   result.overall = allVerified ? "verified" : anyFailed ? "failed" : "pending";
 
-  console.log(`Overall: ${result.overall}`);
+  // リアルタイムステップログ（各NFTの全チェックを列挙）
+  console.log(`\n  VERIFICATION STEPS`);
+  for (const nft of result.nfts) {
+    const nftLabel = nft.id === "c2pa" ? "Core" : `Ext (${nft.id})`;
+    console.log(`  ${mark(nft.collectionVerified)} ${nftLabel} collection membership`);
+    console.log(`  ${mark(nft.teeSignatureVerified)} ${nftLabel} TEE signature (Ed25519)`);
+    for (const sc of nft.specificChecks) {
+      let line = `  ${mark(sc.status)} ${sc.label}`;
+      if (sc.detail) line += `: ${sc.detail}`;
+      console.log(line);
+    }
+  }
+
+  // Owner
+  console.log(`  ${mark("verified")} Owner: ${resolved.ownerWallet}`);
+
+  // サマリー
+  const passed = active.filter((s) => s === "verified").length;
+  console.log(
+    `\n  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
+    `  ${mark(result.overall)} ${result.overall.toUpperCase()} (${passed}/${active.length})\n` +
+    `  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
+    `  RootLens server was NOT consulted.\n` +
+    `  Verify: https://solana.fm/address/${resolved.assetId}`
+  );
   console.groupEnd();
 
   return result;
@@ -289,20 +374,22 @@ async function verifyTeeSignature(
 interface PHashResult {
   status: VerifyStepStatus;
   distance?: number;
+  computedHash?: string;
   reason?: string;
 }
 
 async function verifyPHashWithImage(
   onchainHash: string,
-  thumbnailUrl: string,
+  imageUrl: string,
   wasmHash?: string,
 ): Promise<PHashResult> {
   try {
-    const computedHash = await computePHashWasm(thumbnailUrl, wasmHash);
-    const distance = hammingDistance(onchainHash, computedHash);
+    const computed = await computePHashWasm(imageUrl, wasmHash);
+    const distance = hammingDistance(onchainHash, computed);
     return {
       status: distance <= PHASH_THRESHOLD ? "verified" : "failed",
       distance,
+      computedHash: computed,
     };
   } catch (e) {
     console.warn("  → pHash computation error:", e);

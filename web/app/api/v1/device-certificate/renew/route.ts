@@ -58,11 +58,13 @@ export async function POST(request: NextRequest) {
     // 旧証明書は失効させない（旧証明書で署名済みコンテンツの検証継続のため）
     const result = await issueDeviceCertificate(
       csrResult.publicKey,
-      csrResult.deviceIdHash
+      csrResult.deviceIdHash,
+      body.platform,
     );
 
     return NextResponse.json({
       device_certificate: result.deviceCertDer,
+      intermediate_ca_certificate: result.intermediateCaCertDer,
       root_ca_certificate: result.rootCaCertDer,
       device_id: result.deviceId,
     });

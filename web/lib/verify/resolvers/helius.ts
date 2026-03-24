@@ -119,6 +119,7 @@ async function searchAssetsByCollection(
     grouping: ["collection", collectionMint],
     page,
     limit,
+    sortBy: { sortBy: "id", sortDirection: "asc" },
   });
   return resp.result;
 }

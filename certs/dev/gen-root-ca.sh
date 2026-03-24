@@ -25,7 +25,8 @@ if [ -f "$OUT_DIR/root-ca.pem" ] && [ -f "$OUT_DIR/root-ca-key.pem" ]; then
 fi
 
 # §4.3.1: CN=RootLens Root CA, ES256 (P-256)
-# pathLenConstraint:0, keyUsage: keyCertSign
+# pathLenConstraint:1 (1層の中間CAを許容)
+# keyUsage: keyCertSign, cRLSign
 cat > "$OUT_DIR/_root-ca.cnf" << 'EOF'
 [req]
 distinguished_name = req_dn
@@ -38,8 +39,8 @@ O = RootLens Dev
 C = JP
 
 [v3_ca]
-basicConstraints = critical,CA:TRUE,pathlen:0
-keyUsage = critical,keyCertSign
+basicConstraints = critical,CA:TRUE,pathlen:1
+keyUsage = critical,keyCertSign,cRLSign
 subjectKeyIdentifier = hash
 EOF
 

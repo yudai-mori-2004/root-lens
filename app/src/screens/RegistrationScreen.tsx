@@ -57,8 +57,8 @@ export default function RegistrationScreen() {
     setPhase('syncing');
     try {
       const profile = await loadProfile();
-      const userId = await syncUserToSupabase(address, profile);
-      navigation.navigate('Publishing', { signedUris, address, userId });
+      await syncUserToSupabase(address, profile);
+      navigation.navigate('Publishing', { signedUris, address });
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message || String(e));
     } finally {

@@ -9,10 +9,10 @@ import type {
   VerifyStepStatus,
   ExtensionVerification,
 } from "@/lib/types";
-import type { ResolvedContent, ExtensionNft } from "@/lib/content-resolver";
+import type { ResolvedContent, ExtensionNft } from "@/lib/verify/content-resolver";
 import type { CorePayload, ExtensionPayload, GraphNode, SignedJson } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
-import { PHASH_THRESHOLD, getProtocolAddresses, getGlobalConfigData, type GlobalConfigData } from "@/lib/config";
+import { PHASH_THRESHOLD, getProtocolAddresses, getGlobalConfigData, type GlobalConfigData } from "@/lib/verify/config";
 import styles from "./ContentPage.module.css";
 
 interface Props {
@@ -37,19 +37,39 @@ export default function ContentPage({ page }: Props) {
   }, []);
 
   useEffect(() => {
-    // 全コンテンツを並列取得・検証
+    const n = page.contents.length;
+
+    // ヘッダー
+    console.log(
+      `\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n` +
+      `\u2502              RootLens Verification                  \u2502\n` +
+      `\u2502  ${n} content${n > 1 ? "s" : ""} \u00b7 All steps performed client-side.      \u2502\n` +
+      `\u2502  No RootLens server involved.                      \u2502\n` +
+      `\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518`,
+    );
+
+    // 全コンテンツを並列取得・検証（各コンテンツは console.groupCollapsed 内にログ）
     Promise.all(
       page.contents.map(async (c) => {
         const { record: r, resolved: res } = await fetchContentRecord(c.contentHash);
         const tc = (key: string, params?: Record<string, string | number>) =>
           tCheck.has(key) ? tCheck(key, params) : key;
-        const v = await verifyContent(c.contentHash, c.thumbnailUrl, res, tc);
+        const v = await verifyContent(c.contentHash, { imageUrl: c.thumbnailUrl }, res, tc);
         return { record: r, resolved: res, verification: v };
       })
     ).then((results) => {
       setRecords(results.map((r) => r.record));
       setResolvedList(results.map((r) => r.resolved));
       setVerifications(results.map((r) => r.verification));
+
+      // フッター
+      const passed = results.filter((r) => r.verification.overall === "verified").length;
+      const m = passed === n ? "\u2713" : "\u2717";
+      console.log(
+        `\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n` +
+        `${m} ALL CONTENTS: ${passed}/${n} verified\n` +
+        `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550`,
+      );
     });
   }, [page.contents]);
 
@@ -92,29 +112,19 @@ export default function ContentPage({ page }: Props) {
 
   return (
     <div className={styles.container}>
-      {/* User header — above image, like Instagram */}
-      {(page.user?.displayName || resolved?.ownerWallet) && (
+      {/* User header — page creator (Supabase metadata, not on-chain owner) */}
+      {page.user?.displayName && (
         <div className={styles.userHeader}>
           {page.user?.avatarUrl ? (
             <img src={page.user.avatarUrl} alt="" className={styles.userAvatar} />
-          ) : page.user?.displayName ? (
+          ) : (
             <div className={styles.userAvatarPlaceholder}>
               {page.user.displayName.charAt(0).toUpperCase()}
             </div>
-          ) : null}
+          )}
           <div className={styles.userInfo}>
             <div className={styles.userNameRow}>
-              {page.user?.displayName && <span className={styles.userName}>{page.user.displayName}</span>}
-              {resolved?.ownerWallet && (
-                <button
-                  className={styles.walletCopy}
-                  onClick={() => { navigator.clipboard.writeText(resolved.ownerWallet); }}
-                  title={resolved.ownerWallet}
-                >
-                  <span className={styles.walletAddr}>{truncate(resolved.ownerWallet, 4)}</span>
-                  <CopyIcon />
-                </button>
-              )}
+              <span className={styles.userName}>{page.user.displayName}</span>
             </div>
           </div>
         </div>
@@ -180,7 +190,7 @@ export default function ContentPage({ page }: Props) {
           )}
         </div>
 
-        {/* Device + date metadata */}
+        {/* Device + date + owner metadata */}
         {record ? (
           <>
             {deviceLabel && <p className={styles.deviceLine}>{deviceLabel}</p>}
@@ -188,6 +198,19 @@ export default function ContentPage({ page }: Props) {
               <div className={styles.meta}>
                 <time className={styles.timestamp} dateTime={record.capturedAt || undefined}>{capturedDate}</time>
                 {hasTsa && <span className={styles.metaBadge}>{t("dateTsa")}</span>}
+              </div>
+            )}
+            {resolved?.ownerWallet && (
+              <div className={styles.meta}>
+                <span className={styles.ownerLabel}>Owner</span>
+                <button
+                  className={styles.walletCopy}
+                  onClick={() => { navigator.clipboard.writeText(resolved.ownerWallet); }}
+                  title={resolved.ownerWallet}
+                >
+                  <span className={styles.walletAddr}>{truncate(resolved.ownerWallet, 4)}</span>
+                  <CopyIcon />
+                </button>
               </div>
             )}
           </>
@@ -880,13 +903,13 @@ function downloadVerificationData(data: {
 
   // --- Verification Results ---
   rows.push(["# Verification Results", "", ""]);
-  add("Overall", "§5.2 all steps aggregated", data.verification.overall);
+  add("Overall", "§7.4 all steps aggregated", data.verification.overall);
   for (const nft of data.verification.nfts) {
     rows.push([`## ${nft.id}`, "", ""]);
-    add("Collection Membership", "§5.2 Step 2: cNFT.collection.address == GlobalConfig.*_collection_mint", nft.collectionVerified);
-    add("TEE Signature (Ed25519)", "§5.2 Step 4: verify(tee_pubkey, tee_signature, serialize(payload, attributes))", nft.teeSignatureVerified);
+    add("Collection Membership", "§7.4 Step 2: cNFT.collection.address == GlobalConfig.*_collection_mint", nft.collectionVerified);
+    add("TEE Signature (Ed25519)", "§7.4 Step 4: verify(tee_pubkey, tee_signature, serialize(payload, attributes))", nft.teeSignatureVerified);
     for (const sc of nft.specificChecks) {
-      add(sc.label, `§5.2 Step ${sc.label.includes("Content Hash") ? "5" : sc.label.includes("重複") || sc.label.includes("Duplicate") ? "6" : "ext"}`, `${sc.status} — ${sc.detail}`);
+      add(sc.label, `§7.4 Step ${sc.label.includes("Content Hash") ? "5" : sc.label.includes("重複") || sc.label.includes("Duplicate") ? "6" : "ext"}`, `${sc.status} — ${sc.detail}`);
     }
   }
 

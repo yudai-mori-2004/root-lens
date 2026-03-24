@@ -1,8 +1,15 @@
 /**
- * Root CA 鍵管理 + Device Certificate 発行
+ * Root CA + Intermediate CA 鍵管理 + Device Certificate 発行
  * 仕様書 §4.3, §4.4
  *
- * 環境変数 ROOT_CA_CERT_PEM / ROOT_CA_KEY_PEM から PEM を読み込む。
+ * 3層PKI構造:
+ *   Root CA → iOS/Android Intermediate CA → Device Certificate
+ *
+ * 環境変数:
+ *   ROOT_CA_CERT_PEM / ROOT_CA_KEY_PEM — Root CA
+ *   IOS_INTERMEDIATE_CA_CERT_PEM / IOS_INTERMEDIATE_CA_KEY_PEM — iOS Intermediate CA
+ *   ANDROID_INTERMEDIATE_CA_CERT_PEM / ANDROID_INTERMEDIATE_CA_KEY_PEM — Android Intermediate CA
+ *
  * ローカル開発時はファイルからフォールバック。
  */
 
@@ -12,10 +19,9 @@ import crypto from "crypto";
 // @peculiar/x509 が使う Crypto プロバイダを設定（Node.js環境）
 x509.cryptoProvider.set(crypto.webcrypto as Crypto);
 
-// --- Root CA 読み込み ---
-
-let rootCaCert: x509.X509Certificate | null = null;
-let rootCaKey: CryptoKey | null = null;
+// ---------------------------------------------------------------------------
+// PEM 読み込みユーティリティ
+// ---------------------------------------------------------------------------
 
 function loadPem(envVar: string, fallbackPath?: string): string {
   const envValue = process.env[envVar];
@@ -23,36 +29,71 @@ function loadPem(envVar: string, fallbackPath?: string): string {
   if (fallbackPath) {
     const fs = require("fs");
     const path = require("path");
-    return fs.readFileSync(path.resolve(process.cwd(), fallbackPath), "utf-8");
+    const resolved = path.resolve(process.cwd(), fallbackPath);
+    if (fs.existsSync(resolved)) {
+      return fs.readFileSync(resolved, "utf-8");
+    }
   }
-  throw new Error(`${envVar} is not set`);
+  throw new Error(`${envVar} is not set and fallback not found`);
 }
 
-async function loadRootCa() {
-  if (rootCaCert && rootCaKey) return { cert: rootCaCert, key: rootCaKey };
+// ---------------------------------------------------------------------------
+// Root CA
+// ---------------------------------------------------------------------------
 
+let rootCaCert: x509.X509Certificate | null = null;
+
+async function loadRootCaCert(): Promise<x509.X509Certificate> {
+  if (rootCaCert) return rootCaCert;
   const certPem = loadPem("ROOT_CA_CERT_PEM", "../certs/dev/root-ca.pem");
-  const keyPem = loadPem("ROOT_CA_KEY_PEM", "../certs/dev/root-ca-key.pem");
-
   rootCaCert = new x509.X509Certificate(certPem);
+  return rootCaCert;
+}
 
-  // PEMからECDSA秘密鍵をインポート
+// ---------------------------------------------------------------------------
+// Intermediate CAs (per-platform)
+// ---------------------------------------------------------------------------
+
+interface IntermediateCA {
+  cert: x509.X509Certificate;
+  key: CryptoKey;
+}
+
+const intermediateCache: Record<string, IntermediateCA> = {};
+
+async function loadIntermediateCA(platform: "ios" | "android"): Promise<IntermediateCA> {
+  if (intermediateCache[platform]) return intermediateCache[platform];
+
+  const prefix = platform === "ios" ? "IOS" : "ANDROID";
+  const certPem = loadPem(
+    `${prefix}_INTERMEDIATE_CA_CERT_PEM`,
+    `../certs/dev/${platform}-intermediate-ca.pem`,
+  );
+  const keyPem = loadPem(
+    `${prefix}_INTERMEDIATE_CA_KEY_PEM`,
+    `../certs/dev/${platform}-intermediate-ca-key.pem`,
+  );
+
+  const cert = new x509.X509Certificate(certPem);
   const keyDer = x509.PemConverter.decode(keyPem)[0];
-  rootCaKey = await crypto.webcrypto.subtle.importKey(
+  const key = await crypto.webcrypto.subtle.importKey(
     "pkcs8",
     keyDer,
     { name: "ECDSA", namedCurve: "P-256" },
     false,
-    ["sign"]
+    ["sign"],
   );
 
-  return { cert: rootCaCert, key: rootCaKey };
+  intermediateCache[platform] = { cert, key };
+  return intermediateCache[platform];
 }
 
-// --- CSR 検証 ---
+// ---------------------------------------------------------------------------
+// CSR 検証
+// ---------------------------------------------------------------------------
 
 export async function verifyCSR(
-  csrBase64: string
+  csrBase64: string,
 ): Promise<{
   valid: boolean;
   publicKey: CryptoKey | null;
@@ -88,17 +129,22 @@ export async function verifyCSR(
   }
 }
 
-// --- Device Certificate 発行 ---
+// ---------------------------------------------------------------------------
+// Device Certificate 発行（Intermediate CA で署名）
+// ---------------------------------------------------------------------------
 
 export async function issueDeviceCertificate(
   publicKey: CryptoKey,
-  deviceIdHash: string
+  deviceIdHash: string,
+  platform: "ios" | "android" = "android",
 ): Promise<{
-  deviceCertDer: string; // Base64 DER
-  rootCaCertDer: string; // Base64 DER
+  deviceCertDer: string;           // Base64 DER
+  intermediateCaCertDer: string;   // Base64 DER
+  rootCaCertDer: string;           // Base64 DER
   deviceId: string;
 }> {
-  const { cert: caCert, key: caKey } = await loadRootCa();
+  const intermediateCa = await loadIntermediateCA(platform);
+  const rootCa = await loadRootCaCert();
 
   // §4.3.2 Device Certificate プロファイル
   // 有効期限: 90日（短寿命証明書モデル）
@@ -108,37 +154,40 @@ export async function issueDeviceCertificate(
   const deviceCert = await x509.X509CertificateGenerator.create({
     serialNumber: crypto.randomBytes(20).toString("hex"),
     subject: `CN=RootLens Device ${deviceIdHash}, O=RootLens`,
-    issuer: caCert.subject,
+    issuer: intermediateCa.cert.subject,
     notBefore: now,
     notAfter: notAfter,
     signingAlgorithm: { name: "ECDSA", hash: "SHA-256" },
     publicKey: publicKey,
-    signingKey: caKey,
+    signingKey: intermediateCa.key,
     extensions: [
       new x509.BasicConstraintsExtension(false, undefined, true), // CA:FALSE, critical
       new x509.KeyUsagesExtension(
         x509.KeyUsageFlags.digitalSignature,
-        true // critical
+        true, // critical
       ),
       new x509.ExtendedKeyUsageExtension(
         ["1.3.6.1.5.5.7.3.36"], // id-kp-documentSigning
-        false
+        false,
       ),
       await x509.SubjectKeyIdentifierExtension.create(publicKey),
-      await x509.AuthorityKeyIdentifierExtension.create(caCert.publicKey),
+      await x509.AuthorityKeyIdentifierExtension.create(intermediateCa.cert.publicKey),
     ],
   });
 
   return {
     deviceCertDer: Buffer.from(deviceCert.rawData).toString("base64"),
-    rootCaCertDer: Buffer.from(caCert.rawData).toString("base64"),
+    intermediateCaCertDer: Buffer.from(intermediateCa.cert.rawData).toString("base64"),
+    rootCaCertDer: Buffer.from(rootCa.rawData).toString("base64"),
     deviceId: deviceIdHash,
   };
 }
 
-// --- Root CA 証明書の公開情報 ---
+// ---------------------------------------------------------------------------
+// 公開情報
+// ---------------------------------------------------------------------------
 
 export async function getRootCaCertDer(): Promise<string> {
-  const { cert } = await loadRootCa();
+  const cert = await loadRootCaCert();
   return Buffer.from(cert.rawData).toString("base64");
 }

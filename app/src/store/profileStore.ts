@@ -4,7 +4,7 @@ import { config } from '../config';
 
 const KEY = 'rootlens:profile';
 
-/** ユーザー設定のみ。認証情報(address/userId)はPrivyが管理。 */
+/** ユーザー設定のみ。認証情報(address)はPrivyが管理。 */
 export interface Profile {
   displayName: string;
   bio: string;
@@ -50,13 +50,13 @@ export function shortenAddress(addr: string): string {
 }
 
 /**
- * Supabaseにユーザーを同期し、userIdを返す。
+ * Supabaseにユーザープロフィールを同期する。
  * 認証フロー（RegistrationScreen）から呼ばれる。
  */
 export async function syncUserToSupabase(
   address: string,
   profile: Profile,
-): Promise<string> {
+): Promise<void> {
   const res = await fetch(`${config.serverUrl}/api/v1/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -68,6 +68,4 @@ export async function syncUserToSupabase(
     }),
   });
   if (!res.ok) throw new Error('User sync failed');
-  const data = await res.json();
-  return data.id;
 }

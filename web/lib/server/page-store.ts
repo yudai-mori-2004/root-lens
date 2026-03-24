@@ -227,6 +227,148 @@ export async function softDeletePage(shortId: string): Promise<void> {
   if (error) throw new Error(`delete failed: ${error.message}`);
 }
 
+// ---------------------------------------------------------------------------
+// クリエイターページ用クエリ (§7.1)
+// ---------------------------------------------------------------------------
+
+export interface CreatorProfile {
+  address: string;
+  username: string | null;
+  displayName: string;
+  bio: string;
+  avatarUrl: string | null;
+}
+
+export interface CreatorPageItem {
+  pageId: string;
+  shortId: string;
+  thumbnailUrl: string;
+  contentCount: number;
+  createdAt: string;
+}
+
+/**
+ * ウォレットアドレスまたはusernameからユーザーを解決する。
+ * `@` 付きの場合はusernameで検索、それ以外はaddressで検索。
+ */
+export async function resolveUser(
+  addressOrUsername: string,
+): Promise<CreatorProfile | null> {
+  const isUsername = addressOrUsername.startsWith("@");
+  const column = isUsername ? "username" : "address";
+  const value = isUsername ? addressOrUsername.slice(1) : addressOrUsername;
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("address, username, display_name, bio, avatar_url")
+    .eq(column, value)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    address: data.address,
+    username: data.username,
+    displayName: data.display_name || "",
+    bio: data.bio || "",
+    avatarUrl: data.avatar_url,
+  };
+}
+
+/**
+ * ユーザーの公開済みページ一覧を取得する。
+ * address (Solanaウォレット) を受け取り、内部で user_id に解決する。
+ */
+export async function findPagesByUser(
+  address: string,
+): Promise<CreatorPageItem[]> {
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("address", address)
+    .single();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("pages")
+    .select(`
+      id,
+      short_id,
+      created_at,
+      contents (
+        thumbnail_url
+      )
+    `)
+    .eq("user_id", user.id)
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map((page) => {
+    const contents = (page.contents as unknown as Array<{ thumbnail_url: string }>) ?? [];
+    return {
+      pageId: page.id,
+      shortId: page.short_id,
+      thumbnailUrl: contents[0]?.thumbnail_url || "",
+      contentCount: contents.length,
+      createdAt: page.created_at,
+    };
+  });
+}
+
+/**
+ * pageIdからページを取得する（クリエイターページからの個別ページ表示用）。
+ */
+export async function findByPageId(
+  pageId: string,
+): Promise<PageRecord | null> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select(`
+      short_id,
+      created_at,
+      contents (
+        content_hash,
+        title_protocol_asset_id,
+        thumbnail_url,
+        ogp_image_url,
+        media_url,
+        content_type
+      )
+    `)
+    .eq("id", pageId)
+    .eq("status", "published")
+    .single();
+
+  if (error || !data) return null;
+
+  const rawContents = (data.contents as unknown as Array<{
+    content_hash: string;
+    title_protocol_asset_id: string;
+    thumbnail_url: string;
+    ogp_image_url: string;
+    media_url: string;
+    content_type: string;
+  }>) ?? [];
+
+  if (rawContents.length === 0) return null;
+
+  return {
+    shortId: data.short_id,
+    contents: rawContents.map((c) => ({
+      contentHash: c.content_hash,
+      assetId: c.title_protocol_asset_id,
+      thumbnailUrl: c.thumbnail_url,
+      ogpImageUrl: c.ogp_image_url,
+      mediaUrl: c.media_url || "",
+      mediaType: c.content_type || "image",
+    })),
+    createdAt: data.created_at,
+  };
+}
+
 export async function findByContentHash(
   contentHash: string
 ): Promise<PageRecord | null> {

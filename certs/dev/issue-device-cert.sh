@@ -2,27 +2,35 @@
 # Device Certificate 発行スクリプト（dev環境用）
 # 仕様書 §4.3.2 Device Certificateプロファイルに準拠
 #
-# CSRを受け取り、Dev Root CAで署名して90日有効のDevice Certificateを発行する。
+# CSRを受け取り、プラットフォーム別 Intermediate CA で署名して
+# 90日有効のDevice Certificateを発行する。
 # 本番環境ではサーバーAPIが同等の処理を行う。
 #
 # Usage:
-#   ./issue-device-cert.sh <csr.pem> [output-dir]
+#   ./issue-device-cert.sh <csr.pem> <ios|android> [output-dir]
 #
 # 出力:
 #   device-cert.pem    - Device Certificate（90日有効）
-#   device-chain.pem   - 証明書チェーン（Device + Root CA）
+#   device-chain.pem   - 証明書チェーン（Device + Intermediate CA + Root CA）
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CSR_FILE="${1:?Usage: $0 <csr.pem> [output-dir]}"
-OUT_DIR="${2:-$SCRIPT_DIR}"
+CSR_FILE="${1:?Usage: $0 <csr.pem> <ios|android> [output-dir]}"
+PLATFORM="${2:?Usage: $0 <csr.pem> <ios|android> [output-dir]}"
+OUT_DIR="${3:-$SCRIPT_DIR}"
 
 ROOT_CA_CERT="$SCRIPT_DIR/root-ca.pem"
-ROOT_CA_KEY="$SCRIPT_DIR/root-ca-key.pem"
+INTERMEDIATE_CERT="$SCRIPT_DIR/${PLATFORM}-intermediate-ca.pem"
+INTERMEDIATE_KEY="$SCRIPT_DIR/${PLATFORM}-intermediate-ca-key.pem"
 
-if [ ! -f "$ROOT_CA_CERT" ] || [ ! -f "$ROOT_CA_KEY" ]; then
+if [ ! -f "$ROOT_CA_CERT" ]; then
     echo "Error: Root CA not found. Run gen-root-ca.sh first."
+    exit 1
+fi
+
+if [ ! -f "$INTERMEDIATE_CERT" ] || [ ! -f "$INTERMEDIATE_KEY" ]; then
+    echo "Error: $PLATFORM Intermediate CA not found. Run gen-intermediate-ca.sh $PLATFORM first."
     exit 1
 fi
 
@@ -55,8 +63,8 @@ authorityKeyIdentifier = keyid:always
 EOF
 
 openssl x509 -req -in "$CSR_FILE" \
-  -CA "$ROOT_CA_CERT" \
-  -CAkey "$ROOT_CA_KEY" \
+  -CA "$INTERMEDIATE_CERT" \
+  -CAkey "$INTERMEDIATE_KEY" \
   -CAcreateserial \
   -sha256 -days 90 \
   -extfile "$OUT_DIR/_device.cnf" -extensions v3_device \
@@ -68,15 +76,18 @@ openssl x509 -req -in "$CSR_FILE" \
 # opensslのx509 -reqはCSRのSubjectをそのまま使用する。
 # 本番サーバーAPIではSubject CNを "RootLens Device <hash>" に上書きする。
 
-# 証明書チェーン（Device + Root CA）
-cat "$OUT_DIR/device-cert.pem" "$ROOT_CA_CERT" > "$OUT_DIR/device-chain.pem"
+# 証明書チェーン（Device + Intermediate CA + Root CA）
+cat "$OUT_DIR/device-cert.pem" "$INTERMEDIATE_CERT" "$ROOT_CA_CERT" > "$OUT_DIR/device-chain.pem"
 
-rm -f "$OUT_DIR/_device.cnf" "$SCRIPT_DIR/root-ca.srl"
+rm -f "$OUT_DIR/_device.cnf" "$SCRIPT_DIR/${PLATFORM}-intermediate-ca.srl"
 
 echo ""
-echo "=== Device Certificate 発行完了 ==="
+echo "=== Device Certificate 発行完了 ($PLATFORM) ==="
 echo "有効期限: 90日"
+echo "署名CA: $(openssl x509 -in "$INTERMEDIATE_CERT" -subject -noout)"
 openssl x509 -in "$OUT_DIR/device-cert.pem" -subject -issuer -dates -noout
 echo ""
 echo "チェーン検証:"
-openssl verify -CAfile "$ROOT_CA_CERT" "$OUT_DIR/device-cert.pem"
+cat "$INTERMEDIATE_CERT" "$ROOT_CA_CERT" > "$OUT_DIR/_ca-chain.pem"
+openssl verify -CAfile "$OUT_DIR/_ca-chain.pem" "$OUT_DIR/device-cert.pem"
+rm -f "$OUT_DIR/_ca-chain.pem"

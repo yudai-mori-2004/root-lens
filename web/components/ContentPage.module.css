@@ -129,6 +129,11 @@
   border-radius: 3px;
 }
 
+.ownerLabel {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
 .dateSource {
   font-size: 13px;
   font-weight: 500;

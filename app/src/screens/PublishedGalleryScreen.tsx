@@ -114,9 +114,9 @@ interface PublishedItem {
   createdAt: string;
 }
 
-async function fetchMyPages(userId: string): Promise<PublishedItem[]> {
+async function fetchMyPages(address: string): Promise<PublishedItem[]> {
   try {
-    const res = await fetch(`${config.serverUrl}/api/v1/pages?user_id=${userId}`);
+    const res = await fetch(`${config.serverUrl}/api/v1/pages?address=${address}`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -147,11 +147,8 @@ export default function PublishedGalleryScreen() {
       }
 
       loadProfile().then((p) => {
-        syncUserToSupabase(address, p)
-          .then((userId) => {
-            console.log('[Home] userId:', userId);
-            return fetchMyPages(userId);
-          })
+        syncUserToSupabase(address, p).catch(() => {});
+        fetchMyPages(address)
           .then((items) => {
             console.log('[Home] pages:', items.length);
             setContents(items);

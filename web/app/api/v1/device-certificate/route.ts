@@ -77,14 +77,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Device Certificate 発行
+    // Device Certificate 発行（プラットフォーム別 Intermediate CA で署名）
     const result = await issueDeviceCertificate(
       csrResult.publicKey,
-      csrResult.deviceIdHash
+      csrResult.deviceIdHash,
+      body.platform,
     );
 
     return NextResponse.json({
       device_certificate: result.deviceCertDer,
+      intermediate_ca_certificate: result.intermediateCaCertDer,
       root_ca_certificate: result.rootCaCertDer,
       device_id: result.deviceId,
     });

@@ -9,10 +9,10 @@
  */
 
 import type { PageMeta, ContentRecord, VerificationResult } from "./types";
-import type { ResolvedContent } from "./content-resolver";
+import type { ResolvedContent } from "./verify/content-resolver";
 import type { CorePayload } from "@title-protocol/sdk";
-import { contentResolver } from "./content-resolver";
-import { verifyContentOnChain } from "./verify";
+import { contentResolver } from "./verify/content-resolver";
+import { verifyContentOnChain, type PerceptualInputs } from "./verify/verify-content";
 import { supabase } from "./supabase";
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ export async function fetchContentRecord(
  */
 export async function verifyContent(
   contentHash: string,
-  thumbnailUrl: string,
+  perceptual: PerceptualInputs,
   resolved: ResolvedContent | null,
   tc: (key: string, params?: Record<string, string | number>) => string,
 ): Promise<VerificationResult> {
@@ -175,5 +175,5 @@ export async function verifyContent(
     };
   }
 
-  return verifyContentOnChain(resolved, thumbnailUrl, contentHash, tc);
+  return verifyContentOnChain(resolved, perceptual, contentHash, tc);
 }
