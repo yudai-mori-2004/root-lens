@@ -49,7 +49,7 @@ async function loadWasmByHash(wasmHash: string): Promise<ArrayBuffer> {
     );
   }
 
-  console.log("[phash-wasm] Loaded version from GlobalConfig, hash verified:", hashHex.slice(0, 16) + "...");
+  console.log(`%cWASM binary loaded & SHA-256 verified: %c${hashHex.slice(0, 16)}...`, "color:#6b7280;font-style:italic;", "color:inherit;");
   wasmCache.set(normalized, buf);
   return buf;
 }

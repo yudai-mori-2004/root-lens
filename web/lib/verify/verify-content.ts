@@ -271,6 +271,14 @@ export async function verifyContentOnChain(
           ? await verifyPHashWithImage(phashPayload.phash, perceptual.imageUrl, wasmHash)
           : { status: "skipped" as const, reason: "No image URL provided for pHash comparison" };
         if (phashResult.distance !== undefined) {
+          const phashIcon = phashResult.status === "verified" ? "\u2713" : "\u2717";
+          const phashStyle = phashResult.status === "verified" ? S.pass : S.fail;
+          console.log("");
+          console.log("%cpHash Identity Check", S.section);
+          console.log(`%cOn-chain (TEE computed): %c${phashPayload.phash}`, S.label, S.value);
+          console.log(`%cBrowser (recomputed):    %c${phashResult.computedHash || "?"}`, S.label, S.value);
+          console.log(`%cHamming distance: %c${phashResult.distance} %c(threshold: ${PHASH_THRESHOLD})`, S.label, phashStyle, S.muted);
+          console.log(`%c${phashIcon} ${phashResult.distance} \u2264 ${PHASH_THRESHOLD} → ${phashResult.status}`, phashStyle);
           nftVerif.specificChecks.push({
             label: tc("phash_identity"),
             status: phashResult.status,
@@ -327,7 +335,13 @@ export async function verifyContentOnChain(
   console.log("%cVerification Steps", S.section);
   for (const nft of result.nfts) {
     const nftLabel = nft.id === "c2pa" ? "Core" : `Ext (${nft.id})`;
-    stepLog(nft.collectionVerified, `${nftLabel} collection membership`);
+    const expectedColl = nft.id === "c2pa" ? globalConfig.core : globalConfig.ext;
+    const actualColl = nft.id === "c2pa" ? resolved.collectionAddress
+      : resolved.extensionNfts.find(e => {
+          const p = e.signedJson.payload as ExtensionPayload;
+          return (p.extension_id || "unknown") === nft.id;
+        })?.collectionAddress || "?";
+    stepLog(nft.collectionVerified, `${nftLabel} collection: ${actualColl.slice(0, 8)}... == GlobalConfig.${nft.id === "c2pa" ? "core" : "ext"}`);
     stepLog(nft.teeSignatureVerified, `${nftLabel} TEE signature (Ed25519)`);
     for (const sc of nft.specificChecks) {
       stepLog(sc.status, sc.label);
@@ -345,7 +359,7 @@ export async function verifyContentOnChain(
     : `%c \u2717 FAILED (${passed}/${active.length}) `;
   console.log(overall, result.overall === "verified" ? S.result : S.resultFail);
   console.log("%cRootLens server was NOT consulted for any verification data.", S.muted);
-  console.log("%cVerify independently: %chttps://solana.fm/address/${resolved.assetId}", S.muted, S.link);
+  console.log(`%cVerify independently: %chttps://solana.fm/address/${resolved.assetId}`, S.muted, S.link);
   console.groupEnd();
 
   return result;
