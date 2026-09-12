@@ -1,6 +1,7 @@
 package io.rootlens.mentra;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
@@ -79,6 +80,15 @@ final class DeviceProbe {
                     ? CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN : sourceValue;
 
             JSONObject root = new JSONObject();
+            PackageInfo installed;
+            try {
+                installed = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            } catch (PackageManager.NameNotFoundException error) {
+                throw new IOException("Cannot identify the installed capture application", error);
+            }
+            root.put("capture_app_version", new JSONObject()
+                    .put("version_code", installed.getLongVersionCode())
+                    .put("version_name", installed.versionName));
             root.put("device_manufacturer", Build.MANUFACTURER);
             root.put("device_model", Build.MODEL);
             root.put("android_release", Build.VERSION.RELEASE);

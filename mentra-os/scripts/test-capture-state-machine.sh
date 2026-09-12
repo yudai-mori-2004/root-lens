@@ -9,5 +9,8 @@ mkdir -p "$output_directory"
 javac -d "$output_directory" \
   "${project_directory}/app/src/main/java/io/rootlens/mentra/AppContract.java" \
   "${project_directory}/app/src/main/java/io/rootlens/mentra/CaptureSessionReducer.java" \
-  "${project_directory}/app/src/test/java/io/rootlens/mentra/CaptureSessionReducerTest.java"
+  "${project_directory}/app/src/main/java/io/rootlens/mentra/CaptureStorageBudget.java" \
+  "${project_directory}/app/src/test/java/io/rootlens/mentra/CaptureSessionReducerTest.java" \
+  "${project_directory}/app/src/test/java/io/rootlens/mentra/CaptureStorageBudgetTest.java"
 java -cp "$output_directory" io.rootlens.mentra.CaptureSessionReducerTest
+java -cp "$output_directory" io.rootlens.mentra.CaptureStorageBudgetTest

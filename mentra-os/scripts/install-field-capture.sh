@@ -26,6 +26,8 @@ if [[ "$device_count" -ne 1 ]]; then
   exit 1
 fi
 
+# Package replacement terminates the old process without waiting for its files.
+bash "${script_directory}/check-capture-idle.sh" "$adb_bin" "$package_name"
 "$adb_bin" install -r "$apk_path"
 "$adb_bin" shell pm grant "$package_name" android.permission.CAMERA
 "$adb_bin" shell pm grant "$package_name" android.permission.RECORD_AUDIO

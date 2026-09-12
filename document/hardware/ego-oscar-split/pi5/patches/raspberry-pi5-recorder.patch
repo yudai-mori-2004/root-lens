@@ -1,0 +1,169 @@
+--- a/radxa/fpv_recorder.py
++++ b/radxa/fpv_recorder.py
+@@ -4,0 +5,2 @@
++Modified by RootLens for a Raspberry Pi 5 host and XIAO D8 record button.
++
+@@ -23 +25 @@
+-import gpiod
++import os
+@@ -49 +51 @@
+-ESP_UART_PORT = "/dev/ttyS6"
++ESP_UART_PORT = os.environ.get("ROOTLENS_ESP_UART_PORT", "/dev/ttyAMA0")
+@@ -71,5 +73,2 @@
+-# GPIO Button
+-CHIP_NAME = "gpiochip1"
+-LINE_OFFSET = 8
+-ACTIVE_LOW = True
+-LONG_PRESS_SEC = 1.5
++# XIAO D8 emits B0,LONG after its local 1.5-second debounce/hold check.
++BUTTON_EVENT = "LONG"
+@@ -78 +77 @@
+-DEVICE_ID = 3
++DEVICE_ID = int(os.environ.get("ROOTLENS_DEVICE_ID", "3"))
+@@ -81 +80 @@
+-VIDEO_DEVICE = "/dev/video0"
++VIDEO_DEVICE = os.environ.get("ROOTLENS_VIDEO_DEVICE", "/dev/video0")
+@@ -92 +91 @@
+-    "-c:v", "mjpeg_rkmpp",
++    "-c:v", "mjpeg",
+@@ -94,2 +93,3 @@
+-    "-vf", "format=nv12",
+-    "-c:v", "h264_rkmpp",
++    "-vf", "format=yuv420p",
++    "-c:v", "libx264",
++    "-preset", "ultrafast", "-tune", "zerolatency",
+@@ -97 +97 @@
+-    "-g", "60",
++    "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
+@@ -105 +105 @@
+-USB_MOUNT_POINT = Path("/mnt/usb_drive")
++USB_MOUNT_POINT = Path(os.environ.get("ROOTLENS_USB_MOUNT_POINT", "/mnt/usb_drive"))
+@@ -108 +108 @@
+-RECORDING_BASE_DIR = Path(".")  # directory where fpv_stereo_* folders are created
++RECORDING_BASE_DIR = Path(os.environ.get("ROOTLENS_RECORDING_DIR", "/var/lib/rootlens-recorder"))
+@@ -225,0 +226,3 @@
++        # Unsolicited record-button messages from XIAO D8.
++        self._button_events = queue.Queue()
++
+@@ -495,0 +499,5 @@
++
++        # XIAO D8 long-press event. The receiver thread never controls FFmpeg.
++        elif msg == "B0,LONG":
++            self._button_events.put(BUTTON_EVENT)
++            print("[ESP] Record-button long press")
+@@ -536,0 +545,7 @@
++    def wait_button_event(self, timeout=0.1):
++        """Return a queued XIAO record-button event, or None on timeout."""
++        try:
++            return self._button_events.get(timeout=timeout)
++        except queue.Empty:
++            return None
++
+@@ -722,2 +737,2 @@
+-    folder = Path(f"fpv_stereo_{current_id}")
+-    folder.mkdir(exist_ok=True)
++    folder = RECORDING_BASE_DIR / f"fpv_stereo_{current_id}"
++    folder.mkdir(parents=True, exist_ok=True)
+@@ -1180,10 +1195,2 @@
+-    # Wait for button press to start transfer
+-    print("[USB] Press and hold button to start transfer...")
+-
+-    chip = gpiod.Chip(CHIP_NAME)
+-    line = chip.get_line(LINE_OFFSET)
+-    line.request(
+-        consumer="transfer_button",
+-        type=gpiod.LINE_REQ_DIR_IN,
+-        flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP,
+-    )
++    # Wait for the same XIAO D8 long-press event used by recording mode.
++    print("[USB] Hold XIAO D8 for 1.5 seconds to start transfer...")
+@@ -1192,17 +1199,2 @@
+-        press_t = None
+-        triggered = False
+-
+-        while not triggered:
+-            val = line.get_value()
+-            pressed = (val == 0) if ACTIVE_LOW else (val == 1)
+-
+-            if pressed and press_t is None:
+-                press_t = time.monotonic()
+-            elif not pressed:
+-                press_t = None
+-
+-            if pressed and press_t is not None:
+-                if time.monotonic() - press_t >= LONG_PRESS_SEC:
+-                    triggered = True
+-
+-            time.sleep(0.01)
++        while esp_link.wait_button_event(timeout=0.1) != BUTTON_EVENT:
++            pass
+@@ -1211,2 +1202,0 @@
+-        line.release()
+-        chip.close()
+@@ -1216,3 +1205,0 @@
+-    finally:
+-        line.release()
+-        chip.close()
+@@ -1220 +1207 @@
+-    print("[USB] Button pressed - starting transfer")
++    print("[USB] XIAO record-button event - starting transfer")
+@@ -1334 +1321 @@
+-    """Normal recording mode with button control."""
++    """Normal recording mode controlled by XIAO D8 long-press events."""
+@@ -1342,3 +1329 @@
+-    # Initialize GPIO Button
+-    chip = gpiod.Chip(CHIP_NAME)
+-    line = chip.get_line(LINE_OFFSET)
++    print("[BTN] XIAO D8: hold 1.5 seconds to toggle START/STOP.")
+@@ -1346,12 +1330,0 @@
+-    line.request(
+-        consumer="button_recorder",
+-        type=gpiod.LINE_REQ_DIR_IN,
+-        flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP,
+-    )
+-
+-    print(f"[BTN] Listening on {CHIP_NAME} line {LINE_OFFSET}")
+-    print("[BTN] Hold (>1.5s) to START when idle, tap to STOP when recording.")
+-
+-    press_t = None
+-    prev_pressed = False
+-
+@@ -1360,2 +1332,0 @@
+-            now = time.monotonic()
+-
+@@ -1366,7 +1337,6 @@
+-            val = line.get_value()
+-            pressed = (val == 0) if ACTIVE_LOW else (val == 1)
+-
+-            if pressed and not prev_pressed:
+-                press_t = now
+-                if ffmpeg_proc is not None:
+-                    print("[BTN] PRESS while recording -> STOP")
++            if esp.wait_button_event(timeout=0.05) == BUTTON_EVENT:
++                if ffmpeg_proc is None:
++                    print("[BTN] XIAO LONG -> START")
++                    start_recording()
++                else:
++                    print("[BTN] XIAO LONG -> STOP")
+@@ -1374 +1343,0 @@
+-                    press_t = None
+@@ -1376,13 +1344,0 @@
+-            elif not pressed and prev_pressed:
+-                press_t = None
+-
+-            if pressed and press_t is not None and ffmpeg_proc is None:
+-                held = now - press_t
+-                if held >= LONG_PRESS_SEC:
+-                    print(f"[BTN] HOLD ({held:.2f}s) -> START")
+-                    start_recording()
+-                    press_t = None
+-
+-            prev_pressed = pressed
+-            time.sleep(0.01)
+-
+@@ -1394,3 +1349,0 @@
+-    finally:
+-        line.release()
+-        chip.close()
+@@ -1398 +1350,0 @@
+-

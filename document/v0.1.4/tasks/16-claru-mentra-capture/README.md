@@ -1,5 +1,9 @@
 # Task 16: Claru Mentra capture
 
+現行のデータ受け渡しは[Task 19](../19-mentra-usb-import/README.md)のUSB-C経由のPC取り込みと
+Google Driveへの手動アップロードを使う。撮影・取り込み手順の正は
+[mentra-os/README.md](../../../../mentra-os/README.md)。以下はTask 16実施時の記録として保持する。
+
 ## 目的
 
 Mentra Live単体で1080p30 SDRの一人称RGBとraw IMUを収録し、各video frameとIMUの

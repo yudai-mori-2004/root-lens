@@ -1,0 +1,10 @@
+menu "RootLens Ego camera pipeline"
+
+config EXAMPLE_M2M_MODE_DECODE
+    bool "Decode Motion JPEG frames before H.264 encoding"
+    default y
+    help
+        Enables the Espressif video example's USB-camera-to-JPEG-decoder path.
+        RootLens always requires this because the stereo camera outputs Motion JPEG.
+
+endmenu

@@ -2,6 +2,59 @@
 
 Mentra Live 上で、Claru 向けの一人称 RGB と raw IMU を端末単独で収録する native Android
 アプリ。iPhone/ARKit 実装の `app/` とは別の capture stack として並列に置く。
+撮影データはUSB-CでPCへ取り込み、事業所の承認権限を持つ担当者が確認し、
+PCアプリからGoogle Driveの事業所専用フォルダ内にある「承認済みデータ」へアップロードする。
+このアップロードにより、現場合意書に基づく販売先への提供を承認する。
+RootLens APKは撮影と端末内保存だけを担当し、ネットワーク権限、認証、アップロード処理を持たない。
+
+## 撮影データをPCへ取り込む
+
+現場PCには管理者が「RootLens 取り込み」を導入し、事業所の設定ファイルを読み込んでおく。
+設定ファイルには当該事業所専用のサービスアカウント認証情報と保存先を含める。
+アプリにはPython・Qt・ADB・認証と通信の部品を同梱する。
+
+1. アクションボタンで録画を停止する。停止の案内音声は停止要求の受理を表し、その後も保存処理が続く。
+2. Mentra Liveの電源を入れたまま、データ転送に対応したUSB-CケーブルでPCにつなぐ。
+3. 「RootLens」を開き、「接続」を押す。端末に残っていてDriveに未アップロードの録画を確認する。
+4. 一覧から録画を選び、アプリ内で映像と音声を順に確認する。
+5. 内容を確認した録画を選び、「アップロード」を押す。
+6. アプリの進捗を確認する。Drive上の全ファイルの照合が済むと完了となり、その録画は通常の一覧から外れる。
+
+RootLensは匿名化処理後の内容を事業所が確認できるよう案内し、匿名化処理完了後7日間は販売先へ
+提供しない。この期間はPCへの取り込みやアップロードの日時から計算しない。
+
+各クリップは `rec-<撮影UTC時刻>-<content hashの先頭>` フォルダになり、
+`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json` の4ファイルがそろう。
+この録画フォルダをそのままアップロードし、映像と対応するセンサーデータをまとめて管理する。
+アプリ内の確認チェック、担当者名・同意書番号の入力、別の承認記録ファイルは設けない。
+撮影前の署名済み本人同意書は別途管理する。
+
+アプリと配布・運用手順は[`pc/README.md`](pc/README.md)を参照する。Mac版とWindows版を事業所の
+Driveから配布する。一覧は接続した端末とDriveの現在の情報から作り、PCに残ったコピーや完了履歴は使わない。
+
+取り込みはUSB接続のADBを使う。録画の確定が済んだクリップだけをコピーし、端末側とPC側の
+4ファイルすべてのSHA-256を比較する。`metadata.json`の`content_hash`と映像のSHA-256も
+照合し、すべて一致してから通常のクリップフォルダとして表示する。コピー中のデータは別の非表示作業領域へ
+置き、ケーブル切断などのエラー時には取り除く。PCの強制終了などで作業中のファイルが残っても、
+Google Driveへ渡すフォルダには混ざらず、次回接続時に作業用の残骸を回収する。もう一度実行すれば再試行できる。
+Driveへの照会は、端末に残る録画だけを対象にする。保存済みの録画は端末の全4ファイルのサイズ・SHA-256を
+現在のDriveと照合し、保存先も再確認してから端末から削除する。PCのコピーや過去の完了履歴は削除の根拠にしない。
+送信が途切れた場合はアプリから続きを送り、保存後の端末削除が途中で止まった場合は次の接続で再試行する。
+
+撮影中・確定中のクリップ、失敗したクリップ、キャリブレーション用データは取り込まない。
+停止直後のクリップが「未確定」と表示された場合は、電源を入れたまま保存処理を待って再実行する。
+以前の30分録画では確定に約51秒かかっており、長時間録画ではさらに時間がかかる。
+保存完了を確認するか、対象クリップのPC取り込みが完了するまで電源を切らない。
+PCへの取り込みとGoogle Driveへのアップロードは、それぞれ上記の操作で実行する。
+
+開発者が直接取り込みを確認するときは、Python 3.9以降とADBを用意して次のCLIを使う。
+
+```sh
+python3 mentra-os/scripts/import-recordings.py
+```
+
+保存先などの指定は `python3 mentra-os/scripts/import-recordings.py --help` を参照する。
+Macの`Import Recordings.command`も同じCLIを呼ぶ開発用の入口として保持する。
 
 ## 収録契約
 
@@ -15,12 +68,25 @@ Mentra Live 上で、Claru 向けの一人称 RGB と raw IMU を端末単独で
 | `imu.jsonl` | accelerometerとgyroscopeのraw `SensorEvent`。event timestamp、callback時のelapsed realtime、値、精度 |
 | `camera_frames.raw.jsonl` | Camera2 capture resultの監査用raw記録。フレーム番号、露光開始、露光時間、frame duration、rolling-shutter skew、callback時刻 |
 | `metadata.json` | codec、解像度、色、端末probe、ファイル数、SHA-256等の静的・集計情報 |
-| `sync_report.json` | 端末内だけに保持する内部QA用の同期診断。アップロード・Claru納品はしない |
+| `sync_report.json` | 端末内だけに保持する内部QA用の同期診断。PCへ取り込む4ファイルには含めない |
 | `content_hash.txt` | raw `rgb.mp4` のSHA-256 |
+| `camera_index.bin`、`video_index.bin`、`accelerometer_index.bin`、`gyroscope_index.bin` | フレーム・センサー対応付けのための端末内作業ファイル。PCへ取り込む4ファイルには含めない |
 
-1回の開始から手動停止までは1本のクリップとして収録し、5時間を安全上限とする。30分での
+1回の開始から手動停止までは1本のクリップとして収録し、録画時間の上限を5時間とする。30分での
 自動分割・休止・再開は行わない。途中失敗時は `failure.json` と `.partial` を残し、不完全データを
-アップロード対象にしない。
+PCへの取り込み対象にしない。
+
+録画開始前の停止は取消として扱い、その操作で作った空の作業ファイルだけを片付ける。
+映像の記録を開始した後の保存失敗は取消にせず、失敗として残す。
+MediaRecorderの非同期エラーとCamera2の準備例外を捕捉し、カメラのフレーム完了通知が
+10秒間途絶えた場合も収録を終了する。
+
+完成を示す`metadata.json`は、データファイルの同期が済んでから一時ファイルをatomic moveして公開する。
+ファイル同期が失敗した録画は完成扱いにしない。ディレクトリ同期は対応する保存領域で実行し、
+非対応の場合は`directory_fsync_supported`に記録する。
+metadataには実際に動いたアプリ版を`capture_app_version`として残す。
+MP4とCamera2の時刻の対応が半フレーム以上ずれたサンプルは`camera_result_present=false`とし、
+`camera_aligned_sample_count`と`camera_unmatched_sample_count`に集計する。
 
 ## RGBとIMUの時刻
 
@@ -89,28 +155,36 @@ LiDARは搭載・出力しない。
 
 ## 容量と連続運用
 
-既定video bitrateは7 Mbps。開始時の容量検査は30分ぶんの映像に20%の変動幅と512 MiBの
-固定余白を足した容量を要求する。録画中は5秒ごとに空き容量を検査し、空きが512 MiB以下に
-達した場合は停止音を出して現在のMP4とsidecarを正常確定し、セッションを終了する。
+既定video bitrateは7 Mbps。開始時は、最初の30分ぶんの映像・音声に20%の変動幅を加え、
+録画中に書くセンサーデータ・作業ファイル用に256 KiB/秒と、停止後の確定処理に必要な容量を確保する。
+開発時に30分未満の録画を指定した場合は、その指定時間を使う。
 
-容量が足りても内蔵電池だけで5時間は保証しない。外部給電し、実運用前に5時間の発熱、
-encoder安定性、給電、眼鏡側の装着を通し試験する。ローカルclipはR2への全PUTと
-`POST /api/clips`の成功を確認し、content hashと全4ファイル名を含むfsync済みupload receiptを
-原子的に保存した後にだけ削除する。
+確定処理の予約容量は512 MiBに、経過時間と停止処理の余裕10秒から30fpsで見積もった
+フレーム数×4,096 bytesを足す。録画が長くなるにつれて予約容量も増え、5時間時点では約2.75 GBになる。
+録画中は5秒ごとに空き容量を検査し、この予約容量以下に達した場合は停止音を出して収録を終了し、
+確保した領域を使ってMP4とsidecarを確定する。計算は`CaptureStorageBudget`に集約する。
+
+camera frame、MP4 sample、IMU timestampの索引は`FixedRecordStore`と`TimestampIndex`で
+端末内の固定長ファイルへ書き、確定時に小さなページ単位で読む。全レコードをメモリに蓄積せず、
+各フレームの対応付けや統計に必要な配列だけを保持する。これらの作業ファイルは端末内に保持し、
+PCへ渡す4ファイルには含めない。
+
+5時間の実機連続試験は未完了で、内蔵電池だけで5時間は保証しない。外部給電し、実運用前に
+発熱、encoderの安定性、給電、装着状態、停止後の確定からPC取り込みまでを5時間の録画で通し試験する。
+PCへの取り込みだけでは端末の録画を削除しない。アプリがDriveへの保存を照合してから端末の録画を削除し、空き容量を回復する。
 
 foreground serviceのpartial wake lockは5時間の録画上限と確定処理の余白を含めて保持する。
 
 ## ビルドと実機起動
-
-`app/.env` にある既存のRootLens server URLとSupabase public設定をbuild時に読む。
-passwordは保存せず、取得したaccess/refresh tokenだけをAndroid KeystoreのAES-GCM鍵で
-暗号化して保持する。
 
 ```sh
 cd mentra-os
 bash gradlew assembleDebug
 scripts/install-field-capture.sh
 ```
+
+更新スクリプトは撮影・保存・キャリブレーションのサービスが動いていないことを確認してから
+APKを上書きする。処理中または状態を確認できない場合は中止する。更新が終わるまで撮影操作は行わない。
 
 `SYSTEM_ALERT_WINDOW`はAndroid 11のbackground activity launch制限下で、画面消灯中に開始した
 camera foreground serviceが撮影Activityを前面化するための固定端末用セットアップ権限である。
@@ -121,7 +195,7 @@ macOSではMentraがnative USB backendに現れずlibusb backendで安定して�
 
 ### 現場での開始・停止
 
-初回セットアップ後はスマートフォン、Bluetooth、ADBを必要としない。
+初回セットアップ後の撮影は、Mentra Live単体で操作できる。PCへの接続は撮影データを取り込む際に行う。
 
 1. Mentra Liveの電源を入れて装着する。
 2. アクションボタンを通常押しする。瞬間的に弾かず、押し込んでから長押し判定になる前に離す。
@@ -130,11 +204,11 @@ macOSではMentraがnative USB backendに現れずlibusb backendで安定して�
 4. 終了時に同じアクションボタンをもう一度通常押しする。録画中または確定中の操作は、新規開始ではなく
    現在のsessionの停止として扱う。
 5. 「撮影ストップ」は停止要求の受理を表す。成功時の保存音声は鳴らさず、失敗時だけ案内する。
-   30分実測ではMP4とsidecarの確定に約51秒かかったため、停止後約1分は電源を切らない。
+   保存完了またはPC取り込み完了を確認するまで電源を切らない。以前の30分実測では確定に約51秒かかっており、
+   長時間録画の確定時間を一律1分とは見積もらない。
 
 RootLens APKは通常撮影の録画入力としてAndroid標準`MIC`を所有するが、スピーカー出力用I2SとUARTは操作しない。
-`capture_start_received`、`capture_stop_received`、`capture_failed`、`calibration_instructions`と
-3種類のupload feedbackの
+`capture_start_received`、`capture_stop_received`、`capture_failed`、`calibration_instructions`の
 allowlist済みsemantic eventだけをASG forkへ明示Intentで渡し、
 ASGの既存`I2SAudioController`がMediaPlayerとK900 commandを同一processで所有する。ASGはI2S停止後に
 touch reportingを冪等に再有効化する。feedback再生に失敗しても撮影state/effectは取り消さないが、
@@ -155,7 +229,7 @@ RootLensが未導入、無効、または配送不能でもCameraNeoへfallback�
 `IDLE`または次の長押しを待つ`PENDING(count, first, last, deadline, revision)`、deadlineは
 `min(直前の押下+8秒, 最初の押下+30秒)`とする。各受理回はMentra標準`click_sound.wav`を一度鳴らす。
 deadlineまでに5回目へ到達した場合だけ隠しRGB/IMUキャリブレーションを起動し、1〜4回目で
-deadlineを過ぎた場合はuploadを一度だけ明示起動する。1秒未満の重複firmware reportは状態も期限も
+deadlineを過ぎた場合は待機状態へ戻る。1秒未満の重複firmware reportは状態も期限も
 進めない。通常押しは期限内のPENDINGを取消して通常撮影toggleへ進み、古いtimeout callbackは
 revision不一致でno-opになる。通常押し・長押しのどちらからもstock写真・stock動画は始まらない。
 
@@ -165,7 +239,7 @@ revision不一致でno-opになる。通常押し・長押しのどちらから�
 visual global motionとraw gyro magnitudeの相関から
 offsetを求め、全体相関、peak prominence、受理window数、window間MAD、全体推定との一致をすべて通した
 場合だけ値を採用する。通常押しは録画・確定・解析のどの段階でもキャリブレーション全体の中止を意味し、
-通常撮影の開始には解釈しない。`calibration-*`成果物はupload scannerの対象外で、成功時は端末から削除、
+通常撮影の開始には解釈しない。`calibration-*`成果物はPCへの取り込み対象外で、成功時は端末から削除、
 解析失敗時は診断用に残す。
 
 RootLensは物理入力待ちの常駐serviceを持たず、`READ_LOGS`やlogcat監視も使わない。ASGの明示broadcastが
@@ -173,7 +247,7 @@ RootLensは物理入力待ちの常駐serviceを持たず、`READ_LOGS`やlogcat
 reducerが同じcommand IDの再配送をno-opにする。
 
 撮影sessionの制御規則はAndroid serviceから分離したpure reducerに置く。
-`state × event -> next state + effects`だけを計算し、`CaptureService`はcamera、timer、feedback、uploadを
+`state × event -> next state + effects`だけを計算し、`CaptureService`はcamera、timer、feedbackを
 effectとして実行する。feedback effectはASGへsemantic eventを送るだけでhardware routeを操作しない。START/STOPの
 重複はno-op、timerとcamera callbackはclipごとのgenerationが
 一致する場合だけ受理する。これにより、開始待ち中のSTOP後に古いtimerがcameraを開くことや、
@@ -217,56 +291,9 @@ unit test・lint・build済みで実機へ導入済み。stock ASGは復元可�
 実機v0.1.19ではsegment上限を一時的に15秒へ短縮した35秒sessionを使い、開始3秒後に画面を
 強制消灯した。generation 1/2/3の3 clipをすべて確定し、generation 2のopen前に
 `RootLensMentra:camera-start` wake lockで`Asleep`から復帰した。`CAMERA_DISABLED`は再発しなかった。
-検証clipはproduction upload対象から外して`recordings/test-archive/`へ移し、端末には30分設定の
+検証clipは`recordings/test-archive/`へ移し、端末には30分設定の
 APKを再導入した。
 
-## アップロード
-
-固定端末の初回セットアップ時は、資格情報をshell引数やログへ出さないQR provisioning scriptを使う。
-
-```sh
-cd mentra-os
-scripts/provision-from-qr.sh ../web/accounts-out/bakery_01.png
-```
-
-scriptはQRをPC上でdecodeし、mode 0600の一時JSONをアプリ専用外部directoryへpushする。
-端末は資格情報を読み取ると直ちにJSONを削除し、取得したaccess/refresh tokenだけをAndroid
-KeystoreのAES-GCM鍵で暗号化して保持する。statusにはlogin IDと成否だけを残し、password/tokenは
-書かない。
-
-録画終了時にはuploadを開始しない。長押しシーケンスが1〜4回で期限切れになった場合、または画面の
-`Upload all pending clips`を明示操作した場合だけ、端末内の完了済み未送信clipへ次を実行する。
-
-1. `POST /api/v1/raw-uploads` で `recordingConfig=mentra` のpresigned URLを取得。
-2. 必須4ファイル（`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json`）を
-   `rootlens-raw-mentra/raw/<content_hash>/`へstreaming PUT。
-   各成功後に `upload_state.json` を更新。内部QA用`sync_report.json`はアップロードしない。
-3. 全PUT後に `POST /api/clips` で登録。
-4. API登録の成功後、schema・登録済みflag・content hash・全4ファイル名を含むupload receiptを
-   `AtomicFile`でfsyncしてからだけ削除へ進む。receipt検証済みclipをtombstoneへrenameし、receiptを
-   最後まで残してpayloadを削除する。削除途中で再起動しても次回の明示upload scanで安全に消し切る。
-
-`metadata.json` の `files` はR2に納品される上記4ファイルを列挙する。
-`camera_frames.raw.jsonl`、`sync_report.json`、`content_hash.txt`は端末内で整合性確認と
-アップロード処理に使う補助ファイルであり、R2には納品せず、登録成功時にclipと一緒に削除する。
-
-明示commandのscanで、pending clip、保存済みaccount session、validated Wi-Fiを確認できた場合だけ
-`upload_started.mp3`を鳴らす。未送信clipが0件ならfeedbackは鳴らさない。開始条件を満たさない場合
-または処理途中で失敗した場合は`upload_unavailable.mp3`、全対象の登録と削除まで完了した場合は
-`upload_complete.mp3`を鳴らす。
-Wi-Fi復帰、端末boot、録画停止を契機とする自動再送Jobは持たない。
-
-端末からPCへ救出したclipを直接R2へ戻す場合は、次を使う。
-
-```sh
-cd web
-node scripts/r2_mentra_upload.mjs <clip-directory> <content-hash>
-```
-
-`rgb.mp4`のSHA-256をkeyと照合してから契約上の4ファイルだけをアップロードし、R2のsizeと
-Content-Typeを各PUT後に検証する。`metadata.json`は最後に置く。これはR2オブジェクト救出用であり、
-account認証が必要な`POST /api/clips`登録やローカル削除は行わない。
-
-一回の明示command内ではPUTを最大4回まで再試行する。失敗後の次回明示commandではcheckpointから
-成功済みファイルを飛ばして再開する。upload中に届いた追加commandは同時実行も後続scanも作らず、
-進行中の1回へまとめる。物理command IDの重複配送も永続記録によりno-opにする。
+`metadata.json` の `files` はPCへ取り込む4ファイルを列挙する。
+`camera_frames.raw.jsonl`、`sync_report.json`、`content_hash.txt`は端末内の監査・整合性確認に使う
+補助ファイルとして保持する。

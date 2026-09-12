@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+receiver-ios/.build/
+firmware/build/
+firmware/components/
+firmware/main/upstream/
+firmware/managed_components/
+firmware/sensor-controller/
+firmware/sdkconfig
+firmware/sdkconfig.old

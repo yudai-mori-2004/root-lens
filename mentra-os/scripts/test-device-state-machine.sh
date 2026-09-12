@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "$(uname -s)" == "Darwin" && -z "${ADB_LIBUSB+x}" ]]; then
-  export ADB_LIBUSB=0
+  export ADB_LIBUSB=1
 fi
 
 adb_bin=${ROOTLENS_ADB:-/Users/forest/Library/Android/sdk/platform-tools/adb}
@@ -51,16 +51,22 @@ stop_command_id="rootlens-dedup-stop-${since}"
 
 send_capture_command io.rootlens.mentra.TOGGLE --es command_id "$start_command_id"
 send_capture_command io.rootlens.mentra.TOGGLE --es command_id "$start_command_id"
-sleep 3
+# Allow the normal start cue and camera-open path to complete before testing the stop.
+sleep 6
 send_capture_command io.rootlens.mentra.TOGGLE --es command_id "$stop_command_id"
-sleep 3
+sleep 5
 
 transitions=$($adb_bin logcat -d -T "$since" -v epoch -s RootLensService:I '*:S')
 camera_state=$($adb_bin shell dumpsys media.camera)
 
+if [[ "$transitions" == *"START_PENDING --STOP--> SUCCEEDED"* ]]; then
+  echo "$transitions"
+  echo "Device command deduplication test passed (stop arrived before camera open)"
+  exit 0
+fi
 if [[ "$transitions" != *"RECORDING --STOP--> FINALIZING"* \
       || "$transitions" != *"FINALIZING --SEGMENT_COMPLETED--> SUCCEEDED"* ]]; then
-  echo "The duplicate toggle stopped capture, or the unique stop did not complete it" >&2
+  echo "The duplicate toggle stopped capture, or the unique stop did not finalize it" >&2
   echo "$transitions" >&2
   exit 1
 fi

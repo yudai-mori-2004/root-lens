@@ -29,18 +29,20 @@ import java.util.concurrent.RejectedExecutionException;
 
 public final class CaptureService extends Service {
     private static final String TAG = "RootLensService";
-    private static final long STORAGE_FIXED_RESERVE_BYTES = 512L * 1024L * 1024L;
     private static final int MAX_CAMERA_OPEN_ATTEMPTS = 4;
     private static final long SESSION_WAKE_LOCK_TIMEOUT_MS =
             (AppContract.MAX_SESSION_SECONDS + 60L * 60L) * 1_000L;
     private static final String COMMAND_STATE = "capture_command_state";
     private static final String LAST_COMMAND_ID = "last_command_id";
+    private static final CaptureCommandPolicy COMMAND_POLICY = new CaptureCommandPolicy();
 
     private final ExecutorService serial = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ServiceCommandLifecycle lifecycle = new ServiceCommandLifecycle();
 
     private CaptureSessionReducer.State state = CaptureSessionReducer.State.idle();
     private CaptureEngine engine;
+    private DeviceOperationGate.Lease operationLease;
     private long engineGeneration;
     private long cameraOpenAttemptGeneration;
     private int cameraOpenAttemptCount;
@@ -48,6 +50,7 @@ public final class CaptureService extends Service {
     private Runnable pendingTimeLimit;
     private Runnable pendingStorageCheck;
     private int bitrateBps = AppContract.DEFAULT_BITRATE_BPS;
+    private long recordingStartedElapsedMs;
     private PowerManager.WakeLock wakeLock;
     private PowerManager.WakeLock screenWakeLock;
     private SharedPreferences commandState;
@@ -71,11 +74,14 @@ public final class CaptureService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!lifecycle.delivered(startId)) return START_NOT_STICKY;
         Intent command = intent == null
                 ? new Intent().setAction(AppContract.ACTION_STATUS)
                 : new Intent(intent);
         startForeground(AppContract.NOTIFICATION_ID, notification("Preparing"));
-        submit(() -> handle(command));
+        submit(() -> {
+            if (lifecycle.beginHandling(startId)) handle(command);
+        });
         return START_NOT_STICKY;
     }
 
@@ -86,22 +92,18 @@ public final class CaptureService extends Service {
 
     @Override
     public void onDestroy() {
+        lifecycle.destroy();
         mainHandler.removeCallbacksAndMessages(null);
-        try {
-            serial.execute(() -> {
-                cancelOpen();
-                cancelTimeLimit();
-                cancelStorageCheck();
-                CaptureEngine abandoned = engine;
-                engine = null;
-                engineGeneration = 0L;
-                if (abandoned != null) abandoned.stop();
-            });
-        } catch (RejectedExecutionException ignored) {
-        }
-        releaseLocks();
-        DeviceOperationGate.release(DeviceOperationGate.Owner.CAPTURE);
-        serial.shutdown();
+        submit(() -> {
+            cancelOpen();
+            cancelTimeLimit();
+            cancelStorageCheck();
+            if (engine == null) {
+                finishDestroyed();
+            } else {
+                engine.stop();
+            }
+        });
         super.onDestroy();
     }
 
@@ -111,7 +113,7 @@ public final class CaptureService extends Service {
         if (AppContract.ACTION_START.equals(action)) {
             beginStart(command);
         } else if (AppContract.ACTION_TOGGLE.equals(action)) {
-            if (state.phase == CaptureSessionReducer.Phase.IDLE) {
+            if (!state.isActive()) {
                 Intent start = new Intent()
                         .putExtra(AppContract.EXTRA_DURATION_SECONDS, AppContract.MAX_SESSION_SECONDS);
                 beginStart(start);
@@ -137,7 +139,19 @@ public final class CaptureService extends Service {
     private boolean acceptCommand(Intent command) {
         String commandId = command.getStringExtra(AppContract.EXTRA_COMMAND_ID);
         if (commandId == null) return true;
-        if (commandId.equals(commandState.getString(LAST_COMMAND_ID, null))) {
+        String persistedId = null;
+        try {
+            persistedId = commandState.getString(LAST_COMMAND_ID, null);
+        } catch (RuntimeException error) {
+            Log.e(TAG, "Could not read the previous physical capture command", error);
+        }
+        String action = command.getAction();
+        boolean stopping = AppContract.ACTION_STOP.equals(action)
+                || (AppContract.ACTION_TOGGLE.equals(action) && state.isActive());
+        CaptureCommandPolicy.Decision decision = COMMAND_POLICY.accept(
+                commandId, persistedId, stopping,
+                () -> commandState.edit().putString(LAST_COMMAND_ID, commandId).commit());
+        if (decision == CaptureCommandPolicy.Decision.DUPLICATE) {
             Log.i(TAG, "Ignoring duplicate capture command");
             if (state.isActive()) {
                 publishState();
@@ -146,19 +160,23 @@ public final class CaptureService extends Service {
             }
             return false;
         }
-        if (!commandState.edit().putString(LAST_COMMAND_ID, commandId).commit()) {
+        if (decision == CaptureCommandPolicy.Decision.REJECT) {
             dispatch(CaptureSessionReducer.Event.preflightFailed(
                     "Could not durably record the physical capture command"));
             return false;
+        }
+        if (decision == CaptureCommandPolicy.Decision.STOP_WITHOUT_PERSISTENCE) {
+            Log.e(TAG, "Could not persist the physical command; stopping capture nevertheless");
         }
         return true;
     }
 
     private void beginStart(Intent command) {
-        if (state.phase != CaptureSessionReducer.Phase.IDLE) {
+        if (state.isActive()) {
             publishState();
             return;
         }
+        recordingStartedElapsedMs = 0L;
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                 || checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                         != PackageManager.PERMISSION_GRANTED) {
@@ -166,7 +184,8 @@ public final class CaptureService extends Service {
                     "Camera and microphone permissions are required"));
             return;
         }
-        if (!DeviceOperationGate.tryAcquire(DeviceOperationGate.Owner.CAPTURE)) {
+        operationLease = DeviceOperationGate.tryAcquire(DeviceOperationGate.Owner.CAPTURE);
+        if (operationLease == null) {
             dispatch(CaptureSessionReducer.Event.preflightFailed(
                     "Another camera operation is active"));
             return;
@@ -177,15 +196,20 @@ public final class CaptureService extends Service {
                 AppContract.EXTRA_BITRATE_BPS, AppContract.DEFAULT_BITRATE_BPS);
         requestedBitrate = Math.max(2_000_000, Math.min(12_000_000, requestedBitrate));
 
-        File root = recordingsRoot();
-        int reservedSeconds = Math.min(requested, AppContract.STORAGE_PREFLIGHT_SECONDS);
-        long estimatedBytes = Math.round(reservedSeconds * (requestedBitrate / 8.0) * 1.20)
-                + STORAGE_FIXED_RESERVE_BYTES;
-        long availableBytes = new StatFs(root.getAbsolutePath()).getAvailableBytes();
-        if (availableBytes < estimatedBytes) {
+        try {
+            File root = recordingsRoot();
+            int reservedSeconds = Math.min(requested, AppContract.STORAGE_PREFLIGHT_SECONDS);
+            long estimatedBytes = CaptureStorageBudget.preflightBytes(reservedSeconds, requestedBitrate);
+            long availableBytes = new StatFs(root.getAbsolutePath()).getAvailableBytes();
+            if (availableBytes < estimatedBytes) {
+                dispatch(CaptureSessionReducer.Event.preflightFailed(
+                        "Insufficient storage: need " + estimatedBytes
+                                + " bytes including margin, available " + availableBytes));
+                return;
+            }
+        } catch (RuntimeException error) {
             dispatch(CaptureSessionReducer.Event.preflightFailed(
-                    "Insufficient storage: need " + estimatedBytes
-                            + " bytes including margin, available " + availableBytes));
+                    "Cannot inspect recording storage: " + error));
             return;
         }
 
@@ -251,10 +275,12 @@ public final class CaptureService extends Service {
     }
 
     private void scheduleOpen(long generation, long delayMs) {
+        if (lifecycle.isDestroyed()) return;
         cancelOpen();
         wakeCameraAccessPath();
         Runnable[] callback = new Runnable[1];
         callback[0] = () -> submit(() -> {
+            if (lifecycle.isDestroyed()) return;
             if (pendingOpen != callback[0]) return;
             pendingOpen = null;
             dispatch(CaptureSessionReducer.Event.openTimer(generation));
@@ -270,7 +296,7 @@ public final class CaptureService extends Service {
     }
 
     private void openSegment(long generation) {
-        if (state.phase != CaptureSessionReducer.Phase.OPENING
+        if (lifecycle.isDestroyed() || state.phase != CaptureSessionReducer.Phase.OPENING
                 || state.generation != generation) return;
         if (engine != null) {
             dispatch(CaptureSessionReducer.Event.segmentFailed(
@@ -293,6 +319,11 @@ public final class CaptureService extends Service {
                     }
 
                     @Override
+                    public void onCancelled(File directory) {
+                        submit(() -> segmentCancelled(holder[0], generation, directory));
+                    }
+
+                    @Override
                     public void onFailed(File directory, Throwable error) {
                         submit(() -> segmentFailed(holder[0], generation, directory, error));
                     }
@@ -303,22 +334,8 @@ public final class CaptureService extends Service {
         try {
             next.start();
         } catch (IOException | CameraAccessException | RuntimeException error) {
-            if (engine == next && engineGeneration == generation) {
-                engine = null;
-                engineGeneration = 0L;
-                if (shouldRetryCameraOpen(error, attempt)) {
-                    Log.w(TAG, "Camera access unavailable; waking foreground path and retrying "
-                            + attempt + "/" + MAX_CAMERA_OPEN_ATTEMPTS, error);
-                    dispatch(CaptureSessionReducer.Event.segmentOpenRetry(
-                            generation,
-                            path(next.directory()),
-                            "Camera access retry " + attempt + "/" + MAX_CAMERA_OPEN_ATTEMPTS));
-                } else {
-                    Log.e(TAG, "Capture start failed", error);
-                    dispatch(CaptureSessionReducer.Event.segmentFailed(
-                            generation, path(next.directory()), error.toString()));
-                }
-            }
+            // CaptureEngine reports failure after releasing resources, including start failures.
+            Log.w(TAG, "Capture start rejected on attempt " + attempt, error);
         }
     }
 
@@ -343,6 +360,11 @@ public final class CaptureService extends Service {
             File directory,
             DeviceProbe.Snapshot probe) {
         if (!owns(source, generation)) return;
+        if (lifecycle.isDestroyed()) {
+            source.stop();
+            return;
+        }
+        recordingStartedElapsedMs = SystemClock.elapsedRealtime();
         String guarantee = probe.androidElapsedRealtimeComparable()
                 ? "HAL REALTIME / physical source unverified"
                 : "HAL UNKNOWN / empirical mapping only";
@@ -356,6 +378,10 @@ public final class CaptureService extends Service {
         if (!owns(source, generation)) return;
         engine = null;
         engineGeneration = 0L;
+        if (lifecycle.isDestroyed()) {
+            finishDestroyed();
+            return;
+        }
         dispatch(CaptureSessionReducer.Event.segmentCompleted(generation, path(directory)));
     }
 
@@ -364,9 +390,35 @@ public final class CaptureService extends Service {
         if (!owns(source, generation)) return;
         engine = null;
         engineGeneration = 0L;
+        if (lifecycle.isDestroyed()) {
+            finishDestroyed();
+            return;
+        }
+        if (state.phase == CaptureSessionReducer.Phase.OPENING
+                && shouldRetryCameraOpen(error, cameraOpenAttemptCount)) {
+            Log.w(TAG, "Camera access unavailable; waking foreground path and retrying "
+                    + cameraOpenAttemptCount + "/" + MAX_CAMERA_OPEN_ATTEMPTS, error);
+            dispatch(CaptureSessionReducer.Event.segmentOpenRetry(
+                    generation,
+                    path(directory),
+                    "Camera access retry " + cameraOpenAttemptCount
+                            + "/" + MAX_CAMERA_OPEN_ATTEMPTS));
+            return;
+        }
         Log.e(TAG, "Capture failed", error);
         dispatch(CaptureSessionReducer.Event.segmentFailed(
                 generation, path(directory), error == null ? "Capture failed" : error.toString()));
+    }
+
+    private void segmentCancelled(CaptureEngine source, long generation, File directory) {
+        if (!owns(source, generation)) return;
+        engine = null;
+        engineGeneration = 0L;
+        if (lifecycle.isDestroyed()) {
+            finishDestroyed();
+            return;
+        }
+        dispatch(CaptureSessionReducer.Event.segmentCancelled(generation, path(directory)));
     }
 
     private boolean owns(CaptureEngine source, long generation) {
@@ -374,9 +426,11 @@ public final class CaptureService extends Service {
     }
 
     private void scheduleTimeLimit(long generation, long delayMs) {
+        if (lifecycle.isDestroyed()) return;
         cancelTimeLimit();
         Runnable[] callback = new Runnable[1];
         callback[0] = () -> submit(() -> {
+            if (lifecycle.isDestroyed()) return;
             if (pendingTimeLimit != callback[0]) return;
             pendingTimeLimit = null;
             dispatch(CaptureSessionReducer.Event.timeLimitReached(generation));
@@ -392,15 +446,24 @@ public final class CaptureService extends Service {
     }
 
     private void scheduleStorageCheck(long generation, long delayMs) {
+        if (lifecycle.isDestroyed()) return;
         cancelStorageCheck();
         Runnable[] callback = new Runnable[1];
         callback[0] = () -> submit(() -> {
+            if (lifecycle.isDestroyed()) return;
             if (pendingStorageCheck != callback[0]) return;
             pendingStorageCheck = null;
             if (state.phase != CaptureSessionReducer.Phase.RECORDING
                     || state.generation != generation) return;
-            long availableBytes = new StatFs(recordingsRoot().getAbsolutePath()).getAvailableBytes();
-            if (availableBytes <= STORAGE_FIXED_RESERVE_BYTES) {
+            long availableBytes;
+            try {
+                availableBytes = new StatFs(recordingsRoot().getAbsolutePath()).getAvailableBytes();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Storage monitoring failed; finalizing while storage may still be writable", error);
+                dispatch(CaptureSessionReducer.Event.storageLimitReached(generation));
+                return;
+            }
+            if (availableBytes <= currentStorageReserveBytes()) {
                 dispatch(CaptureSessionReducer.Event.storageLimitReached(generation));
             } else {
                 scheduleStorageCheck(
@@ -427,14 +490,12 @@ public final class CaptureService extends Service {
     }
 
     private void finishSucceeded() {
-        releaseLocks();
-        DeviceOperationGate.release(DeviceOperationGate.Owner.CAPTURE);
+        releaseOperation();
         stopForegroundAndSelf();
     }
 
     private void finishFailed() {
-        releaseLocks();
-        DeviceOperationGate.release(DeviceOperationGate.Owner.CAPTURE);
+        releaseOperation();
         CaptureFeedback.failed(this);
         stopForegroundAndSelf();
     }
@@ -459,7 +520,7 @@ public final class CaptureService extends Service {
                     : "HAL UNKNOWN; only an empirical cross-timebase mapping is available";
             writeStatus("probe_complete", summary, output);
             updateNotification(summary);
-        } catch (IOException | JSONException error) {
+        } catch (IOException | JSONException | RuntimeException error) {
             writeStatus("failed", "Probe failed: " + error, null);
             updateNotification("Probe failed");
         }
@@ -516,9 +577,19 @@ public final class CaptureService extends Service {
     }
 
     private File recordingsRoot() {
-        File root = new File(getExternalFilesDir(null), "recordings");
-        if (!root.exists()) root.mkdirs();
+        File external = getExternalFilesDir(null);
+        if (external == null) throw new IllegalStateException("External recording storage unavailable");
+        File root = new File(external, "recordings");
+        if (!root.isDirectory() && !root.mkdirs()) {
+            throw new IllegalStateException("Cannot create recording directory: " + root);
+        }
         return root;
+    }
+
+    private long currentStorageReserveBytes() {
+        long elapsedMs = recordingStartedElapsedMs == 0L ? 0L
+                : Math.max(0L, SystemClock.elapsedRealtime() - recordingStartedElapsedMs);
+        return CaptureStorageBudget.finalizationReserveBytes(elapsedMs);
     }
 
     private void writeStatus(String status, String message, File artifact) {
@@ -533,11 +604,11 @@ public final class CaptureService extends Service {
                     .put("remaining_seconds", state.remainingSeconds)
                     .put("completed_clip_count", state.completedClipCount)
                     .put("logical_session_active", state.isActive())
-                    .put("storage_stop_reserve_bytes", STORAGE_FIXED_RESERVE_BYTES)
+                    .put("storage_stop_reserve_bytes", currentStorageReserveBytes())
                     .put("artifact", artifact == null
                             ? JSONObject.NULL : artifact.getAbsolutePath());
             SessionArtifacts.writeJson(new File(recordingsRoot(), "status.json"), value);
-        } catch (IOException | JSONException error) {
+        } catch (IOException | JSONException | RuntimeException error) {
             Log.e(TAG, "Status write failed", error);
         }
     }
@@ -561,8 +632,23 @@ public final class CaptureService extends Service {
     }
 
     private void stopForegroundAndSelf() {
-        stopForeground(false);
-        stopSelf();
+        int finishedStartId = lifecycle.handledStartId();
+        mainHandler.post(() -> {
+            if (lifecycle.canStop(finishedStartId) && stopSelfResult(finishedStartId)) {
+                stopForeground(false);
+            }
+        });
+    }
+
+    private void releaseOperation() {
+        releaseLocks();
+        DeviceOperationGate.release(operationLease);
+        operationLease = null;
+    }
+
+    private void finishDestroyed() {
+        releaseOperation();
+        serial.shutdown();
     }
 
     private void submit(Runnable task) {

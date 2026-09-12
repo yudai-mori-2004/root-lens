@@ -27,6 +27,11 @@ if [[ -z $("$ADB_BIN" shell pm path "$STOCK_PACKAGE" 2>/dev/null) ]]; then
   exit 1
 fi
 
+script_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+for capture_package in io.rootlens.mentra io.rootlens.mentra.debug; do
+  bash "${script_directory}/check-capture-idle.sh" "$ADB_BIN" "$capture_package"
+done
+
 rollback() {
   if [[ "$SWITCH_COMPLETE" == true ]]; then
     return

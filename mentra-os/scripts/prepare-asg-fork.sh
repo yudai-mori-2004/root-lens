@@ -36,14 +36,15 @@ fi
 
 ASSET_DIR="$ASG_DIR/app/src/main/assets/rootlens"
 mkdir -p "$ASSET_DIR"
+rm -f \
+  "$ASSET_DIR/upload_started.mp3" \
+  "$ASSET_DIR/upload_complete.mp3" \
+  "$ASSET_DIR/upload_unavailable.mp3"
 for ASSET_NAME in \
   capture_start \
   capture_stop \
   capture_failed \
-  calibration_instructions \
-  upload_started \
-  upload_complete \
-  upload_unavailable; do
+  calibration_instructions; do
   install -m 0644 \
     "$MENTRA_OS_DIR/app/src/main/res/raw/$ASSET_NAME.mp3" \
     "$ASSET_DIR/$ASSET_NAME.mp3"

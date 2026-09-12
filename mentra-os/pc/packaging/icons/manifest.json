@@ -1,0 +1,11 @@
+{
+  "source": "app/assets/icon.png",
+  "source_sha256": "94e5bcb5900e570b16a8f14f1f80cf5d8e0384f0253871b8f8d5614317b15d6d",
+  "conversion": "Unchanged PNG; proportional Qt smooth resizing into PNG-backed ICO and ICNS containers.",
+  "qt_version": "6.11.2",
+  "sha256": {
+    "rootlens_import/assets/rootlens.png": "94e5bcb5900e570b16a8f14f1f80cf5d8e0384f0253871b8f8d5614317b15d6d",
+    "packaging/icons/rootlens.ico": "f4f853ef632fb11da7720054e599f63669fc07d65bffd7800af69333e7d9efb9",
+    "packaging/icons/rootlens.icns": "664d16d806ce722f06685c68915fa7da828fc505f7e68517c50c40e3dd89ed0e"
+  }
+}

@@ -29,10 +29,16 @@ final class CaptureEngine {
     interface Listener {
         void onStarted(File directory, DeviceProbe.Snapshot probe);
         void onCompleted(File directory);
+        void onCancelled(File directory);
         void onFailed(File directory, Throwable error);
     }
 
     private static final String TAG = "RootLensCapture";
+    // Camera2 callbacks are asynchronous. Bound the time the service owns the camera gate when
+    // a driver never answers openCamera or createCaptureSession.
+    private static final long CAMERA_SETUP_TIMEOUT_MS = 10_000L;
+    private static final long FRAME_STALL_TIMEOUT_MS = 10_000L;
+    private static final long FRAME_WATCHDOG_INTERVAL_MS = 1_000L;
 
     private final Context context;
     private final long requestedDurationSeconds;
@@ -51,6 +57,11 @@ final class CaptureEngine {
     private MediaRecorder recorder;
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
+    private boolean cameraOpenPending;
+    private Runnable cameraSetupTimeout;
+    private Runnable frameWatchdog;
+    private long lastCompleteFrameElapsedNs;
+    private boolean stopRequested;
     private boolean recorderStarted;
     private volatile boolean acceptFrames;
     private long recorderStartWallMs;
@@ -81,21 +92,49 @@ final class CaptureEngine {
         try {
             probe = DeviceProbe.inspect(context);
             calibration = CalibrationStore.resolve(context, probe.cameraId);
-            File root = new File(context.getExternalFilesDir(null), "recordings");
+            File external = context.getExternalFilesDir(null);
+            if (external == null) {
+                throw new IOException("External recording storage unavailable");
+            }
+            File root = new File(external, "recordings");
+            if (!root.isDirectory() && !root.mkdirs()) {
+                throw new IOException("Cannot create recording directory: " + root);
+            }
             artifacts = calibrationCapture
                     ? SessionArtifacts.createCalibration(root)
                     : SessionArtifacts.create(root);
             rawImu = new RawImuRecorder(context);
             rawImu.start(artifacts.partialImu);
-            prepareRecorder();
 
             cameraThread.start();
             cameraHandler = new Handler(cameraThread.getLooper());
+            if (!cameraHandler.post(this::openCamera)) {
+                throw new IOException("Camera worker stopped before camera initialization");
+            }
+        } catch (IOException | RuntimeException error) {
+            failNow(error);
+            throw error;
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void openCamera() {
+        if (terminal.get()) return;
+        try {
+            prepareRecorder();
             CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            cameraOpenPending = true;
+            cameraSetupTimeout = () -> {
+                if (!terminal.get() && (cameraOpenPending || captureSession == null)) {
+                    failNow(new IOException("Camera setup timed out"));
+                }
+            };
+            cameraHandler.postDelayed(cameraSetupTimeout, CAMERA_SETUP_TIMEOUT_MS);
             manager.openCamera(probe.cameraId, cameraStateCallback, cameraHandler);
         } catch (IOException | CameraAccessException | RuntimeException error) {
-            fail(error);
-            throw error;
+            cameraOpenPending = false;
+            cancelCameraSetupTimeout();
+            failNow(error);
         }
     }
 
@@ -105,7 +144,12 @@ final class CaptureEngine {
             fail(new IOException("Capture was stopped before camera initialization"));
             return;
         }
-        handler.post(this::stopInternal);
+        if (!handler.post(() -> {
+            stopRequested = true;
+            if (!cameraOpenPending) stopInternal();
+        })) {
+            failNow(new IOException("Camera worker stopped before capture was finalized"));
+        }
     }
 
     File directory() {
@@ -114,6 +158,8 @@ final class CaptureEngine {
 
     private void prepareRecorder() throws IOException {
         recorder = new MediaRecorder();
+        recorder.setOnErrorListener((source, what, extra) -> fail(new IOException(
+                "MediaRecorder error: what=" + what + ", extra=" + extra)));
         boolean recordAudio = !calibrationCapture;
         if (recordAudio) recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
@@ -136,30 +182,42 @@ final class CaptureEngine {
     private final CameraDevice.StateCallback cameraStateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(CameraDevice camera) {
+            cameraOpenPending = false;
             if (terminal.get()) {
-                camera.close();
+                cancelCameraSetupTimeout();
+                try {
+                    camera.close();
+                } catch (RuntimeException error) {
+                    Log.w(TAG, "Could not close a late camera callback", error);
+                }
                 return;
             }
             cameraDevice = camera;
-            Surface recorderSurface = recorder.getSurface();
+            if (stopRequested) {
+                stopInternal();
+                return;
+            }
             try {
+                Surface recorderSurface = recorder.getSurface();
                 camera.createCaptureSession(
                         Collections.singletonList(recorderSurface), sessionStateCallback, cameraHandler);
-            } catch (CameraAccessException error) {
+            } catch (CameraAccessException | RuntimeException error) {
                 fail(error);
             }
         }
 
         @Override
         public void onDisconnected(CameraDevice camera) {
-            camera.close();
-            fail(new IOException("Camera disconnected"));
+            cameraOpenPending = false;
+            cancelCameraSetupTimeout();
+            closeFailedCamera(camera, new IOException("Camera disconnected"));
         }
 
         @Override
         public void onError(CameraDevice camera, int error) {
-            camera.close();
-            fail(new IOException("CameraDevice error " + error));
+            cameraOpenPending = false;
+            cancelCameraSetupTimeout();
+            closeFailedCamera(camera, new IOException("CameraDevice error " + error));
         }
     };
 
@@ -168,7 +226,11 @@ final class CaptureEngine {
                 @Override
                 public void onConfigured(CameraCaptureSession session) {
                     if (terminal.get() || cameraDevice == null) {
-                        session.close();
+                        try {
+                            session.close();
+                        } catch (RuntimeException error) {
+                            Log.w(TAG, "Could not close a late session callback", error);
+                        }
                         return;
                     }
                     captureSession = session;
@@ -198,6 +260,8 @@ final class CaptureEngine {
                         recorderStartElapsedNs = SystemClock.elapsedRealtimeNanos();
                         recorderStartMonotonicNs = System.nanoTime();
                         acceptFrames = true;
+                        cancelCameraSetupTimeout();
+                        startFrameWatchdog();
                         listener.onStarted(artifacts.directory, probe);
                     } catch (CameraAccessException | RuntimeException error) {
                         fail(error);
@@ -206,8 +270,14 @@ final class CaptureEngine {
 
                 @Override
                 public void onConfigureFailed(CameraCaptureSession session) {
-                    session.close();
-                    fail(new IOException("Camera capture session configuration failed"));
+                    cancelCameraSetupTimeout();
+                    Throwable failure = new IOException("Camera capture session configuration failed");
+                    try {
+                        session.close();
+                    } catch (RuntimeException error) {
+                        failure = withFailure(failure, error);
+                    }
+                    fail(failure);
                 }
             };
 
@@ -217,8 +287,10 @@ final class CaptureEngine {
                 public void onCaptureStarted(
                         CameraCaptureSession session, CaptureRequest request, long timestamp, long frameNumber) {
                     if (!acceptFrames) return;
-                    startedFrames.put(frameNumber, new StartedFrame(timestamp,
-                            SystemClock.elapsedRealtimeNanos(), System.nanoTime()));
+                    startedFrames.put(frameNumber, new StartedFrame(timestamp));
+                    if (startedFrames.size() > AppContract.FPS * 4) {
+                        fail(new IOException("Camera frame results stopped arriving"));
+                    }
                 }
 
                 @Override
@@ -246,17 +318,57 @@ final class CaptureEngine {
                     if (duration != null) frame.frameDurationNs = duration;
                     if (skew != null) frame.rollingShutterSkewNs = skew;
                     if (sensitivity != null) frame.sensitivityIso = sensitivity;
-                    artifacts.addCameraFrame(frame);
+                    try {
+                        if (rawImu.writeFailure() != null) throw rawImu.writeFailure();
+                        artifacts.addCameraFrame(frame);
+                        lastCompleteFrameElapsedNs = SystemClock.elapsedRealtimeNanos();
+                    } catch (IOException error) {
+                        fail(error);
+                    }
                 }
 
                 @Override
                 public void onCaptureFailed(
                         CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) {
+                    startedFrames.remove(failure.getFrameNumber());
                     captureFailureCount++;
                     Log.e(TAG, "Camera frame failed: reason=" + failure.getReason()
                             + " frame=" + failure.getFrameNumber());
                 }
             };
+
+    private void closeFailedCamera(CameraDevice camera, Throwable failure) {
+        try {
+            camera.close();
+        } catch (RuntimeException error) {
+            failure = withFailure(failure, error);
+        }
+        fail(failure);
+    }
+
+    private void startFrameWatchdog() {
+        lastCompleteFrameElapsedNs = SystemClock.elapsedRealtimeNanos();
+        frameWatchdog = new Runnable() {
+            @Override
+            public void run() {
+                if (terminal.get() || !acceptFrames) return;
+                long silentNs = SystemClock.elapsedRealtimeNanos() - lastCompleteFrameElapsedNs;
+                if (silentNs >= FRAME_STALL_TIMEOUT_MS * 1_000_000L) {
+                    failNow(new IOException("Camera stopped producing complete frame results"));
+                    return;
+                }
+                cameraHandler.postDelayed(this, FRAME_WATCHDOG_INTERVAL_MS);
+            }
+        };
+        cameraHandler.postDelayed(frameWatchdog, FRAME_WATCHDOG_INTERVAL_MS);
+    }
+
+    private void cancelFrameWatchdog() {
+        if (cameraHandler != null && frameWatchdog != null) {
+            cameraHandler.removeCallbacks(frameWatchdog);
+        }
+        frameWatchdog = null;
+    }
 
     private void setOpticalStabilizationOff(CaptureRequest.Builder builder) {
         int[] modes = probe.characteristics.get(
@@ -273,103 +385,170 @@ final class CaptureEngine {
 
     private void stopInternal() {
         if (!terminal.compareAndSet(false, true)) return;
-        acceptFrames = false;
+        cancelCameraSetupTimeout();
+        cancelFrameWatchdog();
         long stopWallMs = System.currentTimeMillis();
-        boolean recorderStopSucceeded = false;
-        try {
-            if (captureSession != null) {
+        boolean hadRecording = recorderStarted;
+        Throwable failure = stopHardware(null);
+        if (stopRequested && !hadRecording) {
+            failure = closeArtifacts(failure);
+            if (failure == null) {
                 try {
-                    captureSession.stopRepeating();
-                    captureSession.abortCaptures();
-                } catch (CameraAccessException | IllegalStateException error) {
-                    Log.w(TAG, "Could not drain camera session", error);
+                    artifacts.discardCancelled();
+                } catch (IOException error) {
+                    failure = error;
                 }
-                captureSession.close();
-                captureSession = null;
             }
-            if (cameraDevice != null) {
-                cameraDevice.close();
-                cameraDevice = null;
+            cameraThread.quitSafely();
+            if (failure == null) {
+                listener.onCancelled(directory());
+            } else {
+                if (artifacts != null) artifacts.failClip(failure);
+                listener.onFailed(directory(), failure);
             }
-            if (recorderStarted) {
-                recorder.stop();
-                recorderStopSucceeded = true;
-            }
-            releaseRecorder();
-            rawImu.stop();
-            File directory = artifacts.finalizeClip(
-                    probe,
-                    rawImu,
-                    requestedDurationSeconds,
-                    bitrateBps,
-                    recorderStartWallMs,
-                    recorderStartElapsedNs,
-                    recorderStartMonotonicNs,
-                    stopWallMs,
-                    recorderStopSucceeded,
-                    calibration,
-                    !calibrationCapture);
+            return;
+        }
+        File completed = null;
+        try {
+            if (failure != null) throw failure;
             if (captureFailureCount > 0) {
-                SessionArtifacts.writeText(new File(directory, "camera_capture_failures.txt"),
+                SessionArtifacts.writeText(new File(artifacts.directory, "camera_capture_failures.txt"),
                         Integer.toString(captureFailureCount) + "\n");
             }
-            listener.onCompleted(directory);
+            completed = artifacts.finalizeClip(
+                    probe, rawImu, requestedDurationSeconds, bitrateBps,
+                    recorderStartWallMs, recorderStartElapsedNs, recorderStartMonotonicNs,
+                    stopWallMs, hadRecording, calibration, !calibrationCapture);
         } catch (Throwable error) {
-            artifacts.failClip(error);
-            listener.onFailed(artifacts.directory, error);
+            failure = error;
         } finally {
+            failure = closeArtifacts(failure);
             cameraThread.quitSafely();
+        }
+        if (failure == null) {
+            artifacts.discardScratchIndexes();
+            listener.onCompleted(completed);
+        } else {
+            if (artifacts != null) artifacts.failClip(failure);
+            listener.onFailed(directory(), failure);
         }
     }
 
     private void fail(Throwable error) {
         Handler handler = cameraHandler;
         if (handler != null && Thread.currentThread() != cameraThread) {
-            handler.post(() -> fail(error));
-            return;
+            if (handler.post(() -> failNow(error))) return;
         }
-        if (!terminal.compareAndSet(false, true)) return;
-        acceptFrames = false;
-        try {
-            if (captureSession != null) captureSession.close();
-        } catch (RuntimeException ignored) {
-        }
-        try {
-            if (cameraDevice != null) cameraDevice.close();
-        } catch (RuntimeException ignored) {
-        }
-        if (recorderStarted) {
-            try {
-                recorder.stop();
-            } catch (RuntimeException ignored) {
-            }
-        }
-        releaseRecorder();
-        if (rawImu != null) rawImu.stop();
-        if (artifacts != null) artifacts.failClip(error);
-        listener.onFailed(directory(), error);
-        if (cameraHandler != null) cameraThread.quitSafely();
+        failNow(error);
     }
 
-    private void releaseRecorder() {
-        if (recorder == null) return;
-        try {
-            recorder.reset();
-        } catch (RuntimeException ignored) {
+    private void failNow(Throwable error) {
+        if (!terminal.compareAndSet(false, true)) return;
+        cancelCameraSetupTimeout();
+        cancelFrameWatchdog();
+        Throwable failure = stopHardware(error);
+        failure = closeArtifacts(failure);
+        if (artifacts != null) artifacts.failClip(failure);
+        if (cameraHandler != null) cameraThread.quitSafely();
+        listener.onFailed(directory(), failure);
+    }
+
+    private void cancelCameraSetupTimeout() {
+        if (cameraSetupTimeout == null || cameraHandler == null) return;
+        cameraHandler.removeCallbacks(cameraSetupTimeout);
+        cameraSetupTimeout = null;
+    }
+
+    /** Release every hardware resource even when MediaRecorder.stop or a driver throws. */
+    private Throwable stopHardware(Throwable failure) {
+        acceptFrames = false;
+        CameraCaptureSession session = captureSession;
+        captureSession = null;
+        if (session != null) {
+            try {
+                session.stopRepeating();
+                session.abortCaptures();
+            } catch (CameraAccessException | RuntimeException error) {
+                Log.w(TAG, "Could not drain camera session", error);
+            } finally {
+                try {
+                    session.close();
+                } catch (RuntimeException error) {
+                    failure = withFailure(failure, error);
+                }
+            }
         }
-        recorder.release();
+        CameraDevice camera = cameraDevice;
+        cameraDevice = null;
+        if (camera != null) {
+            try {
+                camera.close();
+            } catch (RuntimeException error) {
+                failure = withFailure(failure, error);
+            }
+        }
+        MediaRecorder activeRecorder = recorder;
         recorder = null;
+        if (activeRecorder != null) {
+            try {
+                if (recorderStarted) activeRecorder.stop();
+            } catch (RuntimeException error) {
+                failure = withFailure(failure, error);
+            } finally {
+                recorderStarted = false;
+                try {
+                    activeRecorder.reset();
+                } catch (RuntimeException error) {
+                    Log.w(TAG, "Could not reset media recorder", error);
+                }
+                try {
+                    activeRecorder.release();
+                } catch (RuntimeException error) {
+                    failure = withFailure(failure, error);
+                }
+            }
+        }
+        if (rawImu != null) {
+            try {
+                rawImu.stop();
+                if (rawImu.writeFailure() != null) failure = withFailure(failure, rawImu.writeFailure());
+            } catch (RuntimeException error) {
+                failure = withFailure(failure, error);
+            }
+        }
+        startedFrames.clear();
+        return failure;
+    }
+
+    private Throwable closeArtifacts(Throwable failure) {
+        if (rawImu != null) {
+            try {
+                rawImu.close();
+            } catch (RuntimeException error) {
+                failure = withFailure(failure, error);
+            }
+        }
+        if (artifacts != null) {
+            try {
+                artifacts.close();
+            } catch (IOException error) {
+                failure = withFailure(failure, error);
+            }
+        }
+        return failure;
+    }
+
+    private static Throwable withFailure(Throwable first, Throwable next) {
+        if (first == null) return next;
+        if (first != next) first.addSuppressed(next);
+        return first;
     }
 
     private static final class StartedFrame {
         final long timestampNs;
-        final long callbackElapsedNs;
-        final long callbackMonotonicNs;
 
-        StartedFrame(long timestampNs, long callbackElapsedNs, long callbackMonotonicNs) {
+        StartedFrame(long timestampNs) {
             this.timestampNs = timestampNs;
-            this.callbackElapsedNs = callbackElapsedNs;
-            this.callbackMonotonicNs = callbackMonotonicNs;
         }
     }
 }

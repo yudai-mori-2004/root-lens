@@ -1,0 +1,22 @@
+idf_component_register(
+    SRCS
+        "capture_main.c"
+        "eos2_wire.c"
+        "stereo_encoder.c"
+        "upstream/example_v4l2.c"
+    INCLUDE_DIRS
+        "."
+        "../include"
+        "upstream"
+    REQUIRES
+        esp_driver_uart
+        esp_event
+        esp_h264
+        esp_netif
+        esp_timer
+        esp_video
+        esp_wifi
+        fatfs
+        lwip
+        mbedtls
+)

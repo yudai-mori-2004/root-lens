@@ -8,13 +8,9 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final int CAPTURE_PERMISSION_REQUEST = 100;
@@ -22,9 +18,6 @@ public final class MainActivity extends Activity {
             Manifest.permission.CAMERA,
             Manifest.permission.RECORD_AUDIO
     };
-    private final ExecutorService accountWorker = Executors.newSingleThreadExecutor();
-    private RootLensAuth auth;
-    private TextView accountStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +25,6 @@ public final class MainActivity extends Activity {
         getWindow().addFlags(
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
-        auth = new RootLensAuth(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -44,6 +36,11 @@ public final class MainActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         root.addView(title);
 
+        TextView transferInstructions = new TextView(this);
+        transferInstructions.setText(R.string.usb_transfer_instructions);
+        transferInstructions.setPadding(0, 24, 0, 24);
+        root.addView(transferInstructions);
+
         Button probe = new Button(this);
         probe.setText(R.string.probe_hardware);
         probe.setOnClickListener(v -> send(AppContract.ACTION_PROBE));
@@ -51,12 +48,7 @@ public final class MainActivity extends Activity {
 
         Button start = new Button(this);
         start.setText(R.string.start_short_capture);
-        start.setOnClickListener(v -> {
-            Intent intent = new Intent(this, CaptureService.class);
-            intent.setAction(AppContract.ACTION_START);
-            intent.putExtra(AppContract.EXTRA_DURATION_SECONDS, 30);
-            startForegroundService(intent);
-        });
+        start.setOnClickListener(v -> startCapture(30));
         root.addView(start);
 
         Button startFiveHours = new Button(this);
@@ -68,51 +60,6 @@ public final class MainActivity extends Activity {
         stop.setText(R.string.stop_capture);
         stop.setOnClickListener(v -> send(AppContract.ACTION_STOP));
         root.addView(stop);
-
-        accountStatus = new TextView(this);
-        accountStatus.setText(auth.hasSession()
-                ? R.string.upload_account_signed_in : R.string.upload_account_signed_out);
-        root.addView(accountStatus);
-
-        EditText loginId = new EditText(this);
-        loginId.setHint(R.string.login_id_hint);
-        loginId.setSingleLine(true);
-        root.addView(loginId);
-
-        EditText password = new EditText(this);
-        password.setHint(R.string.password_hint);
-        password.setSingleLine(true);
-        password.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        root.addView(password);
-
-        Button login = new Button(this);
-        login.setText(R.string.sign_in_for_upload);
-        login.setEnabled(auth.isConfigured());
-        login.setOnClickListener(v -> {
-            accountStatus.setText(R.string.signing_in);
-            accountWorker.execute(() -> {
-                try {
-                    auth.login(loginId.getText().toString(), password.getText().toString());
-                    password.getText().clear();
-                    runOnUiThread(() -> accountStatus.setText(R.string.upload_account_signed_in));
-                } catch (Exception error) {
-                    runOnUiThread(() -> accountStatus.setText(
-                            getString(R.string.sign_in_failed, error.getMessage())));
-                }
-            });
-        });
-        root.addView(login);
-
-        Button upload = new Button(this);
-        upload.setText(R.string.upload_all_pending);
-        upload.setOnClickListener(v -> {
-            Intent intent = new Intent(this, UploadService.class);
-            intent.setAction(AppContract.ACTION_UPLOAD);
-            startForegroundService(intent);
-            accountStatus.setText(R.string.upload_requested);
-        });
-        root.addView(upload);
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(root);
@@ -140,11 +87,5 @@ public final class MainActivity extends Activity {
         intent.setAction(AppContract.ACTION_START);
         intent.putExtra(AppContract.EXTRA_DURATION_SECONDS, durationSeconds);
         startForegroundService(intent);
-    }
-
-    @Override
-    protected void onDestroy() {
-        accountWorker.shutdown();
-        super.onDestroy();
     }
 }

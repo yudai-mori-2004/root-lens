@@ -6,15 +6,13 @@ final class AppContract {
     static final String ACTION_TOGGLE = "io.rootlens.mentra.TOGGLE";
     static final String ACTION_PROBE = "io.rootlens.mentra.PROBE";
     static final String ACTION_STATUS = "io.rootlens.mentra.STATUS";
-    static final String ACTION_UPLOAD = "io.rootlens.mentra.UPLOAD";
     static final String ACTION_CALIBRATE = "io.rootlens.mentra.CALIBRATE";
     static final String ACTION_CANCEL_CALIBRATION = "io.rootlens.mentra.CANCEL_CALIBRATION";
-    static final String ACTION_PROVISION_ACCOUNT = "io.rootlens.mentra.PROVISION_ACCOUNT";
 
     static final String EXTRA_DURATION_SECONDS = "duration_seconds";
     static final String EXTRA_BITRATE_BPS = "bitrate_bps";
     static final String EXTRA_COMMAND_ID = "command_id";
-    static final String EXTRA_OPERATION_PREACQUIRED = "operation_preacquired";
+    static final String EXTRA_OPERATION_TOKEN = "operation_token";
 
     static final int WIDTH = 1920;
     static final int HEIGHT = 1080;
@@ -32,8 +30,6 @@ final class AppContract {
 
     static final String CHANNEL_ID = "rootlens_capture";
     static final int NOTIFICATION_ID = 4102;
-    static final int UPLOAD_NOTIFICATION_ID = 4103;
-    static final int PROVISION_NOTIFICATION_ID = 4105;
     static final int CALIBRATION_NOTIFICATION_ID = 4106;
 
     private AppContract() {}

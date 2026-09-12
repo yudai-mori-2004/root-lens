@@ -14,7 +14,12 @@ final class CaptureSessionReducerTest {
         staleLimitEventIsIgnored();
         cameraFailureFailsLoudly();
         manualStopDuringOpenDoesNotBecomeFailure();
+        failureDuringEarlyStopIsNotCancellation();
+        lateStartedDuringStopRetainsFailure();
+        cancellationAfterStartedIsRejected();
         failedFinalizationAfterRecordingFailsLoudly();
+        completedSessionAcceptsQueuedRestartWithNewGeneration();
+        failedSessionCanRetryAndReportAnotherPreflightFailure();
         System.out.println("CaptureSessionReducer tests passed");
     }
 
@@ -175,10 +180,49 @@ final class CaptureSessionReducerTest {
         CaptureSessionReducer.State finalizing = reduce(opening,
                 CaptureSessionReducer.Event.stop()).state;
         CaptureSessionReducer.Transition callback = reduce(finalizing,
-                CaptureSessionReducer.Event.segmentFailed(
-                        finalizing.generation, "/partial", "Stopped before open"));
+                CaptureSessionReducer.Event.segmentCancelled(finalizing.generation, "/partial"));
         require(callback.state.phase == CaptureSessionReducer.Phase.SUCCEEDED,
                 "intentional early stop succeeds");
+    }
+
+    private static CaptureSessionReducer.State stopWhileOpening() {
+        CaptureSessionReducer.State pending = reduce(CaptureSessionReducer.State.idle(),
+                CaptureSessionReducer.Event.start(60)).state;
+        CaptureSessionReducer.State opening = reduce(pending,
+                CaptureSessionReducer.Event.openTimer(pending.generation)).state;
+        return reduce(opening, CaptureSessionReducer.Event.stop()).state;
+    }
+
+    private static void failureDuringEarlyStopIsNotCancellation() {
+        CaptureSessionReducer.State stopping = stopWhileOpening();
+        CaptureSessionReducer.Transition failed = reduce(stopping,
+                CaptureSessionReducer.Event.segmentFailed(stopping.generation, "/partial", "Disk write failed"));
+        require(failed.state.phase == CaptureSessionReducer.Phase.FAILED,
+                "real I/O failure during early stop is announced");
+        require("/partial".equals(failed.state.artifactPath), "failed artifact remains identifiable");
+    }
+
+    private static void lateStartedDuringStopRetainsFailure() {
+        CaptureSessionReducer.State stopping = stopWhileOpening();
+        CaptureSessionReducer.Transition started = reduce(stopping,
+                CaptureSessionReducer.Event.segmentStarted(stopping.generation, "/clip", "recording"));
+        require(started.state.phase == CaptureSessionReducer.Phase.FINALIZING,
+                "late start does not restart recording");
+        require(started.effects.isEmpty(), "late start schedules no new guards or hardware work");
+        require("/clip".equals(started.state.artifactPath), "late start keeps artifact identity");
+        CaptureSessionReducer.Transition failed = reduce(started.state,
+                CaptureSessionReducer.Event.segmentFailed(stopping.generation, "/clip", "MP4 finalization failed"));
+        require(failed.state.phase == CaptureSessionReducer.Phase.FAILED,
+                "late-start finalization failure must not report success");
+    }
+
+    private static void cancellationAfterStartedIsRejected() {
+        CaptureSessionReducer.State stopping = reduce(recording(60),
+                CaptureSessionReducer.Event.stop()).state;
+        CaptureSessionReducer.Transition result = reduce(stopping,
+                CaptureSessionReducer.Event.segmentCancelled(stopping.generation, "/clip"));
+        require(result.state.phase == CaptureSessionReducer.Phase.FAILED,
+                "only a proven cancellation before recording is successful");
     }
 
     private static void failedFinalizationAfterRecordingFailsLoudly() {
@@ -190,6 +234,43 @@ final class CaptureSessionReducerTest {
                         finalizing.generation, "/partial", "MP4 finalization failed"));
         require(failed.state.phase == CaptureSessionReducer.Phase.FAILED,
                 "a started recording cannot report success when finalization fails");
+    }
+
+    private static void completedSessionAcceptsQueuedRestartWithNewGeneration() {
+        CaptureSessionReducer.State active = recording(60);
+        CaptureSessionReducer.State finalizing = reduce(active,
+                CaptureSessionReducer.Event.stop()).state;
+        CaptureSessionReducer.State completed = reduce(finalizing,
+                CaptureSessionReducer.Event.segmentCompleted(active.generation, "/clip")).state;
+        CaptureSessionReducer.Transition restarted = reduce(completed,
+                CaptureSessionReducer.Event.start(120));
+        require(restarted.state.phase == CaptureSessionReducer.Phase.START_PENDING,
+                "a queued start is accepted after finalization without service recreation");
+        require(restarted.state.generation == completed.generation + 1L,
+                "reusing the service retains a monotonically increasing generation");
+        require(effect(restarted, CaptureSessionReducer.EffectType.ACKNOWLEDGE_START) != null,
+                "the new session receives its start cue");
+        CaptureSessionReducer.Transition stale = reduce(restarted.state,
+                CaptureSessionReducer.Event.segmentCompleted(completed.generation, "/old-clip"));
+        require(stale.state == restarted.state && stale.effects.isEmpty(),
+                "the previous session's completion cannot finish the new session");
+    }
+
+    private static void failedSessionCanRetryAndReportAnotherPreflightFailure() {
+        CaptureSessionReducer.State failed = reduce(CaptureSessionReducer.State.idle(),
+                CaptureSessionReducer.Event.preflightFailed("Unavailable")).state;
+        CaptureSessionReducer.Transition retried = reduce(failed,
+                CaptureSessionReducer.Event.start(60));
+        require(retried.state.phase == CaptureSessionReducer.Phase.START_PENDING,
+                "a failed session accepts a later start");
+        require(retried.state.generation == failed.generation + 1L,
+                "retry uses a new generation");
+        CaptureSessionReducer.Transition rejected = reduce(failed,
+                CaptureSessionReducer.Event.preflightFailed("Still unavailable"));
+        require(rejected.state.phase == CaptureSessionReducer.Phase.FAILED,
+                "another failed preflight remains terminal");
+        require(effect(rejected, CaptureSessionReducer.EffectType.FINISH_FAILED) != null,
+                "a new failed preflight is reported and its service start is finished");
     }
 
     private static CaptureSessionReducer.State recording(long duration) {

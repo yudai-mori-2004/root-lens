@@ -1,0 +1,112 @@
+From 4fb8734d8b20f26b951a5bd9a80eaa6109c7ef1c Mon Sep 17 00:00:00 2001
+From: RootLens Hardware <hardware@rootlens.local>
+Date: Mon, 7 Sep 2026 12:00:00 +0900
+Subject: [PATCH] h264: allow 2D DMA input stride wider than encoded view
+
+The stereo camera is decoded as one 2560x720 packed YUV420 picture. Both
+1280x720 H.264 channels can read their half of that picture directly when the
+DMA picture width is 2560. This avoids copying 82.944 MB/s of image payload
+(165.888 MB/s including reads and writes) into two tight intermediate buffers.
+
+The default remains the encoded width, so existing callers are unchanged.
+---
+ esp_h264/hw/src/esp_h264_enc_hw_param.c         | 12 +++++++++++-
+ esp_h264/interface/include/esp_h264_enc_param_hw.h | 16 ++++++++++++++++
+ esp_h264/test_apps/main/test_case.c              |  9 +++++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/esp_h264/hw/src/esp_h264_enc_hw_param.c b/esp_h264/hw/src/esp_h264_enc_hw_param.c
+index c33a835..8d3235d 100644
+--- a/esp_h264/hw/src/esp_h264_enc_hw_param.c
++++ b/esp_h264/hw/src/esp_h264_enc_hw_param.c
+@@ -26,6 +26,7 @@ typedef struct esp_h264_param {
+     uint8_t                    qp_init;
+     uint32_t                   bitrate;
+     uint16_t                   width;
++    uint16_t                   input_stride_width;
+     uint16_t                   height;
+     uint8_t                    mb_width;
+     uint8_t                    mb_height;
+@@ -356,6 +357,7 @@ esp_h264_err_t esp_h264_enc_hw_new_param(esp_h264_enc_hw_param_cfg_t *cfg, esp_h
+     /* Parameter initalization */
+     param->device = cfg->device;
+     param->width = cfg->width;
++    param->input_stride_width = cfg->width;
+     param->height = cfg->height;
+     param->qp_init = (cfg->qp_min + cfg->qp_max) >> 1;
+     param->fps = cfg->fps;
+@@ -438,6 +440,16 @@ esp_h264_err_t esp_h264_enc_hw_get_mutex(esp_h264_enc_param_hw_handle_t handle,
+     return ESP_H264_ERR_OK;
+ }
+ 
++esp_h264_err_t esp_h264_enc_hw_set_input_stride_width(esp_h264_enc_param_hw_handle_t handle, uint16_t input_stride_width)
++{
++    ESP_H264_RET_ON_FALSE(handle, ESP_H264_ERR_ARG, TAG, "Invalid parameter handle");
++    esp_h264_param_t *param = __containerof(handle, esp_h264_param_t, hw_base);
++    uint16_t stride = input_stride_width ? input_stride_width : param->width;
++    ESP_H264_RET_ON_FALSE(stride >= param->width, ESP_H264_ERR_ARG, TAG, "Input stride width is smaller than encoded width");
++    param->input_stride_width = stride;
++    return ESP_H264_ERR_OK;
++}
++
+ bool esp_h264_enc_hw_take_force_idr(esp_h264_enc_param_hw_handle_t handle)
+ {
+     esp_h264_param_t *param = __containerof(handle, esp_h264_param_t, hw_base);
+@@ -493,7 +505,7 @@ esp_h264_err_t esp_h264_enc_hw_cfg_dma_yuv_bs(esp_h264_enc_param_hw_handle_t han
+     esp_h264_param_t *param = __containerof(handle, esp_h264_param_t, hw_base);
+     float hb = 96  / param->bpp;
+     cfg_dsc(dsc_yuv, H264_DMA_2D_ENABLE, H264_DMA_MODE1, H264_DMA_MACRO_SIZE, (int)hb, H264_DMA_EOF_CONTINUE, H264_DMA_OWNER_H264,
+-            param->height, param->width, buf_yuv, NULL);
++            param->height, param->input_stride_width, buf_yuv, NULL);
+     h264_dma_hal_cfg_yuv_dsc(dma2d_hal, (uint32_t)dsc_yuv);
+     cfg_dsc(dsc_bs, H264_DMA_2D_DISABLE, H264_DMA_MODE0, buf_bs_len & H264_DMA_MAX_SIZE, 0, H264_DMA_EOF_END, H264_DMA_OWNER_H264, (buf_bs_len >> H264_DMA_SIZE_BIT),
+             0, buf_bs, NULL);
+diff --git a/esp_h264/interface/include/esp_h264_enc_param_hw.h b/esp_h264/interface/include/esp_h264_enc_param_hw.h
+index b6db7e1..d821387 100644
+--- a/esp_h264/interface/include/esp_h264_enc_param_hw.h
++++ b/esp_h264/interface/include/esp_h264_enc_param_hw.h
+@@ -133,6 +133,22 @@ typedef struct {
+  */
+ typedef struct esp_h264_enc_hw_param_if *esp_h264_enc_param_hw_handle_t;
+ 
++/**
++ * @brief  Set the source picture width used by the H.264 input 2D DMA
++ *
++ * This permits encoding a horizontal view into a larger packed source picture
++ * without copying the view into a tightly packed intermediate buffer. Call it
++ * before opening the encoder. A value of zero restores the encoded width.
++ *
++ * @param[in]  handle              Hardware H.264 encoder parameter handle
++ * @param[in]  input_stride_width  Source picture width in pixels, or zero to use the encoded width
++ *
++ * @return
++ *       - ESP_H264_ERR_OK   Succeeded
++ *       - ESP_H264_ERR_ARG  The handle is NULL or the source width is smaller than the encoded width
++ */
++esp_h264_err_t esp_h264_enc_hw_set_input_stride_width(esp_h264_enc_param_hw_handle_t handle, uint16_t input_stride_width);
++
+ /**
+  * @brief  It is a pointer to the hardware H.264 encoding parameters structure
+  */
+diff --git a/esp_h264/test_apps/main/test_case.c b/esp_h264/test_apps/main/test_case.c
+index 7ffbc18..b012e3f 100644
+--- a/esp_h264/test_apps/main/test_case.c
++++ b/esp_h264/test_apps/main/test_case.c
+@@ -879,6 +879,15 @@ TEST_CASE("hw_enc_error_test", "[esp_h264]")
+ 
+     TEST_ASSERT_EQUAL(ESP_H264_ERR_OK, esp_h264_enc_dual_hw_get_param_hd1(enc_dual, &param_hd1));
+ 
++    /* source stride: NULL handle and a width smaller than the encoded picture are invalid */
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_ARG, esp_h264_enc_hw_set_input_stride_width(NULL, 256));
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_ARG, esp_h264_enc_hw_set_input_stride_width(param_hd0, 127));
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_OK, esp_h264_enc_hw_set_input_stride_width(param_hd0, 256));
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_OK, esp_h264_enc_hw_set_input_stride_width(param_hd1, 256));
++    /* zero restores tightly packed input for existing callers */
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_OK, esp_h264_enc_hw_set_input_stride_width(param_hd0, 0));
++    TEST_ASSERT_EQUAL(ESP_H264_ERR_OK, esp_h264_enc_hw_set_input_stride_width(param_hd1, 0));
++
+     /* enc is NULL */
+     TEST_ASSERT_EQUAL(ESP_H264_ERR_ARG, esp_h264_enc_dual_open(NULL));
+ 
+-- 
+2.51.0

@@ -1,0 +1,13 @@
+diff --git a/esp_video/examples/m2m/main/example_v4l2.c b/esp_video/examples/m2m/main/example_v4l2.c
+index 350369b..4f78987 100644
+--- a/esp_video/examples/m2m/main/example_v4l2.c
++++ b/esp_video/examples/m2m/main/example_v4l2.c
+@@ -28,7 +28,7 @@
+ #define M2M_USE_V4L2_CAPTURE_FORMAT (CONFIG_EXAMPLE_M2M_MODE_DECODE || CONFIG_EXAMPLE_M2M_MODE_PIPELINE)
+ 
+ #define CAP_BUFFER_COUNT         2
+-#define M2M_BUFFER_COUNT         1
++#define M2M_BUFFER_COUNT         2
+ #define SKIP_STARTUP_FRAME_COUNT 2
+ #define FORMAT_DESC_SIZE         32
+ #define MAX_FORMATS              16

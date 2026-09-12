@@ -1,0 +1,1 @@
+This H.264/AAC clip contains an AI-generated kitchen illustration and a synthetic audio track. It is used only to verify playback and capture the instruction screens. It contains no actual site recording. Image provenance is in ../../docs/assets/guide-kitchen-example.source.json.

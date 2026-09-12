@@ -1,0 +1,90 @@
+--- a/firmware/esp32_coprocessor_led_watchdog/esp32_coprocessor_led_watchdog.ino
++++ b/firmware/esp32_coprocessor_led_watchdog/esp32_coprocessor_led_watchdog.ino
+@@ -2,0 +3,3 @@
++ *
++ * Modified by RootLens for the Raspberry Pi 5 host: D8 is an active-low
++ * record button that emits one B0,LONG event after a 1.5 second hold.
+@@ -16,3 +19,3 @@
+- *   NeoPixels (UX)     -> D3 (GPIO1)
+- *   VSYNC Input        -> D0 (GPIO4)
+- *   GPIO LED (Sync)    -> D2 (GPIO2)
++ *   NeoPixels (UX)     -> D3 (GPIO4)
++ *   VSYNC Input        -> D0 (GPIO1)
++ *   GPIO LED (Sync)    -> D2 (GPIO3)
+@@ -21,3 +24,3 @@
+- *   UART TX (to Radxa) -> D6 (GPIO7)
+- *   UART RX (from Radxa)-> D7 (GPIO8)
+- *   Buzzer (reserved)  -> D8 (GPIO43)
++ *   UART TX (to Pi)    -> D6 (GPIO43)
++ *   UART RX (from Pi)  -> D7 (GPIO44)
++ *   Record button      -> D8 (active-low, internal pull-up)
+@@ -68 +71 @@
+-#define NEOPIXEL_PIN    D3      // GPIO1 - UX LEDs
++#define NEOPIXEL_PIN    D3      // GPIO4 - UX LEDs
+@@ -70,2 +73,2 @@
+-#define SYNC_LED_PIN    D2      // GPIO2 - Frame sync LED
+-#define INTERRUPT_PIN   D0      // GPIO4 - VSYNC input
++#define SYNC_LED_PIN    D2      // GPIO3 - Frame sync LED
++#define INTERRUPT_PIN   D0      // GPIO1 - VSYNC input
+@@ -74,3 +77,3 @@
+-#define BUZZER_PIN      D8      // GPIO43 - Reserved, not used yet
+-#define UART_TX_PIN     D6      // GPIO7
+-#define UART_RX_PIN     D7      // GPIO8
++#define RECORD_BUTTON_PIN D8     // GPIO7 - active-low record toggle
++#define UART_TX_PIN     D6      // GPIO43
++#define UART_RX_PIN     D7      // GPIO44
+@@ -89,0 +93,4 @@
++
++// --- Record button ---
++#define RECORD_BUTTON_LONG_PRESS_MS 1500
++#define RECORD_BUTTON_DEBOUNCE_MS      30
+@@ -210,0 +218,7 @@
++
++// Record button is handled without delays so IMU sampling and D2 sync timing continue.
++int recordButtonRawState = HIGH;
++int recordButtonStableState = HIGH;
++unsigned long recordButtonLastChangeMs = 0;
++unsigned long recordButtonPressedAtMs = 0;
++bool recordButtonLongSent = false;
+@@ -1015,0 +1030,31 @@
++// =================== RECORD BUTTON ==========================
++// ============================================================
++
++void handleRecordButton() {
++    unsigned long nowMs = millis();
++    int rawState = digitalRead(RECORD_BUTTON_PIN);
++
++    if (rawState != recordButtonRawState) {
++        recordButtonRawState = rawState;
++        recordButtonLastChangeMs = nowMs;
++    }
++
++    if ((nowMs - recordButtonLastChangeMs) >= RECORD_BUTTON_DEBOUNCE_MS &&
++        recordButtonStableState != recordButtonRawState) {
++        recordButtonStableState = recordButtonRawState;
++        if (recordButtonStableState == LOW) {
++            recordButtonPressedAtMs = nowMs;
++            recordButtonLongSent = false;
++        } else {
++            recordButtonLongSent = false;
++        }
++    }
++
++    if (recordButtonStableState == LOW && !recordButtonLongSent &&
++        (nowMs - recordButtonPressedAtMs) >= RECORD_BUTTON_LONG_PRESS_MS) {
++        RadxaSerial.println("B0,LONG;");
++        recordButtonLongSent = true;
++    }
++}
++
++// ============================================================
+@@ -1026,0 +1072,6 @@
++
++    // Initialize the active-low record button on D8.
++    pinMode(RECORD_BUTTON_PIN, INPUT_PULLUP);
++    recordButtonRawState = digitalRead(RECORD_BUTTON_PIN);
++    recordButtonStableState = recordButtonRawState;
++    recordButtonLastChangeMs = millis();
+@@ -1080,0 +1132,2 @@
++
++    handleRecordButton();

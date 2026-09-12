@@ -1,0 +1,20 @@
+{
+  "frames": 90,
+  "duration_seconds": 3.0003333333333333,
+  "observed_fps": 29.99666703699589,
+  "mean_mbps": 23.79875036107099,
+  "frame_bytes_p95": 102836,
+  "frame_bytes_p99": 103463,
+  "frame_bytes_max": 103463,
+  "one_second_mbps_p99": 24.451088,
+  "one_second_mbps_max": 24.451088,
+  "pts_gaps_over_50ms": 0,
+  "service_mbps_assumed": 32.0,
+  "service_margin_over_mean": 1.344608414916788,
+  "recommended_min_service_mbps_1_5x": 35.69812554160649,
+  "peak_buffer_mib": 0.09867000579833984,
+  "end_backlog_mib": 0.09694385528564453,
+  "buffer_overflow": false,
+  "raw_storage_GB_per_hour": 10.709437662481944,
+  "notes": "Payload-only deterministic model, not measured radio/SD performance. PTS gaps do not prove STRB alignment."
+}

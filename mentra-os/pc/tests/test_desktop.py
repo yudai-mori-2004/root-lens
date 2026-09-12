@@ -1,0 +1,325 @@
+"""Qt workflow checks with isolated local data and a fake USB importer."""
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import tempfile
+import threading
+import time
+import unittest
+from dataclasses import replace
+from unittest.mock import Mock, patch
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
+
+from rootlens_import import desktop
+from rootlens_import.core import ClipProgress, FILES, ImportCancelled, ImportFailure
+from rootlens_import.device_sync import SyncSummary
+from rootlens_import.library import recordings_directory
+from rootlens_import.site import SiteProfile, save_site_profile
+
+
+APPLICATION = QApplication.instance() or QApplication([])
+
+
+def wait_for(condition, timeout=5):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        APPLICATION.processEvents()
+        if condition():
+            return
+        time.sleep(0.01)
+    raise AssertionError("GUI work did not complete")
+
+
+def make_recording(root, index=0):
+    video = f"Synthetic fixture {index}, not real footage.".encode()
+    digest = hashlib.sha256(video).hexdigest()
+    name = f"rec-20260911T0000{index:02}.000Z"
+    clip = root / f"{name}-{digest[:12]}"
+    clip.mkdir()
+    (clip / "rgb.mp4").write_bytes(video)
+    (clip / "frames.jsonl").write_text('{}\n')
+    (clip / "imu.jsonl").write_text('{}\n')
+    (clip / "metadata.json").write_text(json.dumps({
+        "schema": "rootlens.mentra.raw.v1", "files": list(FILES), "content_hash": digest,
+        "created_at": f"2026-09-11T00:00:{index:02}.000Z", "actual_duration_ms": 1000,
+    }))
+    return clip
+
+
+class DesktopTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name).resolve()
+        self.profile_path = self.root / "config/site.json"
+        self.profile = SiteProfile("fixture-site", "説明用事業所", "https://drive.google.com/drive/folders/abcdefghij",
+                                   service_account={"test_only": True})
+        self.importer = Mock(return_value=SyncSummary(self.root, 0, 0, 0, 0))
+        self.window = desktop.ImportWindow(self.profile_path, self.root / "data", self.importer,
+                                           drive_reader=lambda profile, hashes, cancel_event: {})
+
+    def tearDown(self):
+        if self.window.busy:
+            self.window.cancel_event.set()
+            wait_for(lambda: not self.window.busy)
+        self.window.close()
+        APPLICATION.processEvents()
+        self.window.deleteLater()
+        APPLICATION.processEvents()
+        self.temporary.cleanup()
+
+    def populate(self, count=2):
+        root = recordings_directory(self.profile.site_id, self.root / "data")
+        clips = [make_recording(root, i) for i in range(count)]
+        self.window.set_profile(self.profile)
+        self.window._drive_checked({}, "")
+        for clip in clips:
+            self.window._clip_progress(ClipProgress(clip.name.rsplit('-', 1)[0], clip, 'ready'))
+        self.window._flush_progress()
+        return clips
+
+    def test_startup_does_not_show_local_copies_without_device_confirmation(self):
+        root = recordings_directory(self.profile.site_id, self.root / "data")
+        clip = make_recording(root)
+        save_site_profile(replace(self.profile, service_account=None), self.profile_path)
+        self.window._load_saved_profile()
+        self.importer.assert_not_called()
+        self.assertEqual(self.window.records, [])
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
+        self.assertEqual(self.window.connect_button.text(), "接続")
+        self.assertFalse(self.window.connect_button.isEnabled())
+
+    def test_first_launch_requires_site_before_connection(self):
+        self.assertFalse(self.window.connect_button.isEnabled())
+        self.window.start_import()
+        self.importer.assert_not_called()
+
+    def test_previous_next_follow_saved_recordings_and_release_old_source(self):
+        clips = self.populate()
+        self.assertEqual(self.window.preview.path, clips[0] / "rgb.mp4")
+        self.assertFalse(self.window.previous_button.isEnabled())
+        self.window.select_relative(1)
+        self.assertEqual(self.window.selected_recording().path, clips[1])
+        self.assertEqual(self.window.preview.path, clips[1] / "rgb.mp4")
+        self.assertFalse(self.window.next_button.isEnabled())
+        self.window.select_relative(1)
+        self.assertEqual(self.window.selected_recording().path, clips[1])
+        self.window.select_relative(-1)
+        self.assertEqual(self.window.preview.path, clips[0] / "rgb.mp4")
+
+    def test_one_connect_action_retries_and_prevents_overlapping_work(self):
+        self.populate(1)
+        release = threading.Event()
+        started = threading.Event()
+        calls = []
+        def importer(**kwargs):
+            calls.append(kwargs)
+            started.set()
+            release.wait(3)
+            return SyncSummary(kwargs['output'], 0, 1, 0, 0)
+        self.window.importer = importer
+        self.window.start_import()
+        self.assertTrue(started.wait(1))
+        self.window.start_import()
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(self.window.connect_button.isEnabled())
+        self.assertEqual(self.window.connect_button.text(), "接続")
+        release.set()
+        wait_for(lambda: not self.window.busy)
+        self.window.start_import()
+        wait_for(lambda: not self.window.busy)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(self.window.connect_button.isEnabled())
+
+    def test_drive_read_is_requested_only_from_the_device_sync_worker(self):
+        self.populate(1)
+        order = []
+        snapshots = {'a' * 64: object()}
+        reader = Mock(side_effect=lambda profile, hashes, cancel: order.append('drive') or snapshots)
+        self.window.drive_reader = reader
+        def importer(**kwargs):
+            order.append('device')
+            self.assertNotIn('drive_recordings', kwargs)
+            result = kwargs['drive_reader']({'a' * 64})
+            self.assertIs(result, snapshots)
+            kwargs['on_drive_checked'](result)
+            return SyncSummary(kwargs['output'])
+        self.window.importer = importer
+        self.window.start_import()
+        wait_for(lambda: not self.window.busy)
+        self.assertEqual(order, ['device', 'drive'])
+        reader.assert_called_once_with(self.profile, {'a' * 64}, self.window.cancel_event)
+        self.assertTrue(self.window.drive_synced)
+
+    def test_ready_progress_adds_clip_and_preserves_current_selection(self):
+        clips = self.populate(1)
+        added = make_recording(self.window.recordings_root, 1)
+        self.window._clip_progress(ClipProgress(added.name.rsplit('-', 1)[0], added, "ready"))
+        wait_for(lambda: len(self.window.records) == 2)
+        self.assertEqual(len(self.window.records), 2)
+        self.assertEqual(self.window.selected_recording().path, clips[0])
+        self.assertEqual(self.window.preview.path, clips[0] / 'rgb.mp4')
+
+    def test_pending_device_clips_are_visible_but_not_playable(self):
+        self.populate(1)
+        event = ClipProgress("rec-20260911T000099.000Z", None, "importing")
+        self.window._clip_progress(event)
+        self.window._clip_progress(event)
+        wait_for(lambda: self.window.recording_list.topLevelItemCount() == 2)
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 2)
+        pending = self.window.recording_list.topLevelItem(1)
+        self.assertEqual(pending.text(1), "取り込み中")
+        self.assertFalse(pending.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertEqual(len(self.window.records), 1)
+
+    def test_bulk_progress_is_batched_without_rescanning_local_files(self):
+        self.populate(1)
+        with patch.object(desktop, 'read_recording', wraps=desktop.read_recording) as scan:
+            for index in range(500):
+                self.window._clip_progress(ClipProgress(f'pending-{index}', None, 'discovering'))
+            self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
+            wait_for(lambda: self.window.recording_list.topLevelItemCount() == 501)
+            scan.assert_not_called()
+
+    def test_progress_preserves_library_scroll_position(self):
+        self.populate(40)
+        self.window.show()
+        APPLICATION.processEvents()
+        scrollbar = self.window.recording_list.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        position = scrollbar.value()
+        self.assertGreater(position, 0)
+        record = self.window.records[0]
+        self.window._clip_progress(ClipProgress(record.path.name.rsplit('-', 1)[0], record.path, 'verifying'))
+        wait_for(lambda: not self.window._refresh_timer.isActive())
+        self.assertEqual(scrollbar.value(), position)
+
+    def test_failed_checksum_blocks_only_affected_recording_until_ready(self):
+        clips = self.populate(2)
+        name = clips[0].name.rsplit('-', 1)[0]
+        self.window._clip_progress(ClipProgress(name, clips[0], 'error', 'checksum mismatch'))
+        self.assertIsNone(self.window.preview.path)
+        self.assertFalse(self.window.folder_button.isEnabled())
+        wait_for(lambda: not self.window._refresh_timer.isActive())
+        self.assertEqual(self.window.selected_recording().path, clips[1])
+        failed = self.window.recording_list.topLevelItem(0)
+        self.assertFalse(failed.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.window._clip_progress(ClipProgress(name, clips[0], 'verifying'))
+        wait_for(lambda: not self.window._refresh_timer.isActive())
+        self.assertFalse(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.window._clip_progress(ClipProgress(name, clips[0], 'ready'))
+        wait_for(lambda: not self.window._refresh_timer.isActive())
+        self.assertTrue(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
+
+    def test_show_folder_rechecks_all_four_files_before_revealing(self):
+        clips = self.populate(1)
+        (clips[0] / 'imu.jsonl').unlink()
+        with patch.object(desktop, 'reveal_folder') as reveal:
+            self.window.show_recording_folder()
+        reveal.assert_not_called()
+        self.assertFalse(self.window.records)
+        self.assertIsNone(self.window.preview.path)
+
+    def test_existing_recordings_remain_selectable_during_import(self):
+        clips = self.populate()
+        self.window.busy = True
+        self.window._update_controls()
+        self.window.select_relative(1)
+        self.assertEqual(self.window.preview.path, clips[1] / "rgb.mp4")
+        self.assertTrue(self.window.folder_button.isEnabled())
+        self.window.busy = False
+
+    def test_disconnect_keeps_copy_but_clears_device_list_and_allows_retry(self):
+        clips = self.populate(1)
+        self.window.importer = Mock(side_effect=ImportFailure("USB未接続"))
+        self.window.start_import()
+        wait_for(lambda: not self.window.busy)
+        self.assertIsNone(self.window.selected_recording())
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
+        self.assertTrue(clips[0].is_dir())
+        self.assertTrue(self.window.connect_button.isEnabled())
+        self.assertIn("USB未接続", self.window.status_label.text())
+
+    def test_show_folder_selects_whole_recording_and_drive_does_not_mark_uploaded(self):
+        clips = self.populate(1)
+        before = set(clips[0].iterdir())
+        with patch.object(desktop, 'reveal_folder') as reveal:
+            self.window.show_recording_folder()
+        reveal.assert_called_once_with(clips[0])
+        with patch.object(desktop.QDesktopServices, 'openUrl', return_value=True):
+            self.window.open_drive()
+        self.assertEqual(set(clips[0].iterdir()), before)
+        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "未アップロード")
+
+    def test_close_cancels_import_before_releasing_window(self):
+        self.populate(1)
+        def importer(cancel_event, **kwargs):
+            if not cancel_event.wait(3):
+                raise AssertionError("cancel not requested")
+            raise ImportCancelled("cancelled")
+        self.window.importer = importer
+        self.window.start_import()
+        self.window.close()
+        self.assertTrue(self.window.cancel_event.is_set())
+        self.assertTrue(self.window.closing)
+        wait_for(lambda: not self.window.busy)
+        self.assertIsNone(self.window.preview.path)
+
+    def test_profile_switch_is_rejected_while_importing(self):
+        self.populate(1)
+        self.window.busy = True
+        with self.assertRaises(ImportFailure):
+            self.window.set_profile(self.profile)
+        self.window.busy = False
+
+    def test_removed_file_disappears_from_library_and_preview(self):
+        clips = self.populate(1)
+        (clips[0] / "imu.jsonl").unlink()
+        self.window.refresh_recordings()
+        self.assertFalse(self.window.records)
+        self.assertIsNone(self.window.preview.path)
+
+    def test_new_connection_does_not_reuse_previous_device_rows(self):
+        self.populate(2)
+        self.window.start_import()
+        wait_for(lambda: not self.window.busy)
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
+        self.assertIsNone(self.window.preview.path)
+        self.assertNotIn("完了", self.window.count_label.text())
+        self.assertNotIn("取り込み済み", self.window.status_label.text())
+
+    def test_only_exact_device_verified_path_is_shown_with_same_recording_name(self):
+        clips = self.populate(1)
+        old = clips[0].with_name(clips[0].name.rsplit('-', 1)[0] + '-' + 'f' * 12)
+        old.mkdir()
+        for source in clips[0].iterdir():
+            (old / source.name).write_bytes(source.read_bytes())
+        metadata = json.loads((old / 'metadata.json').read_text())
+        metadata['content_hash'] = 'f' * 64
+        (old / 'metadata.json').write_text(json.dumps(metadata))
+        self.window.refresh_recordings()
+        self.assertEqual([r.path for r in self.window.records], clips)
+
+    def test_ready_after_drive_metadata_mismatch_is_visible(self):
+        clips = self.populate(1)
+        digest = self.window.records[0].content_hash
+        self.window.set_profile(self.profile)
+        self.window._drive_checked({digest: object()}, "")
+        self.window._clip_progress(ClipProgress(clips[0].name.rsplit('-', 1)[0], clips[0], 'ready'))
+        self.window._flush_progress()
+        self.assertEqual([r.path for r in self.window.records], clips)
+
+    def test_drive_saved_device_clip_has_no_row_even_without_any_local_copy(self):
+        self.window.set_profile(self.profile)
+        self.window._drive_checked({'a' * 64: object()}, "")
+        self.window._clip_progress(ClipProgress('rec-20260911T000001.000Z', None, 'drive_saved'))
+        self.window._flush_progress()
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
+        self.assertEqual(self.window.count_label.text(), 'アップロード待ち 0 件')
+
+
+if __name__ == '__main__':
+    unittest.main()

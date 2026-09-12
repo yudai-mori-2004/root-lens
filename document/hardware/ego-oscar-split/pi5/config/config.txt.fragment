@@ -1,0 +1,2 @@
+# Enable PL011 UART0 on Raspberry Pi 5 header GPIO14/GPIO15.
+dtoverlay=uart0-pi5

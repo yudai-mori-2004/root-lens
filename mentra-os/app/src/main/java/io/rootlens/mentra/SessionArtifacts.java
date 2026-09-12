@@ -4,6 +4,10 @@ import android.hardware.camera2.CameraMetadata;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.SystemClock;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -12,21 +16,27 @@ import org.json.JSONObject;
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 
-final class SessionArtifacts {
+final class SessionArtifacts implements java.io.Closeable {
+    private static final long CAMERA_PAIR_TOLERANCE_NS = (1_000_000_000L / AppContract.FPS) / 2;
     static final class FrameRecord {
         long frameNumber;
         long captureStartedTimestampNs;
@@ -45,6 +55,63 @@ final class SessionArtifacts {
         int flags;
     }
 
+    private static final class FrameRecords implements java.io.Closeable {
+        private final FixedRecordStore records;
+
+        FrameRecords(File file) throws IOException {
+            records = new FixedRecordStore(file, 9);
+        }
+
+        void add(FrameRecord frame) throws IOException {
+            records.append(frame.frameNumber, frame.captureStartedTimestampNs,
+                    frame.sensorTimestampNs, frame.callbackElapsedRealtimeNs,
+                    frame.callbackMonotonicNs, frame.exposureTimeNs,
+                    frame.frameDurationNs, frame.rollingShutterSkewNs, frame.sensitivityIso);
+        }
+
+        FrameRecord get(int index) throws IOException {
+            FrameRecord frame = new FrameRecord();
+            frame.frameNumber = records.get(index, 0);
+            frame.captureStartedTimestampNs = records.get(index, 1);
+            frame.sensorTimestampNs = records.get(index, 2);
+            frame.callbackElapsedRealtimeNs = records.get(index, 3);
+            frame.callbackMonotonicNs = records.get(index, 4);
+            frame.exposureTimeNs = records.get(index, 5);
+            frame.frameDurationNs = records.get(index, 6);
+            frame.rollingShutterSkewNs = records.get(index, 7);
+            frame.sensitivityIso = (int) records.get(index, 8);
+            return frame;
+        }
+
+        int size() { return records.size(); }
+        void finishWriting() throws IOException { records.finishWriting(); }
+        public void close() throws IOException { records.close(); }
+    }
+
+    private static final class VideoSamples implements java.io.Closeable {
+        private final FixedRecordStore records;
+
+        VideoSamples(File file) throws IOException {
+            records = new FixedRecordStore(file, 3);
+        }
+
+        void add(VideoSample sample) throws IOException {
+            records.append(sample.ptsNs, sample.sizeBytes, sample.flags);
+        }
+
+        VideoSample get(int index) throws IOException {
+            VideoSample sample = new VideoSample();
+            sample.ptsNs = records.get(index, 0);
+            sample.sizeBytes = records.get(index, 1);
+            sample.flags = (int) records.get(index, 2);
+            return sample;
+        }
+
+        int size() { return records.size(); }
+        void finishWriting() throws IOException { records.finishWriting(); }
+        public void close() throws IOException { records.close(); }
+    }
+
     private static final SimpleDateFormat DIRECTORY_FORMAT;
     private static final SimpleDateFormat ISO_FORMAT;
 
@@ -59,22 +126,35 @@ final class SessionArtifacts {
     final File partialVideo;
     final File partialCameraFrames;
     final File partialImu;
+    private final File partialFrames;
 
     private final File video;
     private final File imu;
-    private final ArrayList<FrameRecord> cameraFrames = new ArrayList<>();
+    private final File frames;
+    private final FrameRecords cameraFrames;
     private final BufferedWriter cameraWriter;
     private IOException cameraWriteFailure;
     private int cameraLinesSinceFlush;
+    private boolean cancelledDiscarded;
 
     private SessionArtifacts(File directory) throws IOException {
         this.directory = directory;
         partialVideo = new File(directory, "rgb.mp4.partial");
         partialCameraFrames = new File(directory, "camera_frames.raw.jsonl.partial");
         partialImu = new File(directory, "imu.jsonl.partial");
+        partialFrames = new File(directory, "frames.jsonl.partial");
         video = new File(directory, "rgb.mp4");
         imu = new File(directory, "imu.jsonl");
-        cameraWriter = new BufferedWriter(new FileWriter(partialCameraFrames, false), 1024 * 1024);
+        frames = new File(directory, "frames.jsonl");
+        cameraFrames = new FrameRecords(new File(directory, "camera_index.bin"));
+        try {
+            cameraWriter = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(partialCameraFrames, false), StandardCharsets.UTF_8),
+                    1024 * 1024);
+        } catch (IOException error) {
+            cameraFrames.close();
+            throw error;
+        }
     }
 
     static SessionArtifacts create(File recordingsRoot) throws IOException {
@@ -94,10 +174,10 @@ final class SessionArtifacts {
         return new SessionArtifacts(directory);
     }
 
-    synchronized void addCameraFrame(FrameRecord frame) {
-        cameraFrames.add(frame);
-        if (cameraWriteFailure != null) return;
+    synchronized void addCameraFrame(FrameRecord frame) throws IOException {
+        if (cameraWriteFailure != null) throw cameraWriteFailure;
         try {
+            cameraFrames.add(frame);
             cameraWriter.write(new JSONObject()
                     .put("frame_number", frame.frameNumber)
                     .put("capture_started_timestamp_ns", frame.captureStartedTimestampNs)
@@ -117,6 +197,7 @@ final class SessionArtifacts {
         } catch (IOException | JSONException error) {
             cameraWriteFailure = error instanceof IOException
                     ? (IOException) error : new IOException("Camera JSONL write failed", error);
+            throw cameraWriteFailure;
         }
     }
 
@@ -139,6 +220,7 @@ final class SessionArtifacts {
             if (cameraWriteFailure == null) cameraWriteFailure = closeError;
         }
         if (cameraWriteFailure != null) throw cameraWriteFailure;
+        cameraFrames.finishWriting();
         if (rawImu.writeFailure() != null) throw rawImu.writeFailure();
         if (!recorderStopSucceeded) throw new IOException("MediaRecorder did not produce a complete MP4");
 
@@ -147,75 +229,97 @@ final class SessionArtifacts {
         move(partialCameraFrames, new File(directory, "camera_frames.raw.jsonl"));
 
         ExtractedVideo extracted = extractVideo(video, audioRequired);
-        Alignment alignment = align(cameraFrames, extracted.samples);
-        if (alignment.pairedCount == 0) {
-            throw new IOException("No Camera2 results can be aligned to MP4 samples");
-        }
-        Mapping mapping = calculateMapping(
-                cameraFrames,
-                alignment,
-                probe.androidElapsedRealtimeComparable(),
-                probe.json.optBoolean("single_hardware_timestamp_counter_confirmed", false));
-        writeFrames(extracted.samples, alignment, mapping, rawImu, calibration);
-        JSONObject syncReport = buildSyncReport(
-                probe, rawImu, extracted, alignment, mapping, calibration);
-        writeJson(new File(directory, "sync_report.json"), syncReport);
-
-        String contentHash = sha256(video);
-        writeText(new File(directory, "content_hash.txt"), contentHash + "\n");
-        JSONObject metadata = new JSONObject();
         try {
-            metadata.put("schema", "rootlens.mentra.raw.v1");
-            metadata.put("content_hash", contentHash);
-            metadata.put("created_at", ISO_FORMAT.format(new Date(recorderStartWallMs)));
-            metadata.put("stopped_at", ISO_FORMAT.format(new Date(recorderStopWallMs)));
-            metadata.put("actual_duration_ms", Math.max(1, recorderStopWallMs - recorderStartWallMs));
-            metadata.put("requested_duration_seconds", requestedDurationSeconds);
-            metadata.put("recorder_start_elapsed_realtime_ns", recorderStartElapsedNs);
-            metadata.put("recorder_start_monotonic_ns", recorderStartMonotonicNs);
-            metadata.put("video", extracted.formatJson);
-            metadata.put("video_cadence", extracted.cadenceJson);
-            metadata.put("video_bytes", video.length());
-            metadata.put("audio", extracted.audioFormatJson == null
-                    ? JSONObject.NULL : extracted.audioFormatJson);
-            metadata.put("audio_sample_count", extracted.audioSampleCount);
-            metadata.put("camera_result_count", cameraFrames.size());
-            metadata.put("accelerometer_sample_count", rawImu.accelTimestamps().size());
-            metadata.put("gyroscope_sample_count", rawImu.gyroTimestamps().size());
-            JSONObject captureConfiguration = new JSONObject()
-                    .put("width", AppContract.WIDTH)
-                    .put("height", AppContract.HEIGHT)
-                    .put("fps", AppContract.FPS)
-                    .put("bitrate_bps", bitrateBps)
-                    .put("codec", "video/avc")
-                    .put("bit_depth", 8)
-                    .put("hdr", false)
-                    .put("audio", audioRequired)
-                    .put("orientation", "landscape")
-                    .put("video_to_imu_offset_ns", calibration.offsetNs)
-                    .put("video_to_imu_offset_convention",
-                            VideoImuCalibration.CONVENTION)
-                    .put("video_to_imu_calibration", CalibrationStore.auditJson(calibration));
-            if (audioRequired) {
-                captureConfiguration
-                        .put("audio_source", "mic")
-                        .put("audio_codec", "audio/mp4a-latm")
-                        .put("audio_sample_rate_hz", AppContract.AUDIO_SAMPLE_RATE_HZ)
-                        .put("audio_channels", AppContract.AUDIO_CHANNELS)
-                        .put("audio_bitrate_bps", AppContract.AUDIO_BITRATE_BPS);
+            Alignment alignment = align(cameraFrames, extracted.samples);
+            if (alignment.verifiedPairCount == 0) {
+                throw new IOException("No Camera2 results can be aligned to MP4 samples");
             }
-            metadata.put("capture_configuration", captureConfiguration);
-            metadata.put("device_probe", deliveryDeviceMetadata(probe.json));
-            metadata.put("files", new JSONArray()
-                    .put("rgb.mp4")
-                    .put("frames.jsonl")
-                    .put("imu.jsonl")
-                    .put("metadata.json"));
-        } catch (JSONException error) {
-            throw new IOException("Metadata construction failed", error);
+            Mapping mapping = calculateMapping(
+                    cameraFrames,
+                    alignment,
+                    probe.androidElapsedRealtimeComparable(),
+                    probe.json.optBoolean("single_hardware_timestamp_counter_confirmed", false));
+            writeFrames(extracted.samples, alignment, mapping, rawImu, calibration);
+            move(partialFrames, frames);
+            JSONObject syncReport = buildSyncReport(
+                    probe, rawImu, extracted, alignment, mapping, calibration);
+            writeJson(new File(directory, "sync_report.json"), syncReport);
+
+            String contentHash = sha256(video);
+            writeText(new File(directory, "content_hash.txt"), contentHash + "\n");
+            JSONObject metadata = new JSONObject();
+            try {
+                metadata.put("schema", "rootlens.mentra.raw.v1");
+                metadata.put("capture_app_version", probe.json.getJSONObject("capture_app_version"));
+                metadata.put("content_hash", contentHash);
+                metadata.put("created_at", ISO_FORMAT.format(new Date(recorderStartWallMs)));
+                metadata.put("stopped_at", ISO_FORMAT.format(new Date(recorderStopWallMs)));
+                metadata.put("actual_duration_ms", Math.max(1, recorderStopWallMs - recorderStartWallMs));
+                metadata.put("requested_duration_seconds", requestedDurationSeconds);
+                metadata.put("recorder_start_elapsed_realtime_ns", recorderStartElapsedNs);
+                metadata.put("recorder_start_monotonic_ns", recorderStartMonotonicNs);
+                metadata.put("video", extracted.formatJson);
+                metadata.put("video_cadence", extracted.cadenceJson);
+                metadata.put("video_bytes", video.length());
+                metadata.put("audio", extracted.audioFormatJson == null
+                        ? JSONObject.NULL : extracted.audioFormatJson);
+                metadata.put("audio_sample_count", extracted.audioSampleCount);
+                metadata.put("camera_result_count", cameraFrames.size());
+                metadata.put("camera_aligned_sample_count", alignment.verifiedPairCount);
+                metadata.put("camera_unmatched_sample_count", alignment.sampleCount - alignment.verifiedPairCount);
+                metadata.put("accelerometer_sample_count", rawImu.accelTimestamps().size());
+                metadata.put("gyroscope_sample_count", rawImu.gyroTimestamps().size());
+                JSONObject captureConfiguration = new JSONObject()
+                        .put("width", AppContract.WIDTH)
+                        .put("height", AppContract.HEIGHT)
+                        .put("fps", AppContract.FPS)
+                        .put("bitrate_bps", bitrateBps)
+                        .put("codec", "video/avc")
+                        .put("bit_depth", 8)
+                        .put("hdr", false)
+                        .put("audio", audioRequired)
+                        .put("orientation", "landscape")
+                        .put("video_to_imu_offset_ns", calibration.offsetNs)
+                        .put("video_to_imu_offset_convention",
+                                VideoImuCalibration.CONVENTION)
+                        .put("video_to_imu_calibration", CalibrationStore.auditJson(calibration));
+                if (audioRequired) {
+                    captureConfiguration
+                            .put("audio_source", "mic")
+                            .put("audio_codec", "audio/mp4a-latm")
+                            .put("audio_sample_rate_hz", AppContract.AUDIO_SAMPLE_RATE_HZ)
+                            .put("audio_channels", AppContract.AUDIO_CHANNELS)
+                            .put("audio_bitrate_bps", AppContract.AUDIO_BITRATE_BPS);
+                }
+                metadata.put("capture_configuration", captureConfiguration);
+                metadata.put("device_probe", deliveryDeviceMetadata(probe.json));
+                metadata.put("files", new JSONArray()
+                        .put("rgb.mp4")
+                        .put("frames.jsonl")
+                        .put("imu.jsonl")
+                        .put("metadata.json"));
+            } catch (JSONException error) {
+                throw new IOException("Metadata construction failed", error);
+            }
+            extracted.samples.close();
+            cameraFrames.close();
+            CaptureFileCommit.publish(directory,
+                    new String[] {"rgb.mp4", "imu.jsonl", "frames.jsonl", "camera_frames.raw.jsonl"},
+                    (partialMetadata, directorySyncSupported) -> {
+                        try {
+                            metadata.put("directory_fsync_supported", directorySyncSupported);
+                        } catch (JSONException error) {
+                            throw new IOException("Storage durability metadata construction failed", error);
+                        }
+                        writeJson(partialMetadata, metadata);
+                    }, new CaptureFileCommit.Sync() {
+                        public void file(File file) throws IOException { CaptureFileCommit.syncFile(file); }
+                        public boolean directory(File file) throws IOException { return syncDirectory(file); }
+                    });
+            return directory;
+        } finally {
+            extracted.samples.close();
         }
-        writeJson(new File(directory, "metadata.json"), metadata);
-        return directory;
     }
 
     private static JSONObject deliveryDeviceMetadata(JSONObject probe) throws JSONException {
@@ -227,38 +331,86 @@ final class SessionArtifacts {
     }
 
     synchronized void failClip(Throwable error) {
+        Throwable cause = error == null ? new IOException("Unknown capture failure") : error;
         try {
-            cameraWriter.flush();
-            cameraWriter.close();
+            close();
         } catch (IOException ignored) {
         }
         try {
             JSONObject failure = new JSONObject()
                     .put("status", "failed")
-                    .put("error_type", error.getClass().getName())
-                    .put("message", error.getMessage() == null ? error.toString() : error.getMessage())
+                    .put("error_type", cause.getClass().getName())
+                    .put("message", cause.getMessage() == null ? cause.toString() : cause.getMessage())
                     .put("failed_at_elapsed_realtime_ns", SystemClock.elapsedRealtimeNanos());
             writeJson(new File(directory, "failure.json"), failure);
         } catch (IOException | JSONException ignored) {
         }
     }
 
+    @Override
+    public synchronized void close() throws IOException {
+        try {
+            cameraWriter.close();
+        } finally {
+            cameraFrames.close();
+        }
+    }
+
+    /** Only the engine's never-started, newly created session may call this after closing IMU. */
+    synchronized void discardCancelled() throws IOException {
+        if (cancelledDiscarded) return;
+        close();
+        if (cameraFrames.size() != 0) throw new IOException("Cannot discard a session with camera frames");
+        if (Files.isSymbolicLink(directory.toPath()) || !directory.isDirectory()) {
+            throw new IOException("Cancelled session directory is unavailable");
+        }
+        Set<String> allowed = new HashSet<>(Arrays.asList(
+                "rgb.mp4.partial", "camera_frames.raw.jsonl.partial", "imu.jsonl.partial",
+                "camera_index.bin", "video_index.bin", "accelerometer_index.bin", "gyroscope_index.bin"));
+        File[] children = directory.listFiles();
+        if (children == null) throw new IOException("Cannot inspect cancelled session directory");
+        for (File file : children) {
+            if (!allowed.contains(file.getName())
+                    || !Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Cancelled session contains an unexpected artifact: " + file.getName());
+            }
+        }
+        for (File file : children) Files.delete(file.toPath());
+        Files.delete(directory.toPath());
+        cancelledDiscarded = true;
+    }
+
+    void discardScratchIndexes() {
+        for (String name : new String[] {"camera_index.bin", "video_index.bin",
+                "accelerometer_index.bin", "gyroscope_index.bin"}) {
+            try {
+                Files.deleteIfExists(new File(directory, name).toPath());
+            } catch (IOException error) {
+                Log.w("RootLensArtifacts", "Could not remove finalized scratch index " + name, error);
+            }
+        }
+    }
+
     private void writeFrames(
-            ArrayList<VideoSample> samples,
+            VideoSamples samples,
             Alignment alignment,
             Mapping mapping,
             RawImuRecorder rawImu,
             VideoImuCalibration calibration) throws IOException {
-        File output = new File(directory, "frames.jsonl");
         FrameRecord anchorFrame = cameraFrames.get(alignment.cameraStart);
         VideoSample anchorSample = samples.get(alignment.sampleStart);
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(output, false), 1024 * 1024)) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(partialFrames, false), StandardCharsets.UTF_8), 1024 * 1024)) {
             for (int sampleIndex = 0; sampleIndex < samples.size(); sampleIndex++) {
                 VideoSample sample = samples.get(sampleIndex);
                 int pairedOffset = sampleIndex - alignment.sampleStart;
-                boolean hasCameraResult = pairedOffset >= 0 && pairedOffset < alignment.pairedCount;
-                int cameraIndex = hasCameraResult ? alignment.cameraStart + pairedOffset : -1;
-                FrameRecord frame = hasCameraResult ? cameraFrames.get(cameraIndex) : null;
+                int candidateIndex = pairedOffset >= 0 && pairedOffset < alignment.pairedCount
+                        ? alignment.cameraStart + pairedOffset : -1;
+                FrameRecord frame = candidateIndex >= 0 ? cameraFrames.get(candidateIndex) : null;
+                if (frame != null && !timestampsAgree(frame.sensorTimestampNs, sample.ptsNs,
+                        anchorFrame.sensorTimestampNs, anchorSample.ptsNs)) frame = null;
+                boolean hasCameraResult = frame != null;
+                int cameraIndex = hasCameraResult ? candidateIndex : -1;
                 long videoTimestampInCameraDomainNs = frame == null
                         ? anchorFrame.sensorTimestampNs + (sample.ptsNs - anchorSample.ptsNs)
                         : frame.sensorTimestampNs;
@@ -316,7 +468,7 @@ final class SessionArtifacts {
     }
 
     private static void putNeighbors(
-            JSONObject row, String prefix, PrimitiveLongList timestamps, int before) throws JSONException {
+            JSONObject row, String prefix, TimestampIndex timestamps, int before) throws JSONException, IOException {
         int after = before + 1 < timestamps.size() ? before + 1 : -1;
         row.put(prefix + "_before_index", before < 0 ? JSONObject.NULL : before);
         row.put(prefix + "_before_timestamp_ns", before < 0 ? JSONObject.NULL : timestamps.get(before));
@@ -366,14 +518,16 @@ final class SessionArtifacts {
                     .put("video_alignment", new JSONObject()
                             .put("camera_result_count", alignment.cameraCount)
                             .put("mp4_sample_count", alignment.sampleCount)
-                            .put("paired_count", alignment.pairedCount)
+                            .put("paired_count", alignment.verifiedPairCount)
+                            .put("timestamp_mismatch_count", alignment.pairedCount - alignment.verifiedPairCount)
+                            .put("camera_pair_tolerance_ns", CAMERA_PAIR_TOLERANCE_NS)
                             .put("camera_start_index", alignment.cameraStart)
                             .put("mp4_start_index", alignment.sampleStart)
-                            .put("unpaired_camera_results", alignment.cameraCount - alignment.pairedCount)
-                            .put("unpaired_mp4_samples", alignment.sampleCount - alignment.pairedCount)
+                            .put("unpaired_camera_results", alignment.cameraCount - alignment.verifiedPairCount)
+                            .put("unpaired_mp4_samples", alignment.sampleCount - alignment.verifiedPairCount)
                             .put("per_frame_video_imu_timestamp_count", alignment.sampleCount)
                             .put("interpolated_video_frame_timestamp_count",
-                                    alignment.sampleCount - alignment.pairedCount)
+                                    alignment.sampleCount - alignment.verifiedPairCount)
                             .put("relative_timeline_mean_absolute_error_ns", alignment.meanAbsoluteTimelineErrorNs))
                     .put("accelerometer_sample_count", rawImu.accelTimestamps().size())
                     .put("gyroscope_sample_count", rawImu.gyroTimestamps().size())
@@ -394,10 +548,10 @@ final class SessionArtifacts {
     }
 
     private static Mapping calculateMapping(
-            ArrayList<FrameRecord> frames,
+            FrameRecords frames,
             Alignment alignment,
             boolean halRealtimeGuaranteed,
-            boolean commonTimestampCounterConfirmed) {
+            boolean commonTimestampCounterConfirmed) throws IOException {
         if (alignment.pairedCount == 0) {
             return new Mapping(0, 0, 0, 0, 0, "unavailable", "no_frames");
         }
@@ -483,11 +637,11 @@ final class SessionArtifacts {
         return Math.round(Math.sqrt(sumSquares / values.length));
     }
 
-    private static Alignment align(ArrayList<FrameRecord> frames, ArrayList<VideoSample> samples) {
+    private static Alignment align(FrameRecords frames, VideoSamples samples) throws IOException {
         int cameraCount = frames.size();
         int sampleCount = samples.size();
         int paired = Math.min(cameraCount, sampleCount);
-        if (paired == 0) return new Alignment(cameraCount, sampleCount, 0, 0, 0, -1);
+        if (paired == 0) return new Alignment(cameraCount, sampleCount, 0, 0, 0, 0, -1);
 
         int bestCameraStart = 0;
         int bestSampleStart = 0;
@@ -504,16 +658,27 @@ final class SessionArtifacts {
                 }
             }
         }
-        return new Alignment(cameraCount, sampleCount, paired, bestCameraStart, bestSampleStart,
+        long cameraOrigin = frames.get(bestCameraStart).sensorTimestampNs;
+        long sampleOrigin = samples.get(bestSampleStart).ptsNs;
+        int verifiedPairs = 0;
+        for (int index = 0; index < paired; index++) {
+            if (timestampsAgree(frames.get(bestCameraStart + index).sensorTimestampNs,
+                    samples.get(bestSampleStart + index).ptsNs, cameraOrigin, sampleOrigin)) verifiedPairs++;
+        }
+        return new Alignment(cameraCount, sampleCount, paired, verifiedPairs, bestCameraStart, bestSampleStart,
                 Math.round(bestError));
     }
 
+    private static boolean timestampsAgree(long cameraNs, long sampleNs, long cameraOrigin, long sampleOrigin) {
+        return Math.abs((cameraNs - cameraOrigin) - (sampleNs - sampleOrigin)) < CAMERA_PAIR_TOLERANCE_NS;
+    }
+
     private static double timelineError(
-            ArrayList<FrameRecord> frames,
-            ArrayList<VideoSample> samples,
+            FrameRecords frames,
+            VideoSamples samples,
             int cameraStart,
             int sampleStart,
-            int paired) {
+            int paired) throws IOException {
         long cameraOrigin = frames.get(cameraStart).sensorTimestampNs;
         long sampleOrigin = samples.get(sampleStart).ptsNs;
         int evaluated = Math.min(paired, 600);
@@ -529,6 +694,8 @@ final class SessionArtifacts {
 
     private static ExtractedVideo extractVideo(File video, boolean audioRequired) throws IOException {
         MediaExtractor extractor = new MediaExtractor();
+        VideoSamples samples = new VideoSamples(new File(video.getParentFile(), "video_index.bin"));
+        boolean completed = false;
         try {
             extractor.setDataSource(video.getAbsolutePath());
             int videoTrack = -1;
@@ -591,7 +758,6 @@ final class SessionArtifacts {
             }
 
             extractor.selectTrack(videoTrack);
-            ArrayList<VideoSample> samples = new ArrayList<>();
             while (extractor.getSampleTrackIndex() >= 0) {
                 VideoSample sample = new VideoSample();
                 sample.ptsNs = extractor.getSampleTime() * 1000L;
@@ -600,11 +766,14 @@ final class SessionArtifacts {
                 samples.add(sample);
                 if (!extractor.advance()) break;
             }
-            if (samples.isEmpty()) throw new IOException("MP4 video track has no samples");
+            if (samples.size() == 0) throw new IOException("MP4 video track has no samples");
+            samples.finishWriting();
 
             if (!audioRequired) {
-                return new ExtractedVideo(
+                ExtractedVideo result = new ExtractedVideo(
                         samples, formatJson, cadenceJson(samples), null, 0);
+                completed = true;
+                return result;
             }
 
             String audioMime = audioFormat.getString(MediaFormat.KEY_MIME);
@@ -657,10 +826,13 @@ final class SessionArtifacts {
             } catch (JSONException error) {
                 throw new IOException("Audio format JSON failed", error);
             }
-            return new ExtractedVideo(
+            ExtractedVideo result = new ExtractedVideo(
                     samples, formatJson, cadenceJson(samples), audioFormatJson, audioSampleCount);
+            completed = true;
+            return result;
         } finally {
             extractor.release();
+            if (!completed) samples.close();
         }
     }
 
@@ -674,7 +846,7 @@ final class SessionArtifacts {
         return source.getInteger(key);
     }
 
-    private static JSONObject cadenceJson(ArrayList<VideoSample> samples) throws IOException {
+    private static JSONObject cadenceJson(VideoSamples samples) throws IOException {
         try {
             JSONObject result = new JSONObject()
                     .put("nominal_fps", AppContract.FPS)
@@ -749,8 +921,44 @@ final class SessionArtifacts {
     }
 
     static void writeText(File file, String value) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, false))) {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("Cannot create parent directory: " + parent);
+        }
+        FileOutputStream output = new FileOutputStream(file, false);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                output, StandardCharsets.UTF_8))) {
             writer.write(value);
+            writer.flush();
+            output.getFD().sync();
+        }
+    }
+
+    private static boolean syncDirectory(File directory) throws IOException {
+        FileDescriptor descriptor;
+        try {
+            descriptor = Os.open(directory.getAbsolutePath(), OsConstants.O_RDONLY, 0);
+        } catch (ErrnoException error) {
+            throw new IOException("Cannot open capture directory for sync", error);
+        }
+        try {
+            try {
+                Os.fsync(descriptor);
+                return true;
+            } catch (ErrnoException error) {
+                if (error.errno == OsConstants.EINVAL || error.errno == OsConstants.ENOTSUP
+                        || error.errno == OsConstants.ENOSYS) {
+                    Log.w("RootLensArtifacts", "Recording filesystem does not support directory fsync", error);
+                    return false;
+                }
+                throw new IOException("Capture directory sync failed", error);
+            }
+        } finally {
+            try {
+                Os.close(descriptor);
+            } catch (ErrnoException error) {
+                throw new IOException("Cannot close capture directory after sync", error);
+            }
         }
     }
 
@@ -759,14 +967,14 @@ final class SessionArtifacts {
     }
 
     private static final class ExtractedVideo {
-        final ArrayList<VideoSample> samples;
+        final VideoSamples samples;
         final JSONObject formatJson;
         final JSONObject cadenceJson;
         final JSONObject audioFormatJson;
         final int audioSampleCount;
 
         ExtractedVideo(
-                ArrayList<VideoSample> samples,
+                VideoSamples samples,
                 JSONObject formatJson,
                 JSONObject cadenceJson,
                 JSONObject audioFormatJson,
@@ -783,15 +991,18 @@ final class SessionArtifacts {
         final int cameraCount;
         final int sampleCount;
         final int pairedCount;
+        final int verifiedPairCount;
         final int cameraStart;
         final int sampleStart;
         final long meanAbsoluteTimelineErrorNs;
 
-        Alignment(int cameraCount, int sampleCount, int pairedCount, int cameraStart, int sampleStart,
+        Alignment(int cameraCount, int sampleCount, int pairedCount, int verifiedPairCount,
+                  int cameraStart, int sampleStart,
                   long meanAbsoluteTimelineErrorNs) {
             this.cameraCount = cameraCount;
             this.sampleCount = sampleCount;
             this.pairedCount = pairedCount;
+            this.verifiedPairCount = verifiedPairCount;
             this.cameraStart = cameraStart;
             this.sampleStart = sampleStart;
             this.meanAbsoluteTimelineErrorNs = meanAbsoluteTimelineErrorNs;

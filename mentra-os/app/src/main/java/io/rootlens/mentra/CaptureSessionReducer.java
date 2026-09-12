@@ -36,6 +36,7 @@ final class CaptureSessionReducer {
         SEGMENT_OPEN_RETRY,
         SEGMENT_STARTED,
         SEGMENT_COMPLETED,
+        SEGMENT_CANCELLED,
         SEGMENT_FAILED,
         TIME_LIMIT_REACHED,
         STORAGE_LIMIT_REACHED,
@@ -151,6 +152,10 @@ final class CaptureSessionReducer {
                     EventType.SEGMENT_FAILED, generation, 0L, message, artifactPath);
         }
 
+        static Event segmentCancelled(long generation, String artifactPath) {
+            return new Event(EventType.SEGMENT_CANCELLED, generation, 0L, null, artifactPath);
+        }
+
         static Event timeLimitReached(long generation) {
             return new Event(EventType.TIME_LIMIT_REACHED, generation, 0L, null, null);
         }
@@ -209,6 +214,8 @@ final class CaptureSessionReducer {
                 return segmentStarted(state, event);
             case SEGMENT_COMPLETED:
                 return segmentCompleted(state, event);
+            case SEGMENT_CANCELLED:
+                return segmentCancelled(state, event);
             case SEGMENT_FAILED:
                 return segmentFailed(state, event);
             case TIME_LIMIT_REACHED:
@@ -225,7 +232,7 @@ final class CaptureSessionReducer {
     }
 
     private static Transition start(State state, long requestedSeconds) {
-        if (state.phase != Phase.IDLE) return unchanged(state);
+        if (state.isActive()) return unchanged(state);
         long duration = Math.max(1L, requestedSeconds);
         State next = new State(
                 Phase.START_PENDING,
@@ -299,6 +306,12 @@ final class CaptureSessionReducer {
     }
 
     private static Transition segmentStarted(State state, Event event) {
+        if (state.phase == Phase.FINALIZING) {
+            return transition(new State(
+                    state.phase, state.generation, state.remainingSeconds,
+                    state.currentSegmentSeconds, state.completedClipCount, state.stopCause,
+                    state.message, event.artifactPath));
+        }
         if (state.phase != Phase.OPENING) return unchanged(state);
         State recording = new State(
                 Phase.RECORDING,
@@ -367,19 +380,23 @@ final class CaptureSessionReducer {
                 Effect.now(EffectType.FINISH_SUCCEEDED, state.generation));
     }
 
+    private static Transition segmentCancelled(State state, Event event) {
+        if (state.phase == Phase.FINALIZING
+                && state.stopCause == StopCause.USER && state.artifactPath == null) {
+            return transition(succeeded(state, "Capture stopped before recording began"),
+                    Effect.now(EffectType.CANCEL_TIME_LIMIT, state.generation),
+                    Effect.now(EffectType.CANCEL_STORAGE_CHECK, state.generation),
+                    Effect.now(EffectType.FINISH_SUCCEEDED, state.generation));
+        }
+        return segmentFailed(state, Event.segmentFailed(
+                event.generation, event.artifactPath, "Capture cancelled unexpectedly"));
+    }
+
     private static Transition segmentFailed(State state, Event event) {
         if (state.phase != Phase.OPENING
                 && state.phase != Phase.RECORDING
                 && state.phase != Phase.FINALIZING) {
             return unchanged(state);
-        }
-        if (state.phase == Phase.FINALIZING
-                && state.stopCause == StopCause.USER
-                && state.artifactPath == null) {
-            return transition(succeeded(state, "Capture stopped before a clip was committed"),
-                    Effect.now(EffectType.CANCEL_TIME_LIMIT, state.generation),
-                    Effect.now(EffectType.CANCEL_STORAGE_CHECK, state.generation),
-                    Effect.now(EffectType.FINISH_SUCCEEDED, state.generation));
         }
         State failed = new State(
                 Phase.FAILED,
@@ -398,7 +415,7 @@ final class CaptureSessionReducer {
     }
 
     private static Transition preflightFailed(State state, String message) {
-        if (state.phase != Phase.IDLE) return unchanged(state);
+        if (state.isActive()) return unchanged(state);
         State failed = new State(
                 Phase.FAILED,
                 state.generation + 1L,

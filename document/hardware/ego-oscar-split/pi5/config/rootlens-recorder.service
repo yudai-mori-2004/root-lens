@@ -1,0 +1,21 @@
+[Unit]
+Description=RootLens Ego-OSCAR Raspberry Pi 5 recorder
+After=local-fs.target
+
+[Service]
+Type=simple
+User=rootlens
+Group=rootlens
+SupplementaryGroups=video dialout
+EnvironmentFile=/etc/rootlens-recorder.env
+WorkingDirectory=/var/lib/rootlens-recorder
+ExecStartPre=/usr/bin/test -c /dev/ttyAMA0
+ExecStartPre=/usr/bin/test -c /dev/video0
+ExecStart=/usr/bin/python3 /opt/rootlens-recorder/fpv_recorder.py
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

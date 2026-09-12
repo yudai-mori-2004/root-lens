@@ -38,18 +38,6 @@ final class CaptureFeedback {
         send(context, "capture_stop_received");
     }
 
-    static void uploadStarted(Context context) {
-        send(context, "upload_started");
-    }
-
-    static void uploadComplete(Context context) {
-        send(context, "upload_complete");
-    }
-
-    static void uploadUnavailable(Context context) {
-        send(context, "upload_unavailable");
-    }
-
     static void errorTone(Context context) {
         record("error");
     }

@@ -264,10 +264,10 @@ index 6108f10ae8..2a403d971b 100644
      private boolean notifyI2SState(boolean playing) {
 diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java b/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java
 new file mode 100644
-index 0000000000..09ec36a532
+index 0000000000..09567edbbc
 --- /dev/null
 +++ b/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,64 @@
 +package com.mentra.asg_client.audio;
 +
 +import android.content.Context;
@@ -325,12 +325,6 @@ index 0000000000..09ec36a532
 +        return new String[] {"rootlens/capture_failed.mp3"};
 +      case "calibration_gesture_step":
 +        return new String[] {AudioAssets.CLICK_SOUND};
-+      case "upload_started":
-+        return new String[] {"rootlens/upload_started.mp3"};
-+      case "upload_complete":
-+        return new String[] {"rootlens/upload_complete.mp3"};
-+      case "upload_unavailable":
-+        return new String[] {"rootlens/upload_unavailable.mp3"};
 +      case "calibration_instructions":
 +        return new String[] {"rootlens/calibration_instructions.mp3"};
 +      default:
@@ -715,7 +709,7 @@ index 0000000000..c3befb143f
 +  }
 +}
 diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
-index 45b81b9027..cbbbcd49ec 100644
+index 45b81b9027..f003e534b6 100644
 --- a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
 +++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
 @@ -4,9 +4,11 @@ import android.content.Context;
@@ -752,7 +746,7 @@ index 45b81b9027..cbbbcd49ec 100644
  
      private BesLogManager mBesLogSession;
  
-@@ -163,23 +165,96 @@ public class K900CommandHandler {
+@@ -163,23 +165,82 @@ public class K900CommandHandler {
          }
      }
  
@@ -774,7 +768,7 @@ index 45b81b9027..cbbbcd49ec 100644
 -    /**
 -     * Handle camera button long press
 -     */
-+    /** Resolve one long-press sequence to upload or hidden calibration. */
++    /** Recognize the hidden five-long-press calibration gesture. */
      private void handleCameraButtonLongPress() {
 -        Log.d(TAG, "📹 Camera button long pressed - handling with configurable mode");
 -        handleConfigurableButtonPress(true); // true = long press
@@ -804,9 +798,6 @@ index 45b81b9027..cbbbcd49ec 100644
 +                case TOGGLE_CAPTURE:
 +                    Log.d(TAG, "📸 Camera button short pressed - toggling RootLens capture");
 +                    handleRootLensToggle(effect.commandIdNs);
-+                    break;
-+                case START_UPLOAD:
-+                    deliverRootLensUpload(effect.commandIdNs);
 +                    break;
 +                case START_CALIBRATION:
 +                    deliverRootLensCalibration(effect.commandIdNs);
@@ -839,17 +830,6 @@ index 45b81b9027..cbbbcd49ec 100644
 +        pendingButtonTimeout = null;
 +    }
 +
-+    private void deliverRootLensUpload(long elapsedRealtimeNanos) {
-+        boolean delivered = RootLensCaptureControl.upload(
-+                serviceManager.getContext(), elapsedRealtimeNanos);
-+        if (!delivered) {
-+            RootLensFeedback.play(serviceManager.getContext(), "upload_unavailable");
-+        }
-+        Log.i(TAG, delivered
-+                ? "Expired long-press sequence delivered RootLens upload command"
-+                : "Expired long-press sequence upload failed closed");
-+    }
-+
 +    private void deliverRootLensCalibration(long elapsedRealtimeNanos) {
 +        boolean delivered = RootLensCaptureControl.calibrate(
 +                serviceManager.getContext(), elapsedRealtimeNanos);
@@ -862,7 +842,7 @@ index 45b81b9027..cbbbcd49ec 100644
      }
  
      /**
-@@ -801,133 +876,16 @@ public class K900CommandHandler {
+@@ -801,133 +862,16 @@ public class K900CommandHandler {
          }
      }
  
@@ -1007,17 +987,17 @@ index 45b81b9027..cbbbcd49ec 100644
      /**
 diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java
 new file mode 100644
-index 0000000000..4f4b17e6bd
+index 0000000000..52d29574a3
 --- /dev/null
 +++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java
-@@ -0,0 +1,222 @@
+@@ -0,0 +1,208 @@
 +package com.mentra.asg_client.service.core.handlers;
 +
 +import java.util.Arrays;
 +import java.util.Collections;
 +import java.util.List;
 +
-+/** Pure policy for capture toggle, upload, and the five-press calibration gesture. */
++/** Pure policy for capture toggle and the five-press calibration gesture. */
 +final class RootLensButtonReducer {
 +    static final int REQUIRED_CALIBRATION_PRESSES = 5;
 +    static final long SEQUENCE_TIMEOUT_NS = 30_000_000_000L;
@@ -1031,7 +1011,6 @@ index 0000000000..4f4b17e6bd
 +        CANCEL_TIMEOUT,
 +        ARM_TIMEOUT,
 +        TOGGLE_CAPTURE,
-+        START_UPLOAD,
 +        START_CALIBRATION
 +    }
 +
@@ -1139,11 +1118,11 @@ index 0000000000..4f4b17e6bd
 +    }
 +
 +    private static Transition longPress(State state, long nowNs) {
-+        if (state.phase == Phase.IDLE) return begin(state, nowNs, false);
++        if (state.phase == Phase.IDLE) return begin(state, nowNs);
 +
 +        long gapNs = nowNs - state.lastPressNs;
 +        if (gapNs >= 0L && gapNs < DUPLICATE_GUARD_NS) return unchanged(state);
-+        if (gapNs < 0L || nowNs > state.deadlineNs) return begin(state, nowNs, true);
++        if (gapNs < 0L || nowNs > state.deadlineNs) return begin(state, nowNs);
 +
 +        int nextCount = state.pressCount + 1;
 +        if (nextCount == REQUIRED_CALIBRATION_PRESSES) {
@@ -1168,12 +1147,6 @@ index 0000000000..4f4b17e6bd
 +        if (state.phase == Phase.IDLE) {
 +            return transition(state, Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
 +        }
-+        if (nowNs > state.deadlineNs) {
-+            return transition(idleAfter(state),
-+                    Effect.now(EffectType.CANCEL_TIMEOUT),
-+                    Effect.command(EffectType.START_UPLOAD, state.firstPressNs),
-+                    Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
-+        }
 +        return transition(idleAfter(state),
 +                Effect.now(EffectType.CANCEL_TIMEOUT),
 +                Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
@@ -1187,20 +1160,13 @@ index 0000000000..4f4b17e6bd
 +        if (nowNs <= state.deadlineNs) {
 +            return transition(state, Effect.arm(state));
 +        }
-+        return transition(idleAfter(state),
-+                Effect.command(EffectType.START_UPLOAD, state.firstPressNs));
++        return transition(idleAfter(state));
 +    }
 +
-+    private static Transition begin(State state, long nowNs, boolean uploadExpiredSequence) {
++    private static Transition begin(State state, long nowNs) {
 +        State next = waiting(1, nowNs, nowNs, state.revision + 1L);
-+        if (uploadExpiredSequence) {
-+            return transition(next,
-+                    Effect.now(EffectType.CANCEL_TIMEOUT),
-+                    Effect.now(EffectType.PLAY_STEP),
-+                    Effect.command(EffectType.START_UPLOAD, state.firstPressNs),
-+                    Effect.arm(next));
-+        }
 +        return transition(next,
++                Effect.now(EffectType.CANCEL_TIMEOUT),
 +                Effect.now(EffectType.PLAY_STEP),
 +                Effect.arm(next));
 +    }
@@ -1235,10 +1201,10 @@ index 0000000000..4f4b17e6bd
 +}
 diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java
 new file mode 100644
-index 0000000000..59ecad94df
+index 0000000000..35a9e265e7
 --- /dev/null
 +++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,89 @@
 +package com.mentra.asg_client.service.core.handlers;
 +
 +import android.content.ComponentName;
@@ -1252,7 +1218,6 @@ index 0000000000..59ecad94df
 +final class RootLensCaptureControl {
 +    private static final String TAG = "RootLensCaptureControl";
 +    private static final String ACTION_TOGGLE = "io.rootlens.mentra.TOGGLE";
-+    private static final String ACTION_UPLOAD = "io.rootlens.mentra.UPLOAD";
 +    private static final String ACTION_CALIBRATE = "io.rootlens.mentra.CALIBRATE";
 +    private static final String EXTRA_COMMAND_ID = "command_id";
 +    private static final String RECEIVER_CLASS =
@@ -1284,28 +1249,6 @@ index 0000000000..59ecad94df
 +
 +    static String commandId(long pressElapsedNanos) {
 +        return "action-button-short:" + pressElapsedNanos;
-+    }
-+
-+    static boolean upload(Context context, long pressElapsedNanos) {
-+        Context appContext = context.getApplicationContext();
-+        String packageName = activePackage(appContext.getPackageManager());
-+        if (packageName == null) return false;
-+
-+        Intent command = new Intent(ACTION_UPLOAD)
-+                .setComponent(new ComponentName(packageName, RECEIVER_CLASS))
-+                .putExtra(EXTRA_COMMAND_ID, uploadCommandId(pressElapsedNanos));
-+        try {
-+            appContext.sendBroadcast(command);
-+            Log.i(TAG, "Upload command delivered to " + packageName);
-+            return true;
-+        } catch (RuntimeException error) {
-+            Log.e(TAG, "Could not deliver upload command", error);
-+            return false;
-+        }
-+    }
-+
-+    static String uploadCommandId(long pressElapsedNanos) {
-+        return "action-button-upload:" + pressElapsedNanos;
 +    }
 +
 +    static boolean calibrate(Context context, long pressElapsedNanos) {
@@ -1392,10 +1335,10 @@ index 0000000000..f740125c80
 +}
 diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java
 new file mode 100644
-index 0000000000..9b4ddef7ed
+index 0000000000..6b193b67c6
 --- /dev/null
 +++ b/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,29 @@
 +package com.mentra.asg_client.audio;
 +
 +import static org.assertj.core.api.Assertions.assertThat;
@@ -1415,12 +1358,9 @@ index 0000000000..9b4ddef7ed
 +        .isNull();
 +    assertThat(Arrays.asList(RootLensFeedback.assetsFor("calibration_gesture_step")))
 +        .containsExactly("click_sound.wav");
-+    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_started")))
-+        .containsExactly("rootlens/upload_started.mp3");
-+    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_complete")))
-+        .containsExactly("rootlens/upload_complete.mp3");
-+    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_unavailable")))
-+        .containsExactly("rootlens/upload_unavailable.mp3");
++    assertThat(RootLensFeedback.assetsFor("upload_started")).isNull();
++    assertThat(RootLensFeedback.assetsFor("upload_complete")).isNull();
++    assertThat(RootLensFeedback.assetsFor("upload_unavailable")).isNull();
 +    assertThat(Arrays.asList(RootLensFeedback.assetsFor("calibration_instructions")))
 +        .containsExactly("rootlens/calibration_instructions.mp3");
 +    assertThat(RootLensFeedback.assetsFor("upload_paused")).isNull();
@@ -1509,10 +1449,10 @@ index 0000000000..04a1a86fee
 +}
 diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java
 new file mode 100644
-index 0000000000..39d0ea0ad3
+index 0000000000..1849191e2a
 --- /dev/null
 +++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,153 @@
 +package com.mentra.asg_client.service.core.handlers;
 +
 +import static org.assertj.core.api.Assertions.assertThat;
@@ -1532,20 +1472,22 @@ index 0000000000..39d0ea0ad3
 +            if (index < 4) {
 +                assertThat(effect(transition, RootLensButtonReducer.EffectType.ARM_TIMEOUT))
 +                        .isNotNull();
-+                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD))
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_CALIBRATION))
 +                        .isNull();
 +            } else {
 +                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_CALIBRATION))
 +                        .isNotNull();
-+                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD))
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.ARM_TIMEOUT))
 +                        .isNull();
 +                assertThat(state.phase).isEqualTo(RootLensButtonReducer.Phase.IDLE);
 +            }
++            assertThat(effect(transition, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE))
++                    .isNull();
 +        }
 +    }
 +
 +    @Test
-+    public void eachIncompletePrefixTimesOutToExactlyOneUpload() {
++    public void eachIncompletePrefixExpiresSilently() {
 +        for (int presses = 1; presses < 5; presses++) {
 +            RootLensButtonReducer.State state = RootLensButtonReducer.State.idle();
 +            for (int index = 0; index < presses; index++) {
@@ -1556,7 +1498,7 @@ index 0000000000..39d0ea0ad3
 +            RootLensButtonReducer.Transition timeout = reduce(
 +                    state,
 +                    RootLensButtonReducer.Event.timeout(revision, state.deadlineNs + 1L));
-+            assertThat(effect(timeout, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
++            assertThat(timeout.effects).isEmpty();
 +            assertThat(timeout.state.phase).isEqualTo(RootLensButtonReducer.Phase.IDLE);
 +            assertThat(reduce(timeout.state,
 +                    RootLensButtonReducer.Event.timeout(revision, state.deadlineNs + 2L)).effects)
@@ -1575,13 +1517,17 @@ index 0000000000..39d0ea0ad3
 +        }
 +        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_CALIBRATION))
 +                .isNotNull();
-+        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
 +
 +        state = reduce(RootLensButtonReducer.State.idle(),
 +                RootLensButtonReducer.Event.longPress(0L)).state;
 +        transition = reduce(state,
 +                RootLensButtonReducer.Event.longPress(8L * SECOND + 1L));
-+        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
++        assertThat(transition.state.pressCount).isEqualTo(1);
++        assertThat(transition.state.firstPressNs).isEqualTo(8L * SECOND + 1L);
++        assertThat(transition.effects).extracting(effect -> effect.type).containsExactly(
++                RootLensButtonReducer.EffectType.CANCEL_TIMEOUT,
++                RootLensButtonReducer.EffectType.PLAY_STEP,
++                RootLensButtonReducer.EffectType.ARM_TIMEOUT);
 +    }
 +
 +    @Test
@@ -1611,36 +1557,39 @@ index 0000000000..39d0ea0ad3
 +    }
 +
 +    @Test
-+    public void normalPressBeforeDeadlineCancelsButAfterDeadlineCatchesUpUpload() {
++    public void normalPressCancelsSequenceAndOnlyTogglesCaptureBeforeOrAfterDeadline() {
 +        RootLensButtonReducer.State pending = reduce(
 +                RootLensButtonReducer.State.idle(),
 +                RootLensButtonReducer.Event.longPress(0L)).state;
-+        RootLensButtonReducer.Transition before = reduce(
-+                pending, RootLensButtonReducer.Event.normalPress(8L * SECOND));
-+        assertThat(effect(before, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
-+        assertThat(effect(before, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE)).isNotNull();
-+
-+        RootLensButtonReducer.Transition after = reduce(
-+                pending, RootLensButtonReducer.Event.normalPress(8L * SECOND + 1L));
-+        assertThat(effect(after, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
-+        assertThat(effect(after, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE)).isNotNull();
++        for (long atNs : new long[] {8L * SECOND, 8L * SECOND + 1L}) {
++            RootLensButtonReducer.Transition normal = reduce(
++                    pending, RootLensButtonReducer.Event.normalPress(atNs));
++            assertThat(normal.effects).extracting(effect -> effect.type).containsExactly(
++                    RootLensButtonReducer.EffectType.CANCEL_TIMEOUT,
++                    RootLensButtonReducer.EffectType.TOGGLE_CAPTURE);
++            assertThat(normal.state.phase).isEqualTo(RootLensButtonReducer.Phase.IDLE);
++            assertThat(effect(normal, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE).commandIdNs)
++                    .isEqualTo(atNs);
++        }
 +    }
 +
 +    @Test
-+    public void staleAndEarlyTimeoutsCannotUpload() {
++    public void staleAndEarlyTimeoutsCannotClearAnActiveSequence() {
 +        RootLensButtonReducer.State first = reduce(
 +                RootLensButtonReducer.State.idle(),
 +                RootLensButtonReducer.Event.longPress(0L)).state;
 +        RootLensButtonReducer.State second = reduce(
 +                first, RootLensButtonReducer.Event.longPress(2L * SECOND)).state;
-+        assertThat(reduce(second,
-+                RootLensButtonReducer.Event.timeout(first.revision, 20L * SECOND)).effects)
-+                .isEmpty();
++        RootLensButtonReducer.Transition stale = reduce(second,
++                RootLensButtonReducer.Event.timeout(first.revision, 20L * SECOND));
++        assertThat(stale.state).isSameAs(second);
++        assertThat(stale.effects).isEmpty();
 +
 +        RootLensButtonReducer.Transition early = reduce(second,
 +                RootLensButtonReducer.Event.timeout(second.revision, second.deadlineNs));
-+        assertThat(effect(early, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
-+        assertThat(effect(early, RootLensButtonReducer.EffectType.ARM_TIMEOUT)).isNotNull();
++        assertThat(early.state).isSameAs(second);
++        assertThat(early.effects).extracting(effect -> effect.type)
++                .containsExactly(RootLensButtonReducer.EffectType.ARM_TIMEOUT);
 +    }
 +
 +    private static RootLensButtonReducer.Transition reduce(
@@ -1659,10 +1608,10 @@ index 0000000000..39d0ea0ad3
 +}
 diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java
 new file mode 100644
-index 0000000000..177bfaa74c
+index 0000000000..1da15ccd4a
 --- /dev/null
 +++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,19 @@
 +package com.mentra.asg_client.service.core.handlers;
 +
 +import static org.assertj.core.api.Assertions.assertThat;
@@ -1677,15 +1626,8 @@ index 0000000000..177bfaa74c
 +    }
 +
 +    @Test
-+    public void uploadCommandId_isSeparateFromCaptureToggle() {
-+        assertThat(RootLensCaptureControl.uploadCommandId(123_456_789L))
-+                .isEqualTo("action-button-upload:123456789");
-+    }
-+
-+    @Test
-+    public void calibrationCommandId_isSeparateFromUpload() {
++    public void calibrationCommandId_isSeparateFromCaptureToggle() {
 +        assertThat(RootLensCaptureControl.calibrationCommandId(123_456_789L))
 +                .isEqualTo("action-button-calibration:123456789");
 +    }
 +}
-
