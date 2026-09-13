@@ -24,6 +24,7 @@ const outputArg = args.indexOf('--output');
 const calibrationArg = args.indexOf('--calibration');
 const boundaryDirArg = args.indexOf('--boundary-dir');
 const clockAuditDirArg = args.indexOf('--clock-audit-dir');
+const siteIdArg = args.indexOf('--site-id');
 const PORT = portArg >= 0 ? Number(args[portArg + 1]) : 4318;
 const outputBase = outputArg >= 0 ? path.resolve(args[outputArg + 1]) : undefined;
 const boundaryDir = boundaryDirArg >= 0
@@ -35,6 +36,7 @@ const clockAuditDir = clockAuditDirArg >= 0
 const videoImuCalibration = calibrationArg >= 0
   ? JSON.parse(await fs.readFile(path.resolve(args[calibrationArg + 1]), 'utf8'))
   : undefined;
+const siteId = siteIdArg >= 0 ? args[siteIdArg + 1] : undefined;
 
 let session = null;
 let exportJob = { status: 'idle', progress: null, result: null, error: null };
@@ -242,6 +244,7 @@ const server = http.createServer(async (request, response) => {
         outputBase,
         videoImuCalibration,
         videoClockAudit: audit?.value,
+        siteId,
         onProgress(progress) {
           exportJob = { ...exportJob, progress };
         },

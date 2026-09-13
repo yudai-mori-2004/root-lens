@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -14,6 +13,14 @@ import {
   probeVideoPackets,
 } from './session.mjs';
 import { snapStartAtOrBefore } from './time.mjs';
+import {
+  UNIT_ID_RE,
+  createUnitId,
+  describeFiles,
+  sha256File,
+  sourceManifestSha256,
+  sourceRecordingManifestSha256,
+} from './integrity.mjs';
 
 const NS_PER_SECOND = 1_000_000_000;
 const VERSION = '1.0.0';
@@ -211,23 +218,6 @@ export function validateSegments(segments, durationSeconds, keyframes, minDurati
   return normalized;
 }
 
-async function sha256File(file, onProgress) {
-  const stat = await fs.stat(file);
-  const hash = createHash('sha256');
-  let bytes = 0;
-  await new Promise((resolve, reject) => {
-    const stream = fsSync.createReadStream(file);
-    stream.on('data', (chunk) => {
-      hash.update(chunk);
-      bytes += chunk.length;
-      onProgress?.(stat.size ? bytes / stat.size : 1);
-    });
-    stream.on('error', reject);
-    stream.on('end', resolve);
-  });
-  return hash.digest('hex');
-}
-
 async function* jsonLines(file) {
   const input = fsSync.createReadStream(file, { encoding: 'utf8' });
   const lines = readline.createInterface({ input, crlfDelay: Infinity });
@@ -353,7 +343,6 @@ export function rewriteImu(row, baseIndex) {
 
 export function buildMetadata(sourceMetadata, segment, facts) {
   const metadata = structuredClone(sourceMetadata);
-  delete metadata.content_hash;
   delete metadata.video_bytes;
   metadata.created_at = dateAtOffset(sourceMetadata.created_at, segment.sourceStartPtsSeconds);
   metadata.stopped_at = dateAtOffset(sourceMetadata.created_at, segment.sourceStartPtsSeconds + facts.media.durationSeconds);
@@ -362,7 +351,8 @@ export function buildMetadata(sourceMetadata, segment, facts) {
   metadata.accelerometer_sample_count = facts.accelerometerSampleCount;
   metadata.gyroscope_sample_count = facts.gyroscopeSampleCount;
   metadata.audio_sample_count = facts.audioSampleCount;
-  metadata.content_hash = facts.contentHash;
+  metadata.unit_id = facts.unitId;
+  metadata.site_id = facts.siteId;
   metadata.video_bytes = facts.videoBytes;
   metadata.files = [...REQUIRED_FILES];
   delete metadata.task_label;
@@ -406,7 +396,9 @@ export function buildMetadata(sourceMetadata, segment, facts) {
     tool: `rootlens-claru-session-cutter/${VERSION}`,
     created_at: new Date().toISOString(),
     mode: 'single_continuous_interval',
-    source_content_hash: facts.sourceContentHash,
+    source_unit_id: facts.sourceUnitId,
+    source_recording_id: facts.sourceRecordingId,
+    source_recording_manifest_sha256: facts.sourceRecordingManifestSha256,
     source_recording_created_at: sourceMetadata.created_at,
     source_selected_start_ms: Math.round(segment.startSeconds * 1000),
     source_selected_end_ms: Math.round(segment.endSeconds * 1000),
@@ -428,22 +420,24 @@ export function buildMetadata(sourceMetadata, segment, facts) {
   return metadata;
 }
 
-async function validateClipFolder(folder) {
+async function validateClipFolder(folder, expectedUnitId = path.basename(folder)) {
   const names = (await fs.readdir(folder)).sort();
   const expected = [...REQUIRED_FILES].sort();
   if (JSON.stringify(names) !== JSON.stringify(expected)) {
     throw new Error(`出力manifest不一致: ${names.join(', ')}`);
   }
   const metadata = JSON.parse(await fs.readFile(path.join(folder, 'metadata.json'), 'utf8'));
-  const [media, packets, actualHash, videoStat] = await Promise.all([
+  const [media, packets, videoStat] = await Promise.all([
     probeMedia(path.join(folder, 'rgb.mp4')),
     probeVideoPackets(path.join(folder, 'rgb.mp4')),
-    sha256File(path.join(folder, 'rgb.mp4')),
     fs.stat(path.join(folder, 'rgb.mp4')),
   ]);
-  if (actualHash !== metadata.content_hash || videoStat.size !== metadata.video_bytes) {
-    throw new Error('content_hashまたはvideo_bytesがmetadataと一致しません');
+  const unitId = expectedUnitId;
+  if (!UNIT_ID_RE.test(unitId) || metadata.unit_id !== unitId || videoStat.size !== metadata.video_bytes) {
+    throw new Error('unit_idまたはvideo_bytesがmetadataと一致しません');
   }
+  const sourceFiles = await describeFiles(folder, REQUIRED_FILES);
+  const manifestSha256 = sourceManifestSha256(unitId, sourceFiles);
   const expectedOffsetNs = Number(metadata.capture_configuration?.video_to_imu_offset_ns ?? 0);
   const expectedConvention = metadata.capture_configuration?.video_to_imu_offset_convention
     ?? VIDEO_IMU_CONVENTION;
@@ -510,7 +504,7 @@ async function validateClipFolder(folder) {
   if (frameCount !== packets.length || frameCount !== metadata.video_frame_count) {
     throw new Error(`video/frame count不一致: mp4=${packets.length} frames=${frameCount} metadata=${metadata.video_frame_count}`);
   }
-  return { media, frameCount, contentHash: actualHash };
+  return { media, frameCount, unitId, sourceFiles, sourceManifestSha256: manifestSha256 };
 }
 
 export async function exportSegments({
@@ -521,6 +515,7 @@ export async function exportSegments({
   minDurationSeconds = 120,
   videoImuCalibration,
   videoClockAudit,
+  siteId,
   onProgress,
 }) {
   const { sourceDir: resolved, metadata: sourceMetadata } = await assertSourceSession(sourceDir);
@@ -549,8 +544,15 @@ export async function exportSegments({
   await fs.mkdir(rawRoot, { recursive: true });
   const report = (phase, detail = {}) => onProgress?.({ phase, ...detail });
 
-  report('source-hash', { message: '長尺原本のSHA-256を計算中', progress: 0 });
-  const sourceContentHash = await sha256File(sourceVideo, (progress) => report('source-hash', { progress }));
+  const effectiveSiteId = siteId ?? sourceMetadata.site_id;
+  if (!effectiveSiteId) throw new Error('書き出しには匿名site_idが必要です（--site-idで指定してください）');
+  const sourceRecordingId = UNIT_ID_RE.test(sourceMetadata.unit_id)
+    ? sourceMetadata.unit_id
+    : path.basename(resolved);
+  const sourceUnitId = UNIT_ID_RE.test(sourceMetadata.unit_id) ? sourceMetadata.unit_id : null;
+  report('source-hash', { message: '長尺原本の全ファイルを検証中', progress: 0 });
+  const sourceFiles = await describeFiles(resolved, REQUIRED_FILES);
+  const sourceRecordingManifest = sourceRecordingManifestSha256(sourceRecordingId, sourceFiles);
   report('source-packets', { message: '長尺原本のvideo packetを検査中', progress: 0 });
   const sourcePackets = await probeVideoPackets(sourceVideo);
   if (sourceMetadata.video_frame_count !== sourcePackets.length) {
@@ -690,7 +692,7 @@ export async function exportSegments({
   const results = [];
   for (let index = 0; index < states.length; index += 1) {
     const state = states[index];
-    report('finalize', { clipIndex: index, clipCount: states.length, label: state.label, progress: 0, message: 'index・metadata・hashを確定中' });
+    report('finalize', { clipIndex: index, clipCount: states.length, label: state.label, progress: 0, message: 'unit ID・index・metadataを確定中' });
     const framesPath = path.join(state.workDir, 'frames.jsonl');
     const framesStream = fsSync.createWriteStream(framesPath);
     let localIndex = 0;
@@ -701,32 +703,38 @@ export async function exportSegments({
     await closeStream(framesStream);
     await fs.rename(state.rawImuPath, path.join(state.workDir, 'imu.jsonl'));
     await fs.rm(state.rawFramesPath, { force: true });
-    const [contentHash, videoStat] = await Promise.all([
-      sha256File(state.videoPath, (progress) => report('finalize', { clipIndex: index, clipCount: states.length, label: state.label, progress })),
-      fs.stat(state.videoPath),
-    ]);
+    const unitId = createUnitId(
+      effectiveSiteId,
+      dateAtOffset(sourceMetadata.created_at, state.sourceStartPtsSeconds),
+    );
+    const videoStat = await fs.stat(state.videoPath);
     const metadata = buildMetadata(sourceMetadata, state, {
-      sourceContentHash,
+      unitId,
+      siteId: effectiveSiteId,
+      sourceUnitId,
+      sourceRecordingId,
+      sourceRecordingManifestSha256: sourceRecordingManifest,
       media: state.media,
       videoFrameCount: state.outputPackets.length,
       accelerometerSampleCount: state.imuRanges.accelerometer.count,
       gyroscopeSampleCount: state.imuRanges.gyroscope.count,
       audioSampleCount: state.audioSampleCount,
-      contentHash,
       videoBytes: videoStat.size,
       videoImuCalibration: normalizedCalibration,
       videoClockAudit: normalizedClockAudit,
     });
     await fs.writeFile(path.join(state.workDir, 'metadata.json'), `${JSON.stringify(metadata, null, 2)}\n`);
-    const validation = await validateClipFolder(state.workDir);
-    const finalDir = path.join(rawRoot, contentHash);
+    const validation = await validateClipFolder(state.workDir, unitId);
+    const finalDir = path.join(rawRoot, unitId);
     await fs.rename(state.workDir, finalDir);
     results.push({
-      contentHash,
+      unitId,
       label: state.label,
       folder: finalDir,
       durationSeconds: validation.media.durationSeconds,
       videoFrameCount: validation.frameCount,
+      sourceManifestSha256: validation.sourceManifestSha256,
+      sourceFiles: validation.sourceFiles,
     });
   }
   await fs.rm(workRoot, { recursive: true, force: true });
@@ -735,7 +743,12 @@ export async function exportSegments({
     throw new Error(`R2 upload root不一致: ${outputEntries.join(', ')}`);
   }
   report('complete', { progress: 1, outputRoot, clips: results });
-  return { outputRoot, sourceContentHash, clips: results };
+  return {
+    outputRoot,
+    sourceRecordingId,
+    sourceRecordingManifestSha256: sourceRecordingManifest,
+    clips: results,
+  };
 }
 
 export { validateClipFolder };

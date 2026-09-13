@@ -1,5 +1,5 @@
 // Mentra がアップロード済みの映像を iPhone で確認し、同意をクリップへ結び付ける画面。
-// 動画は R2 からストリーミングし、同意後も同じ content_hash のサーバ行を使い続ける。
+// 動画は R2 からストリーミングし、同意後も同じ unit_id のサーバ行を使い続ける。
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -51,8 +51,8 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
   const frame = useUploadedClipFrame(
-    clip ? clip.contentHash : null,
-    clip ? clip.contentHash : null,
+    clip ? clip.unitId : null,
+    clip ? clip.unitId : null,
   );
   const poster: ImageSourcePropType | undefined = frame ? { uri: frame } : undefined;
 
@@ -68,13 +68,13 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
     if (!visible || !clip) return;
 
     let cancelled = false;
-    void fetchClipMediaUrl(clip.contentHash)
+    void fetchClipMediaUrl(clip.unitId)
       .then((url) => { if (!cancelled) setMediaUrl(url); })
       .catch((e) => {
         if (!cancelled) setMediaError(e instanceof ClipApiError ? e.kind : 'server');
       });
     return () => { cancelled = true; };
-  }, [visible, clip?.contentHash]);
+  }, [visible, clip?.unitId]);
 
   if (!clip) return null;
 

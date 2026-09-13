@@ -101,19 +101,19 @@ export function useLocalClipFrame(key: string, videoUri: string | null): string 
 }
 
 /** アップロード済みクリップの代表フレーム (= /media の presigned URL から range 読み)。
- *  識別子は content_hash。 */
-export function useUploadedClipFrame(key: string | null, contentHash: string | null): string | null {
+ *  識別子は unit_id。 */
+export function useUploadedClipFrame(key: string | null, unitId: string | null): string | null {
   const [uri, setUri] = useState<string | null>(key ? frames.get(key) ?? null : null);
   useEffect(() => {
     cleanupLegacyThumbs();
-    if (!key || !contentHash || frames.has(key)) return;
+    if (!key || !unitId || frames.has(key)) return;
     let cancelled = false;
     void resolveFrame(key, async () => {
-      return fetchClipMediaUrl(contentHash);
+      return fetchClipMediaUrl(unitId);
     }).then((u) => {
       if (!cancelled && u) setUri(u);
     });
     return () => { cancelled = true; };
-  }, [key, contentHash]);
+  }, [key, unitId]);
   return uri;
 }

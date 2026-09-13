@@ -12,10 +12,11 @@ from urllib.parse import urlsplit
 
 import requests
 
-from rootlens_import.core import FILES, ImportCancelled, ImportFailure
-from rootlens_import.drive import API, UPLOAD_API, FOLDER_MIME, DriveUploader, completed_hashes
+from rootlens_import.core import FILES, ImportCancelled, ImportFailure, source_manifest_sha256
+from rootlens_import.drive import API, UPLOAD_API, FOLDER_MIME, DriveUploader, completed_unit_ids
 from rootlens_import.site import SiteProfile
 from rootlens_import.upload_state import state_directory
+from unit_fixtures import unit_id as fixture_unit_id
 
 KEY = {"type": "service_account", "project_id": "test-project", "private_key_id": "test-key",
        "private_key": "-----BEGIN PRIVATE KEY-----\nfixture-secret\n-----END PRIVATE KEY-----\n",
@@ -155,14 +156,14 @@ class DriveUploadTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.video = b"v" * (600 * 1024)
-        self.content_hash = hashlib.sha256(self.video).hexdigest()
-        self.path = self.root / ("rec-20260911T010203.000Z-" + self.content_hash[:12])
+        self.unit_id = fixture_unit_id()
+        self.path = self.root / self.unit_id
         self.path.mkdir()
         (self.path / "rgb.mp4").write_bytes(self.video)
         for name in ("frames.jsonl", "imu.jsonl"):
             (self.path / name).write_bytes(b"{}\n")
         (self.path / "metadata.json").write_text(json.dumps({"schema": "rootlens.mentra.raw.v1",
-                    "content_hash": self.content_hash, "files": list(FILES), "created_at": "2026-09-11T01:02:03.000Z"}))
+                    "unit_id": self.unit_id, "files": list(FILES), "created_at": "2026-09-11T01:02:03.000Z"}))
         self.profile = SiteProfile("test-site", "試験", "https://drive.google.com/drive/folders/TESTFOLDER00000", service_account=copy.deepcopy(KEY))
         self.http = DriveHTTP()
         self.states = self.root / "states"
@@ -174,16 +175,16 @@ class DriveUploadTests(unittest.TestCase):
         return uploader
 
     def state_file(self):
-        return state_directory(self.profile, self.states) / (self.content_hash + ".json")
+        return state_directory(self.profile, self.states) / (self.unit_id + ".json")
 
     def test_complete_only_after_every_remote_file_verified_and_deduplicate_restart(self):
         events = []
         result = self.uploader().upload_recording(self.path, on_progress=events.append)
-        self.assertEqual(result.content_hash, self.content_hash)
+        self.assertEqual(result.unit_id, self.unit_id)
         self.assertEqual(events[-1].state, "completed")
         self.assertEqual(events[-1].bytes_uploaded, events[-1].total_bytes)
         self.assertIn("verifying_remote", [item.state for item in events[:-1]])
-        self.assertEqual(completed_hashes(self.profile, self.states), {self.content_hash})
+        self.assertEqual(completed_unit_ids(self.profile, self.states), {self.unit_id})
         self.assertEqual(set(p.name for p in self.path.iterdir()), set(FILES))
         self.assertEqual(len(self.http.files), 6)
         writes = len(self.http.writes)
@@ -205,14 +206,14 @@ class DriveUploadTests(unittest.TestCase):
         self.uploader().upload_recording(self.path)
         writes = [item for item in self.http.writes if item[0] == "rgb.mp4"]
         self.assertEqual([item[1] for item in writes], [0, 256 * 1024, 512 * 1024])
-        self.assertEqual(completed_hashes(self.profile, self.states), {self.content_hash})
+        self.assertEqual(completed_unit_ids(self.profile, self.states), {self.unit_id})
 
     def test_cancel_then_restart_reuses_partial_session_without_duplicate(self):
         cancel = threading.Event()
         self.http.on_chunk = lambda *_: cancel.set()
         with self.assertRaises(ImportCancelled):
             self.uploader().upload_recording(self.path, cancel_event=cancel)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
         state = json.loads(self.state_file().read_text())
         session = state["files"]["rgb.mp4"]["session"]
         self.assertIsNotNone(session)
@@ -231,18 +232,18 @@ class DriveUploadTests(unittest.TestCase):
         self.http.corrupt_file = "imu.jsonl"
         with self.assertRaisesRegex(ImportFailure, "一致しません"):
             self.uploader().upload_recording(self.path)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
         count = len(self.http.writes)
         with self.assertRaises(ImportFailure):
             self.uploader().upload_recording(self.path)
         self.assertEqual(len(self.http.writes), count)
         self.assertEqual((self.path / "rgb.mp4").read_bytes(), self.video)
 
-    def test_local_checksum_mismatch_stops_before_network(self):
+    def test_unit_identity_is_independent_of_file_bytes(self):
         (self.path / "rgb.mp4").write_bytes(b"changed")
-        with self.assertRaises(ImportFailure):
-            self.uploader().upload_recording(self.path)
-        self.assertEqual(self.http.calls, [])
+        result = self.uploader().upload_recording(self.path)
+        self.assertEqual(result.unit_id, self.unit_id)
+        self.assertEqual(completed_unit_ids(self.profile, self.states), {self.unit_id})
 
     def test_local_change_after_first_attempt_fails_before_network(self):
         self.http.corrupt_file = "imu.jsonl"
@@ -303,23 +304,23 @@ class DriveUploadTests(unittest.TestCase):
                 cancel.set()
         with self.assertRaises(ImportCancelled):
             self.uploader().upload_recording(self.path, on_progress=progress, cancel_event=cancel)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
 
     def test_malformed_complete_state_is_not_used_to_hide_recording(self):
         self.uploader().upload_recording(self.path)
         value = json.loads(self.state_file().read_text())
         value["files"]["imu.jsonl"]["verified"] = False
         self.state_file().write_text(json.dumps(value))
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
 
     def test_state_and_credentials_do_not_cross_site_or_destination(self):
         self.uploader().upload_recording(self.path)
         other = SiteProfile("other-site", "他", self.profile.approved_drive_url, service_account=copy.deepcopy(KEY))
-        self.assertEqual(completed_hashes(other, self.states), set())
+        self.assertEqual(completed_unit_ids(other, self.states), set())
         other_account = copy.deepcopy(KEY)
         other_account["client_email"] = "other@test-project.iam.gserviceaccount.com"
         other = SiteProfile(self.profile.site_id, "他", self.profile.approved_drive_url, service_account=other_account)
-        self.assertEqual(completed_hashes(other, self.states), set())
+        self.assertEqual(completed_unit_ids(other, self.states), set())
 
     def test_expired_partial_session_restarts_with_same_file_id(self):
         cancel = threading.Event()
@@ -342,7 +343,7 @@ class DriveUploadTests(unittest.TestCase):
         self.http.files["duplicate"] = duplicate
         with self.assertRaisesRegex(ImportFailure, "複数"):
             self.uploader().upload_recording(self.path)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
 
     def test_changed_file_during_upload_cannot_complete(self):
         def progress(event):
@@ -350,7 +351,7 @@ class DriveUploadTests(unittest.TestCase):
                 (self.path / "frames.jsonl").write_bytes(b"changed")
         with self.assertRaises(ImportFailure):
             self.uploader().upload_recording(self.path, on_progress=progress)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
 
     def test_network_retry_is_bounded_and_preserves_no_completion(self):
         uploader = self.uploader()
@@ -360,7 +361,7 @@ class DriveUploadTests(unittest.TestCase):
         self.assertEqual(request.call_count, 4)
         self.assertNotIn("secret-token", str(caught.exception))
         self.assertTrue(caught.exception.__suppress_context__)
-        self.assertEqual(completed_hashes(self.profile, self.states), set())
+        self.assertEqual(completed_unit_ids(self.profile, self.states), set())
 
     def test_real_google_auth_signs_ephemeral_key_and_refreshes_token(self):
         import base64
@@ -404,39 +405,43 @@ class DriveUploadTests(unittest.TestCase):
         self.assertEqual(len(self.http.files), 1)
 
     def current_fixture(self, index=0):
-        content_hash = self.content_hash if index == 0 else hashlib.sha256(str(index).encode()).hexdigest()
+        unit_id = self.unit_id if index == 0 else fixture_unit_id(index)
         folder_id = f"current-folder-{index}"
-        properties = {"rootlens_site": self.profile.site_id, "rootlens_hash": content_hash,
-                      "rootlens_kind": "recording"}
-        folder = {"id": folder_id, "name": "rec-20260911T010203.000Z-" + content_hash[:12],
-                  "mimeType": FOLDER_MIME, "driveId": "shared-drive", "trashed": False,
-                  "parents": ["TESTFOLDER00000"], "appProperties": properties}
-        self.http.files[folder_id] = folder
         manifest = {}
         for filename in FILES:
             payload = (self.path / filename).read_bytes()
-            sha256 = content_hash if filename == "rgb.mp4" else hashlib.sha256(payload).hexdigest()
+            manifest[filename] = {"size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+        manifest_sha256 = source_manifest_sha256(unit_id, manifest)
+        properties = {"rootlens_site": self.profile.site_id, "rootlens_unit_id": unit_id,
+                      "rootlens_kind": "recording", "rootlens_source_manifest": manifest_sha256}
+        folder = {"id": folder_id, "name": unit_id,
+                  "mimeType": FOLDER_MIME, "driveId": "shared-drive", "trashed": False,
+                  "parents": ["TESTFOLDER00000"], "appProperties": properties}
+        self.http.files[folder_id] = folder
+        for filename in FILES:
+            payload = (self.path / filename).read_bytes()
+            sha256 = hashlib.sha256(payload).hexdigest()
             file_id = folder_id + "-" + filename.replace(".", "-")
             self.http.files[file_id] = {"id": file_id, "name": filename, "parents": [folder_id],
                 "mimeType": "application/octet-stream", "driveId": "shared-drive", "trashed": False,
                 "size": str(len(payload)), "sha256Checksum": sha256,
-                "appProperties": {**properties, "rootlens_kind": "file", "rootlens_file": filename}}
-            manifest[filename] = {"size": len(payload), "sha256": sha256}
-        return content_hash, folder, manifest
+                "appProperties": {"rootlens_site": self.profile.site_id,
+                    "rootlens_unit_id": unit_id, "rootlens_kind": "file", "rootlens_file": filename}}
+        return unit_id, folder, manifest
 
     def test_current_drive_state_without_journal_is_read_only_and_batched(self):
-        hashes = {self.current_fixture(index)[0] for index in range(20)}
+        unit_ids = {self.current_fixture(index)[0] for index in range(20)}
         before = copy.deepcopy(self.http.files)
-        values = self.uploader().current_recordings(hashes)
-        self.assertEqual(set(values), hashes)
+        values = self.uploader().current_recordings(unit_ids)
+        self.assertEqual(set(values), unit_ids)
         self.assertEqual(len(self.http.calls), 5)
         self.assertTrue(all(method == "GET" for method, _, _ in self.http.calls))
         lists = [options["params"] for _, url, options in self.http.calls if url == API + "/files"]
         self.assertTrue(all(params["corpora"] == "user" and "driveId" not in params for params in lists))
         self.assertEqual(before, self.http.files)
         self.assertFalse(self.states.exists())
-        self.assertEqual(set(values[self.content_hash].files), set(FILES))
-        self.assertIsInstance(values[self.content_hash].files["rgb.mp4"]["size"], int)
+        self.assertEqual(set(values[self.unit_id].files), set(FILES))
+        self.assertIsInstance(values[self.unit_id].files["rgb.mp4"]["size"], int)
 
     def test_current_drive_state_requires_valid_targets_and_empty_targets_do_not_connect(self):
         uploader = self.uploader()
@@ -444,14 +449,14 @@ class DriveUploadTests(unittest.TestCase):
             self.assertEqual(uploader.current_recordings(empty), {})
         with self.assertRaises(TypeError):
             uploader.current_recordings()
-        for invalid in (None, self.content_hash, {"short"}, {self.content_hash.upper()}, {123},
-                        [[self.content_hash]], {self.content_hash + "\n"}, {"' or trashed = true"}):
+        for invalid in (None, self.unit_id, {"short"}, {self.unit_id.upper()}, {123},
+                        [[self.unit_id]], {self.unit_id + "\n"}, {"' or trashed = true"}):
             with self.subTest(targets=invalid):
                 with self.assertRaises(ImportFailure):
                     uploader.current_recordings(invalid)
         self.assertEqual(self.http.calls, [])
 
-    def test_current_drive_state_queries_only_requested_hashes_and_their_children(self):
+    def test_current_drive_state_queries_only_requested_unit_ids_and_their_children(self):
         fixtures = [self.current_fixture(index) for index in range(80)]
         target = fixtures[23][0]
         values = self.uploader().current_recordings({target})
@@ -463,10 +468,10 @@ class DriveUploadTests(unittest.TestCase):
         self.assertIn("'TESTFOLDER00000' in parents", folder_query)
         self.assertIn("key='rootlens_site' and value='test-site'", folder_query)
         self.assertIn("key='rootlens_kind' and value='recording'", folder_query)
-        self.assertEqual(re.findall(r"key='rootlens_hash' and value='([^']+)'", folder_query), [target])
+        self.assertEqual(re.findall(r"key='rootlens_unit_id' and value='([^']+)'", folder_query), [target])
         self.assertEqual(re.findall(r"'([^']+)' in parents", child_query), [fixtures[23][1]["id"]])
         self.http.calls.clear()
-        self.assertEqual(self.uploader().current_recordings({"0" * 64}), {})
+        self.assertEqual(self.uploader().current_recordings({fixture_unit_id(999)}), {})
         self.assertEqual(len(self.http.calls), 2)
 
     def test_current_drive_state_discards_out_of_target_folder_response(self):
@@ -475,18 +480,18 @@ class DriveUploadTests(unittest.TestCase):
         original = self.http.request
         def request(method, url, **options):
             response = original(method, url, **options)
-            if url == API + "/files" and "rootlens_hash" in options["params"]["q"]:
+            if url == API + "/files" and "rootlens_unit_id" in options["params"]["q"]:
                 response.value["files"].append(copy.deepcopy(other))
             return response
         with patch.object(self.http, "request", side_effect=request):
-            self.assertEqual(set(self.uploader().current_recordings({self.content_hash})), {self.content_hash})
+            self.assertEqual(set(self.uploader().current_recordings({self.unit_id})), {self.unit_id})
         child_queries = [options["params"]["q"] for _, url, options in self.http.calls
-                         if url == API + "/files" and "rootlens_hash" not in options["params"]["q"]]
+                         if url == API + "/files" and "rootlens_unit_id" not in options["params"]["q"]]
         self.assertNotIn("'current-folder-1' in parents", " ".join(child_queries))
 
     def test_current_drive_state_returns_all_four_current_checksums_and_sizes(self):
-        content_hash, _, manifest = self.current_fixture()
-        result = self.uploader().current_recordings({self.content_hash})[content_hash]
+        unit_id, _, manifest = self.current_fixture()
+        result = self.uploader().current_recordings({self.unit_id})[unit_id]
         for filename in FILES:
             self.assertEqual(result.files[filename]["sha256"], manifest[filename]["sha256"])
             self.assertEqual(result.files[filename]["size"], manifest[filename]["size"])
@@ -498,17 +503,16 @@ class DriveUploadTests(unittest.TestCase):
         file_id = next(key for key, value in self.http.files.items() if value.get("name") == "imu.jsonl")
         del self.http.files[file_id]
         self.http.calls.clear()
-        self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+        self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
         self.assertEqual(self.state_file().read_bytes(), receipt)
         self.assertTrue(all(method == "GET" for method, _, _ in self.http.calls))
 
     def test_current_drive_state_reports_current_bytes_independently_of_local_history(self):
-        content_hash, _, _ = self.current_fixture()
+        unit_id, _, _ = self.current_fixture()
         imu = next(value for value in self.http.files.values() if value.get("name") == "imu.jsonl")
         imu["sha256Checksum"] = hashlib.sha256(b"different current data").hexdigest()
-        current = self.uploader().current_recordings({self.content_hash})[content_hash]
-        self.assertEqual(current.files["imu.jsonl"]["sha256"], imu["sha256Checksum"])
-        self.assertEqual(self.uploader(self.root / "another-pc").current_recordings({self.content_hash})[content_hash], current)
+        self.assertEqual(self.uploader().current_recordings({unit_id}), {})
+        self.assertEqual(self.uploader(self.root / "another-pc").current_recordings({unit_id}), {})
 
     def test_current_drive_state_excludes_deleted_moved_or_trashed_folders(self):
         for change in ("deleted", "moved", "trashed"):
@@ -521,7 +525,7 @@ class DriveUploadTests(unittest.TestCase):
                     folder["parents"] = ["elsewhere"]
                 else:
                     folder["trashed"] = True
-                self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+                self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
     def test_current_drive_state_rechecks_folder_after_reading_children(self):
         for change in ("moved", "trashed", "duplicate", "replaced"):
@@ -544,7 +548,7 @@ class DriveUploadTests(unittest.TestCase):
                                 del self.http.files[folder["id"]]
                     return response
                 with patch.object(self.http, "request", side_effect=request):
-                    self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+                    self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
     def test_current_drive_state_rechecks_destination_after_reading_children(self):
         self.current_fixture()
@@ -556,7 +560,7 @@ class DriveUploadTests(unittest.TestCase):
             return response
         with patch.object(self.http, "request", side_effect=request):
             with self.assertRaises(ImportFailure):
-                self.uploader().current_recordings({self.content_hash})
+                self.uploader().current_recordings({self.unit_id})
 
     def test_current_drive_state_excludes_incomplete_or_invalid_files(self):
         changes = {"missing": None, "trashed": True, "parents": ["elsewhere"],
@@ -571,13 +575,13 @@ class DriveUploadTests(unittest.TestCase):
                     del self.http.files[key]
                 else:
                     self.http.files[key][field] = invalid
-                self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+                self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
-    def test_current_drive_state_excludes_video_identity_mismatch(self):
+    def test_current_drive_state_excludes_source_manifest_mismatch(self):
         self.current_fixture()
         video = next(value for value in self.http.files.values() if value.get("name") == "rgb.mp4")
         video["sha256Checksum"] = "0" * 64
-        self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+        self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
     def test_current_drive_state_excludes_duplicate_folders_and_files(self):
         for duplicate_kind in ("recording", "file"):
@@ -588,34 +592,34 @@ class DriveUploadTests(unittest.TestCase):
                     if value.get("appProperties", {}).get("rootlens_kind") == duplicate_kind))
                 duplicate["id"] = "duplicate-current"
                 self.http.files[duplicate["id"]] = duplicate
-                self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+                self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
     def test_current_drive_state_excludes_other_sites_and_misnamed_folders(self):
-        for field, invalid in (("appProperties", {"rootlens_kind": "recording", "rootlens_hash": self.content_hash,
-                "rootlens_site": "another-site"}), ("name", "rec-20260911T010203.000Z-000000000000")):
+        for field, invalid in (("appProperties", {"rootlens_kind": "recording", "rootlens_unit_id": self.unit_id,
+                "rootlens_site": "another-site"}), ("name", fixture_unit_id(999))):
             with self.subTest(field=field):
                 self.http = DriveHTTP()
                 _, folder, _ = self.current_fixture()
                 folder[field] = invalid
-                self.assertEqual(self.uploader().current_recordings({self.content_hash}), {})
+                self.assertEqual(self.uploader().current_recordings({self.unit_id}), {})
 
     def test_current_drive_state_follows_pages_and_splits_parent_groups(self):
-        hashes = {self.current_fixture(index)[0] for index in range(41)}
+        unit_ids = {self.current_fixture(index)[0] for index in range(41)}
         self.http.page_size = 7
-        self.assertEqual(set(self.uploader().current_recordings(hashes)), hashes)
+        self.assertEqual(set(self.uploader().current_recordings(unit_ids)), unit_ids)
         children_queries = {options["params"]["q"] for _, url, options in self.http.calls
                             if url == API + "/files" and "current-folder-" in options["params"]["q"]}
         self.assertEqual(len(children_queries), 3)
         self.assertTrue(all(len(re.findall(r"'([^']+)' in parents", query)) <= 20 for query in children_queries))
         folder_queries = {options["params"]["q"] for _, url, options in self.http.calls
-                          if url == API + "/files" and "rootlens_hash" in options["params"]["q"]}
+                          if url == API + "/files" and "rootlens_unit_id" in options["params"]["q"]}
         self.assertEqual(len(folder_queries), 3)
         requested = set()
         for query in folder_queries:
-            batch = re.findall(r"key='rootlens_hash' and value='([^']+)'", query)
+            batch = re.findall(r"key='rootlens_unit_id' and value='([^']+)'", query)
             self.assertLessEqual(len(batch), 20)
             requested.update(batch)
-        self.assertEqual(requested, hashes)
+        self.assertEqual(requested, unit_ids)
 
     def test_current_drive_state_rejects_partial_and_looping_list_responses(self):
         self.current_fixture()
@@ -627,18 +631,18 @@ class DriveUploadTests(unittest.TestCase):
                     return Response(body=malformed) if url == API + "/files" else original(method, url, **options)
                 with patch.object(self.http, "request", side_effect=request) as calls:
                     with self.assertRaises(ImportFailure):
-                        self.uploader().current_recordings({self.content_hash})
+                        self.uploader().current_recordings({self.unit_id})
                     self.assertLessEqual(calls.call_count, 3)
 
     def test_current_drive_state_can_cancel_and_read_without_write_permission(self):
         self.current_fixture()
         self.http.files["TESTFOLDER00000"]["capabilities"] = {"canAddChildren": False}
-        self.assertEqual(set(self.uploader().current_recordings({self.content_hash})), {self.content_hash})
+        self.assertEqual(set(self.uploader().current_recordings({self.unit_id})), {self.unit_id})
         self.http.calls.clear()
         cancel = threading.Event()
         cancel.set()
         with self.assertRaises(ImportCancelled):
-            self.uploader().current_recordings({self.content_hash}, cancel_event=cancel)
+            self.uploader().current_recordings({self.unit_id}, cancel_event=cancel)
         self.assertEqual(self.http.calls, [])
 
     def test_current_drive_state_never_returns_partial_results_after_network_failure(self):
@@ -650,6 +654,6 @@ class DriveUploadTests(unittest.TestCase):
             return original(method, url, **options)
         with patch.object(self.http, "request", side_effect=request):
             with self.assertRaises(ImportFailure) as caught:
-                self.uploader().current_recordings({self.content_hash})
+                self.uploader().current_recordings({self.unit_id})
         self.assertNotIn("fixture-secret", str(caught.exception))
         self.assertFalse(self.states.exists())

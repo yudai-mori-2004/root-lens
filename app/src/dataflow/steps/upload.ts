@@ -1,8 +1,8 @@
 // Upload step: PUT the recording's files to R2.
 //
-// POST the content hash + recording config to /api/v1/raw-uploads to get
+// POST the unit id + recording config to /api/v1/raw-uploads to get
 // presigned PUT URLs, then send the recording config's output files under
-// raw/<content_hash>/. The server derives the target bucket from the config
+// raw/<unit_id>/. The server derives the target bucket from the config
 // (arkit → the raw ARKit bucket).
 //
 // ⚠ Dataflow layer: must not import react / react-native.
@@ -18,6 +18,7 @@ interface PresignedFile {
   url: string;
   key: string;
   contentType: string;
+  headers: Record<string, string>;
 }
 interface PresignResponse {
   files: Record<string, PresignedFile>;
@@ -25,13 +26,17 @@ interface PresignResponse {
 }
 
 async function requestPresignedUrls(
-  contentHash: string,
-  recordingConfig: string,
+  input: UploadInput,
 ): Promise<PresignResponse> {
   const res = await fetch(`${SERVER_URL}/api/v1/raw-uploads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
-    body: JSON.stringify({ contentHash, recordingConfig }),
+    body: JSON.stringify({
+      unitId: input.unitId,
+      recordingConfig: input.recordingConfig,
+      sourceManifestSha256: input.sourceManifestSha256,
+      sourceFiles: input.sourceFiles,
+    }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -68,7 +73,7 @@ async function putWithRetry(
         httpMethod: 'PUT',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
         sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
-        headers: { 'Content-Type': target.contentType },
+        headers: target.headers,
       },
       (data) => onSentBytes(data.totalBytesSent),
     );
@@ -98,7 +103,7 @@ async function putWithRetry(
 }
 
 /**
- * Get presigned URLs for the content hash and PUT the files map (name → local
+ * Get presigned URLs for the unit id and PUT the files map (name → local
  * URI) to R2. A file whose name has no presigned URL fails loudly, which is how
  * a drift between the recording config and the server contract gets caught.
  */
@@ -109,7 +114,7 @@ export async function uploadToR2(
   onProgress?: (fraction: number) => void,
 ): Promise<UploadResult> {
   sink({ step: 'r2-upload', level: 'info', message: `presigned URL を取得 (構成 ${input.recordingConfig})` });
-  const presigned = await requestPresignedUrls(input.contentHash, input.recordingConfig);
+  const presigned = await requestPresignedUrls(input);
 
   const names = Object.keys(input.files);
 

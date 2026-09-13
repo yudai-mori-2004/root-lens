@@ -2,19 +2,17 @@ import CryptoKit
 import ExpoModulesCore
 import Foundation
 
-// content_hash (= 生 mp4 の SHA-256) のネイティブ計算。
-//
-// v0.1.4 の識別子は「生 mp4 のバイト内容の SHA-256」 (DATA_SPECS_JA.md)。 JS (Hermes) で
-// 計算すると数 GB で数十分かかるため、 ここでファイルを 4MB ずつ順次読みながら
-// CryptoKit SHA256 (= ハードウェア支援、 GB/s 級) で計算する。 ランダムアクセスは不要。
+// Large-file SHA-256 for source-file integrity manifests. JS (Hermes) is too
+// slow for multi-GB recordings, so files are streamed through CryptoKit in 4 MB
+// chunks without loading them into memory.
 //
 // 提供:
 //   AsyncFunction("sha256File", path) 64 文字 hex を返す。 path は file:// URI か素の絶対パス。
 
-public class ContentHashModule: Module {
+public class FileHashModule: Module {
 
   public func definition() -> ModuleDefinition {
-    Name("ContentHash")
+    Name("FileHash")
 
     AsyncFunction("sha256File") { (path: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
@@ -25,7 +23,7 @@ public class ContentHashModule: Module {
           url = URL(fileURLWithPath: path)
         }
         guard let stream = InputStream(url: url) else {
-          promise.reject("CONTENT_HASH_OPEN_ERROR", "cannot open file: \(url.path)")
+          promise.reject("FILE_HASH_OPEN_ERROR", "cannot open file: \(url.path)")
           return
         }
         stream.open()
@@ -43,7 +41,7 @@ public class ContentHashModule: Module {
           }
           if n < 0 {
             let msg = stream.streamError?.localizedDescription ?? "read failed"
-            promise.reject("CONTENT_HASH_READ_ERROR", "\(msg) (at byte \(total))")
+            promise.reject("FILE_HASH_READ_ERROR", "\(msg) (at byte \(total))")
             return
           }
           if n == 0 { break }
@@ -51,7 +49,7 @@ public class ContentHashModule: Module {
           total += n
         }
         if total == 0 {
-          promise.reject("CONTENT_HASH_EMPTY_ERROR", "file is empty: \(url.path)")
+          promise.reject("FILE_HASH_EMPTY_ERROR", "file is empty: \(url.path)")
           return
         }
         let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()

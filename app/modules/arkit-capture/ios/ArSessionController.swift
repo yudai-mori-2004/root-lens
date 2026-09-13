@@ -762,7 +762,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       obj["video_bytes"] = bytes.int64Value
     }
     // Configのupload manifestに含まれ、実際にこのsessionへ生成されたものだけを列挙する。
-    // content hashはMP4確定後にJS層で計算する識別子で、ファイルとしては納品しない。
+    // unit_idとsource manifestは録画確定後にJS層で付与する。
     let deliveryNames = [
       "rgb.mp4", "frames.jsonl", "imu.jsonl", "metadata.json", "depth.tar",
       "pointcloud.jsonl", "mesh.jsonl", "arkit_imu.jsonl", "device_metrics.jsonl",

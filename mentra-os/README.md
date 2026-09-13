@@ -23,7 +23,7 @@ RootLens APKは撮影と端末内保存だけを担当し、ネットワーク�
 RootLensは匿名化処理後の内容を事業所が確認できるよう案内し、匿名化処理完了後7日間は販売先へ
 提供しない。この期間はPCへの取り込みやアップロードの日時から計算しない。
 
-各クリップは `rec-<撮影UTC時刻>-<content hashの先頭>` フォルダになり、
+各クリップはPC上で`<unit_id>`フォルダになり、
 `rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json` の4ファイルがそろう。
 この録画フォルダをそのままアップロードし、映像と対応するセンサーデータをまとめて管理する。
 アプリ内の確認チェック、担当者名・同意書番号の入力、別の承認記録ファイルは設けない。
@@ -33,7 +33,7 @@ RootLensは匿名化処理後の内容を事業所が確認できるよう案内
 Driveから配布する。一覧は接続した端末とDriveの現在の情報から作り、PCに残ったコピーや完了履歴は使わない。
 
 取り込みはUSB接続のADBを使う。録画の確定が済んだクリップだけをコピーし、端末側とPC側の
-4ファイルすべてのSHA-256を比較する。`metadata.json`の`content_hash`と映像のSHA-256も
+4ファイルすべてのSHA-256を比較する。事業所設定、`metadata.json`の`site_id`、`unit_id`も
 照合し、すべて一致してから通常のクリップフォルダとして表示する。コピー中のデータは別の非表示作業領域へ
 置き、ケーブル切断などのエラー時には取り除く。PCの強制終了などで作業中のファイルが残っても、
 Google Driveへ渡すフォルダには混ざらず、次回接続時に作業用の残骸を回収する。もう一度実行すれば再試行できる。
@@ -67,9 +67,8 @@ Macの`Import Recordings.command`も同じCLIを呼ぶ開発用の入口とし�
 | `frames.jsonl` | MP4の全video sampleにつき1行。MP4 PTS、Camera2の露光開始timestamp、共通timelineへ写したtimestamp、前後のaccel/gyro indexとtimestamp |
 | `imu.jsonl` | accelerometerとgyroscopeのraw `SensorEvent`。event timestamp、callback時のelapsed realtime、値、精度 |
 | `camera_frames.raw.jsonl` | Camera2 capture resultの監査用raw記録。フレーム番号、露光開始、露光時間、frame duration、rolling-shutter skew、callback時刻 |
-| `metadata.json` | codec、解像度、色、端末probe、ファイル数、SHA-256等の静的・集計情報 |
+| `metadata.json` | codec、解像度、色、端末probe、ファイル数等の静的・集計情報。PC取り込み時に`site_id`と`unit_id`を追記 |
 | `sync_report.json` | 端末内だけに保持する内部QA用の同期診断。PCへ取り込む4ファイルには含めない |
-| `content_hash.txt` | raw `rgb.mp4` のSHA-256 |
 | `camera_index.bin`、`video_index.bin`、`accelerometer_index.bin`、`gyroscope_index.bin` | フレーム・センサー対応付けのための端末内作業ファイル。PCへ取り込む4ファイルには含めない |
 
 1回の開始から手動停止までは1本のクリップとして収録し、録画時間の上限を5時間とする。30分での
@@ -295,5 +294,5 @@ unit test・lint・build済みで実機へ導入済み。stock ASGは復元可�
 APKを再導入した。
 
 `metadata.json` の `files` はPCへ取り込む4ファイルを列挙する。
-`camera_frames.raw.jsonl`、`sync_report.json`、`content_hash.txt`は端末内の監査・整合性確認に使う
+`camera_frames.raw.jsonl`、`sync_report.json`は端末内の監査・整合性確認に使う
 補助ファイルとして保持する。

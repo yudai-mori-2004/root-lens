@@ -15,7 +15,6 @@ domain / site の正は DB の accounts テーブル。
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import os
 
@@ -32,33 +31,6 @@ def r2_client():
     )
 
 
-QT_EPOCH = dt.datetime(1904, 1, 1, tzinfo=dt.timezone.utc)
-
-
-def mp4_creation_time_from_r2(s3, bucket: str, key: str) -> dt.datetime | None:
-    """raw rgb.mp4 の mvhd creation_time (= 録画開始の壁時計 UTC) を末尾 16MB の
-    レンジ読みで取り出す (fpvlabs.py の _mp4_creation_time と同じ規則)。"""
-    import struct
-
-    size = s3.head_object(Bucket=bucket, Key=key)["ContentLength"]
-    buf = s3.get_object(Bucket=bucket, Key=key,
-                        Range=f"bytes={max(0, size - 16_000_000)}-")["Body"].read()
-    i = buf.rfind(b"mvhd")
-    if i < 0:
-        # 一部の録画は moov が先頭側にある (中断復旧などで書き直された個体)。
-        buf = s3.get_object(Bucket=bucket, Key=key, Range="bytes=0-15999999")["Body"].read()
-        i = buf.rfind(b"mvhd")
-    if i < 0:
-        return None
-    version = buf[i + 4]
-    if version == 0:
-        secs = struct.unpack(">I", buf[i + 8:i + 12])[0]
-    else:
-        secs = struct.unpack(">Q", buf[i + 8:i + 16])[0]
-    ts = QT_EPOCH + dt.timedelta(seconds=secs)
-    return ts if 2020 <= ts.year <= 2035 else None
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bucket", default=os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs"))
@@ -69,13 +41,20 @@ def main():
     s3 = r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
 
-    sessions: dict[str, int] = {}
+    objects: dict[str, dict] = {}
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=args.bucket):
         for obj in page.get("Contents") or []:
             key = obj["Key"]
-            if key.endswith("/session.mcap") and key.count("/") == 1:
-                sessions[key.split("/")[0]] = obj["Size"]
+            if key.count("/") != 1:
+                continue
+            unit_id, name = key.split("/", 1)
+            if name in {"session.mcap", "delivery-manifest.json"}:
+                objects.setdefault(unit_id, {})[name] = obj
+    sessions = {
+        unit_id: value for unit_id, value in objects.items()
+        if {"session.mcap", "delivery-manifest.json"}.issubset(value)
+    }
 
     rows: dict[str, dict] = {}
     if sessions:
@@ -83,39 +62,22 @@ def main():
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select c.content_hash, c.duration_ms, c.created_at, c.recorded_at,"
+                    "select c.unit_id, c.duration_ms, c.created_at, c.recorded_at,"
                     " a.domain, a.site"
                     " from clips c left join accounts a on a.id = c.account_id"
-                    " where c.content_hash = any(%s)",
+                    " where c.unit_id = any(%s)",
                     (list(sessions),),
                 )
                 rows = {h: {"duration_ms": d, "created_at": c, "recorded_at": r,
                             "domain": dom, "site": site}
                         for h, d, c, r, dom, site in cur.fetchall()}
 
-            # clips.recorded_at が未記録のセッションは raw の mvhd から読んで埋める
-            # (通常はパイプラインが埋めるので、 ここに来るのは導入前の在庫だけ)。
-            for h, row in rows.items():
-                if row["recorded_at"] is not None:
-                    continue
-                rec = mp4_creation_time_from_r2(s3, bucket_raw, f"raw/{h}/rgb.mp4")
-                if rec is None:
-                    print(f"  ⚠ {h[:8]}: mvhd が読めない (recordedAt は推定値になる)")
-                    continue
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "update clips set recorded_at = %s"
-                        " where content_hash = %s and recorded_at is null",
-                        (rec, h),
-                    )
-                conn.commit()
-                row["recorded_at"] = rec
-                print(f"  ✓ {h[:8]}: recorded_at = {rec.isoformat()}")
         finally:
             conn.close()
 
     entries = []
-    for h, mcap_bytes in sessions.items():
+    for h, objects_for_unit in sessions.items():
+        mcap_bytes = objects_for_unit["session.mcap"]["Size"]
         db_row = rows.get(h)
         if not db_row:
             print(f"  ⚠ {h[:8]}: clips テーブルに未登録 (欠損フィールドは null)")
@@ -130,16 +92,14 @@ def main():
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
         uploaded = db_row["created_at"] if db_row else None
-        # recordedAt の正は clips.recorded_at (= mvhd 由来)。 読めなかった行だけ
-        # 「アップロード時刻 − 尺」で録画開始を近似 (fpvlabs.py と同じ規則)。
+        # recordedAt の正はunit発行時に固定したclips.recorded_at。
         recorded = db_row["recorded_at"] if db_row else None
         if recorded is not None:
             recorded = recorded.isoformat()
-        elif uploaded is not None:
-            recorded = (uploaded - dt.timedelta(
-                milliseconds=(db_row["duration_ms"] or 0))).isoformat()
+        delivery_head = s3.head_object(Bucket=args.bucket, Key=f"{h}/delivery-manifest.json")
+        delivery_manifest_sha256 = (delivery_head.get("Metadata") or {}).get("delivery-manifest-sha256")
         entries.append({
-            "contentHash": h,
+            "unitId": h,
             "domain": db_row["domain"] if db_row else None,
             "site": db_row["site"] if db_row else None,
             "recordedAt": recorded,
@@ -152,8 +112,9 @@ def main():
             "osVersion": meta.get("os_version"),
             "blurred": True,
             "mcapBytes": mcap_bytes,
+            "deliveryManifestSha256": delivery_manifest_sha256,
         })
-    entries.sort(key=lambda e: (e.get("recordedAt") or "", e["contentHash"]))
+    entries.sort(key=lambda e: (e.get("recordedAt") or "", e["unitId"]))
     lines = "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n" for e in entries)
     s3.put_object(Bucket=args.bucket, Key="manifest.jsonl", Body=lines.encode("utf-8"),
                   ContentType="application/x-ndjson")

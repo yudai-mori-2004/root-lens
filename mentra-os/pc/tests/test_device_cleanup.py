@@ -12,15 +12,17 @@ import threading
 from types import SimpleNamespace
 import unittest
 
-from rootlens_import.core import FILES, ImportCancelled, ImportFailure, validate_metadata
+from rootlens_import.core import (FILES, ImportCancelled, ImportFailure,
+                                  source_manifest_sha256, validate_metadata)
 from rootlens_import.device_cleanup import (
     AUXILIARY_FILES, PENDING_NAME, cleanup_recording, discover_pending, _manifest,
 )
+from unit_fixtures import unit_id
 
 
 ROOT = "/sdcard/Android/data/io.rootlens.mentra.debug/files/recordings"
 NAME = "rec-20260911T123456.789Z"
-FIXTURE_AUXILIARY = ("camera_frames.raw.jsonl", "content_hash.txt", "sync_report.json")
+FIXTURE_AUXILIARY = ("camera_frames.raw.jsonl", "sync_report.json")
 
 
 class LocalAdb:
@@ -90,11 +92,14 @@ class LocalAdb:
         return result
 
 
-def descriptor_for(path, content_hash):
-    return SimpleNamespace(content_hash=content_hash, folder_id="drive-folder", name=NAME + "-" + content_hash[:12],
-                           files={name: dict(id="file-" + str(index), size=(path / name).stat().st_size,
-                                            sha256=hashlib.sha256((path / name).read_bytes()).hexdigest())
-                                  for index, name in enumerate(FILES)})
+def descriptor_for(path, identity):
+    files = {name: dict(id="file-" + str(index), size=(path / name).stat().st_size,
+                        sha256=hashlib.sha256((path / name).read_bytes()).hexdigest())
+             for index, name in enumerate(FILES)}
+    source_files = {name: {"size": item["size"], "sha256": item["sha256"]} for name, item in files.items()}
+    from rootlens_import.core import source_manifest_sha256
+    return SimpleNamespace(unit_id=identity, folder_id="drive-folder", name=identity, files=files,
+                           source_manifest_sha256=source_manifest_sha256(identity, source_files))
 
 
 @unittest.skipIf(os.name == "nt", "Uses a POSIX shell to execute Android command guards on fixture files")
@@ -107,14 +112,14 @@ class DeviceCleanupTests(unittest.TestCase):
         self.path = self.root / NAME
         self.path.mkdir(parents=True)
         video = b"synthetic video bytes, never a real recording"
-        self.content_hash = hashlib.sha256(video).hexdigest()
-        metadata = dict(schema="rootlens.mentra.raw.v1", files=list(FILES), content_hash=self.content_hash)
+        self.unit_id = unit_id()
+        metadata = dict(schema="rootlens.mentra.raw.v1", files=list(FILES), unit_id=self.unit_id)
         payloads = dict(zip(FILES, (video, b'{"frame":1}\n', b'{"imu":1}\n', json.dumps(metadata).encode())))
         for name, payload in payloads.items():
             (self.path / name).write_bytes(payload)
         for name in FIXTURE_AUXILIARY:
-            (self.path / name).write_text(self.content_hash + "\n" if name == "content_hash.txt" else "diagnostic\n")
-        self.descriptor = descriptor_for(self.path, self.content_hash)
+            (self.path / name).write_text("diagnostic\n")
+        self.descriptor = descriptor_for(self.path, self.unit_id)
         self.reads = []
         self.progress = []
         self.neighbor = self.root / "rec-20260911T000000.000Z"
@@ -123,11 +128,11 @@ class DeviceCleanupTests(unittest.TestCase):
 
     def read_drive(self, digest):
         self.reads.append(digest)
-        self.assertEqual(digest, self.content_hash)
+        self.assertEqual(digest, self.unit_id)
         return copy.deepcopy(self.descriptor)
 
     def clean(self, name=NAME, reader=None, adb=None):
-        return cleanup_recording(adb or self.adb, ROOT, name, self.content_hash,
+        return cleanup_recording(adb or self.adb, ROOT, name, self.unit_id,
                                  reader or self.read_drive, log=lambda _: None,
                                  on_progress=self.progress.append)
 
@@ -143,7 +148,7 @@ class DeviceCleanupTests(unittest.TestCase):
 
     def test_complete_recording_retires_all_seven_only_after_fresh_drive_and_sync(self):
         result = self.clean()
-        self.assertEqual((result.name, result.content_hash), (NAME, self.content_hash))
+        self.assertEqual((result.name, result.unit_id), (NAME, self.unit_id))
         self.assertFalse(self.path.exists())
         self.assertEqual(discover_pending(self.adb, ROOT), [])
         self.assertEqual((self.neighbor / "keep.txt").read_text(), "not this recording")
@@ -154,7 +159,7 @@ class DeviceCleanupTests(unittest.TestCase):
         rename = next(index for index, value in enumerate(commands) if " && mv " in value)
         sync = next(index for index, value in enumerate(commands) if value.endswith(" && sync"))
         unlinks = [index for index, value in enumerate(commands) if " && rm -- " in value]
-        self.assertEqual(len(unlinks), 7)
+        self.assertEqual(len(unlinks), 6)
         self.assertLess(rename, sync)
         self.assertLess(sync, min(unlinks))
         self.assertFalse(any("rm -" in item for item in commands if "rm -- " not in item))
@@ -245,7 +250,7 @@ class DeviceCleanupTests(unittest.TestCase):
             self.clean()
         self.assert_no_mutation()
         (self.path / "imu.jsonl").write_bytes(original)
-        (self.path / "content_hash.txt").write_text("0" * 64)
+        (self.path / "unexpected.txt").write_text("not part of the recording contract")
         with self.assertRaises(ImportFailure):
             self.clean()
         self.assert_no_mutation()
@@ -266,7 +271,7 @@ class DeviceCleanupTests(unittest.TestCase):
             self.clean()
         self.adb.after_shell = None
         path = self.root / self.pending().name
-        self.assertEqual(len(list(path.iterdir())), 8)
+        self.assertEqual(len(list(path.iterdir())), 7)
         self.assertFalse(any(" && rm -- " in command for command in self.adb.commands))
 
     def test_cancel_before_verification_performs_no_io(self):
@@ -309,13 +314,13 @@ class DeviceCleanupTests(unittest.TestCase):
             self.clean()
         self.adb.before_shell = None
         pending = self.pending()
-        self.assertEqual(len(list((self.root / pending.name).iterdir())), 7)
+        self.assertEqual(len(list((self.root / pending.name).iterdir())), 6)
         self.assertFalse(any(" && rm -- " in command for command in self.adb.commands))
         self.clean(pending.name, adb=LocalAdb(self.temporary.name))
 
     def test_lost_usb_reply_after_each_mutation_resumes_without_pc_history(self):
-        # Rename, each of seven unlinks, and rmdir can succeed before USB disappears.
-        for cut in range(9):
+        # Rename, each of six unlinks, and rmdir can succeed before USB disappears.
+        for cut in range(8):
             with self.subTest(cut=cut):
                 if cut:
                     self.setUp()
@@ -331,7 +336,7 @@ class DeviceCleanupTests(unittest.TestCase):
                     self.clean()
                 other_pc = LocalAdb(self.temporary.name)
                 found = discover_pending(other_pc, ROOT)
-                if cut < 8:
+                if cut < 7:
                     self.assertEqual(len(found), 1)
                     self.clean(found[0].name, adb=other_pc)
                 else:
@@ -387,8 +392,8 @@ class DeviceCleanupTests(unittest.TestCase):
                 self.assertEqual(discover_pending(other_pc, ROOT), [])
 
     def test_existing_pending_target_is_never_overwritten_or_nested(self):
-        digest = _manifest(self.read_drive, self.content_hash, NAME)[1]
-        target = self.root / f".rootlens-cleanup-{NAME}-{self.content_hash}-{digest}"
+        digest = _manifest(self.read_drive, self.unit_id, NAME)[1]
+        target = self.root / f".rootlens-cleanup-{NAME}-{self.unit_id}-{digest}"
         target.mkdir()
         (target / "keep.txt").write_text("keep")
         with self.assertRaises(ImportFailure):
@@ -402,8 +407,8 @@ class DeviceCleanupTests(unittest.TestCase):
         with self.assertRaises(ImportFailure):
             discover_pending(self.adb, ROOT)
         bad.rmdir()
-        digest = _manifest(self.read_drive, self.content_hash, NAME)[1]
-        target = self.root / f".rootlens-cleanup-{NAME}-{self.content_hash}-{digest}"
+        digest = _manifest(self.read_drive, self.unit_id, NAME)[1]
+        target = self.root / f".rootlens-cleanup-{NAME}-{self.unit_id}-{digest}"
         target.symlink_to(self.path, target_is_directory=True)
         with self.assertRaises(ImportFailure):
             discover_pending(self.adb, ROOT)
@@ -429,17 +434,20 @@ class DeviceCleanupTests(unittest.TestCase):
         self.adb.selector = ["-t", "23"]
         for root, name in ((ROOT + "/..", NAME), ("/sdcard/recordings", NAME), (ROOT, "../" + NAME)):
             with self.assertRaises(ImportFailure):
-                cleanup_recording(self.adb, root, name, self.content_hash, self.read_drive)
+                cleanup_recording(self.adb, root, name, self.unit_id, self.read_drive)
             self.assertEqual(self.adb.commands, [])
 
 
 class CleanupManifestTests(unittest.TestCase):
     def setUp(self):
-        self.digest = "a" * 64
-        self.recording = SimpleNamespace(content_hash=self.digest, name=NAME + "-" + self.digest[:12],
-                                         folder_id="folder", files={name: dict(id="id" + str(index), size=123,
-                                                                              sha256=self.digest)
-                                                                   for index, name in enumerate(FILES)})
+        self.digest = unit_id()
+        files = {name: dict(id="id" + str(index), size=123, sha256="a" * 64)
+                 for index, name in enumerate(FILES)}
+        source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                        for name, item in files.items()}
+        self.recording = SimpleNamespace(unit_id=self.digest, name=self.digest,
+                                         folder_id="folder", files=files,
+                                         source_manifest_sha256=source_manifest_sha256(self.digest, source_files))
 
     def manifest(self):
         return _manifest(lambda _: self.recording, self.digest, NAME)[1]
@@ -450,13 +458,17 @@ class CleanupManifestTests(unittest.TestCase):
         self.assertEqual(self.manifest(), baseline)
         for filename in FILES:
             for field, value in (("id", "replacement"), ("size", 124), ("sha256", "b" * 64)):
-                if filename == "rgb.mp4" and field == "sha256":
-                    continue
                 with self.subTest(file=filename, field=field):
                     old = self.recording.files[filename][field]
                     self.recording.files[filename][field] = value
+                    source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                                    for name, item in self.recording.files.items()}
+                    self.recording.source_manifest_sha256 = source_manifest_sha256(self.digest, source_files)
                     self.assertNotEqual(self.manifest(), baseline)
                     self.recording.files[filename][field] = old
+                    source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                                    for name, item in self.recording.files.items()}
+                    self.recording.source_manifest_sha256 = source_manifest_sha256(self.digest, source_files)
         self.recording.folder_id = "another-folder"
         self.assertNotEqual(self.manifest(), baseline)
         pending = f".rootlens-cleanup-{NAME}-{self.digest}-{baseline}"
@@ -467,7 +479,7 @@ class CleanupManifestTests(unittest.TestCase):
         original = copy.deepcopy(self.recording)
         mutations = [lambda: setattr(self.recording, "folder_id", "../folder"),
                      lambda: setattr(self.recording, "name", NAME),
-                     lambda: setattr(self.recording, "content_hash", "b" * 64),
+                     lambda: setattr(self.recording, "unit_id", "b" * 64),
                      lambda: self.recording.files.pop("imu.jsonl"),
                      lambda: self.recording.files.update(extra={}),
                      lambda: self.recording.files["imu.jsonl"].update(size=True),

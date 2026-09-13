@@ -4,7 +4,7 @@ import {
 
 // v0.1.4: 「データを取って id に紐づけるだけの機械」 の最小 schema。
 //
-// public スキーマは clips / consent_events / accounts の 3 テーブル。 アカウントの実体は
+// public スキーマは clips / upload_units / consent_events / accounts の4テーブル。アカウントの実体は
 // Supabase Auth (auth.users) が持ち、 accounts はその撮影運用属性 (domain / site の匿名コード)
 // だけを載せる。 店名・契約・振込先などの実世界対応は一切 DB に置かず、 運営の台帳
 // (freee 取引先メモ等) で uuid ↔ 実世界を対応させる (= 店名非公表の構造的保証。
@@ -14,9 +14,8 @@ export const clips = pgTable(
   "clips",
   {
     // ── 識別・所有 ───────────────────────────────────────────────────
-    /// raw mp4 バイト列の SHA-256 hex。 端末で計算し、 R2 raw キーと
-    /// 完全に 1:1 (= raw/<content_hash>/*)。 ストレージが内容アドレスで世界一意なので DB も同じ。
-    contentHash: text("content_hash").primaryKey(),
+    /// 撮影単位の不透明な識別子。R2 raw キーと1:1 (= raw/<unit_id>/*)。
+    unitId: text("unit_id").primaryKey(),
 
     /// 撮影アカウント (= auth.users.id)。 検証済み JWT の sub からのみ書かれる。
     accountId: uuid("account_id").notNull(),
@@ -27,10 +26,8 @@ export const clips = pgTable(
     /// 行作成時刻 (= 登録 ≒ アップロード完了時刻)。
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 
-    /// 録画開始時刻 (= raw rgb.mp4 の QuickTime mvhd creation_time、 UTC)。 撮影から
-    /// アップロードまで数十時間空くことがあるため created_at とは別に持つ。
-    /// 納品パイプラインが raw を読むついでに埋める (nullable = まだ読んでいない)。
-    recordedAt: timestamp("recorded_at", { withTimezone: true }),
+    /// 録画開始時刻。unit_id発行時に固定し、created_atとは別に持つ。
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
 
     // ── 撮影ファクト (端末申告) ───────────────────────────────────────
     /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit' | 'mentra' | 'iphone')。
@@ -40,7 +37,12 @@ export const clips = pgTable(
     durationMs: integer("duration_ms"),
 
     /// rgb.mp4 (= raw、 blur 無し) のバイト数。
-    contentSize: bigint("content_size", { mode: "number" }),
+    videoBytes: bigint("video_bytes", { mode: "number" }).notNull(),
+
+    /// 送信対象となった全rawファイルの完全性。ファイル名順に正規化した
+    /// source manifestのSHA-256と、そのファイル一覧を保存する。
+    sourceManifestSha256: text("source_manifest_sha256").notNull(),
+    sourceFiles: jsonb("source_files").notNull(),
 
     /// 撮影端末の機種 (= utsname machine、 例 "iPhone15,2")。 来歴用。
     deviceModel: text("device_model"),
@@ -53,6 +55,22 @@ export const clips = pgTable(
 
 export type Clip = typeof clips.$inferSelect;
 export type NewClip = typeof clips.$inferInsert;
+
+/// Upload reservation created when the server issues a unit id. It prevents a
+/// caller from obtaining R2 write URLs for another account's recording unit.
+export const uploadUnits = pgTable(
+  "upload_units",
+  {
+    unitId: text("unit_id").primaryKey(),
+    accountId: uuid("account_id").notNull(),
+    recordingConfig: text("recording_config").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("upload_units_account_id_idx").on(t.accountId)],
+);
+
+export type UploadUnit = typeof uploadUnits.$inferSelect;
 
 /// 撮影アカウントの現場属性 (= 納品 manifest の domain / site の正)。 id は auth.users.id。
 /// site は "bakery-01" のような匿名コードのみ (実世界との対応は台帳側に置く)。
@@ -89,11 +107,11 @@ export const consentEvents = pgTable(
     docSlug: text("doc_slug").notNull(),
     docVersion: text("doc_version").notNull(),
     /// 正本全文 (raw md) の SHA-256 hex
-    docContentHash: text("doc_content_hash").notNull(),
+    docSha256: text("doc_sha256").notNull(),
     /// 画面に表示した層1要約の版
     summaryVersion: text("summary_version").notNull(),
     /// 表示した要約文言 (locale 別) の SHA-256 hex
-    summaryHash: text("summary_hash").notNull(),
+    summarySha256: text("summary_sha256").notNull(),
 
     /// 同意スコープ (= ['collection','ai_training_use','license_sale','cross_border'])
     scopes: jsonb("scopes").notNull(),

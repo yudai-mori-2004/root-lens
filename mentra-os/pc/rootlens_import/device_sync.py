@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .core import (
     Adb, ClipProgress, ImportCancelled, ImportFailure, check_cancelled, find_adb,
-    import_clip, import_lock, is_link, recover_staging,
+    ensure_unit_id, import_clip, import_lock, is_link, recover_staging,
 )
 from .device_cleanup import cleanup_recording, discover_pending
 
@@ -16,7 +16,7 @@ class DeviceSource:
     serial: str
     root: str
     name: str
-    content_hash: str
+    unit_id: str
     lock_directory: Path
 
 
@@ -45,8 +45,9 @@ def _output_directory(output):
 
 
 def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
-                    on_clip=None, on_drive_checked=None, adb_path=None, package=None):
-    """Read USB first; Drive is queried only for hashes currently on that device."""
+                    on_clip=None, on_drive_checked=None, adb_path=None, package=None,
+                    site_id="local"):
+    """Read USB first; Drive is queried only for unit ids currently on that device."""
     check_cancelled(cancel_event)
     adb = Adb(find_adb(adb_path), cancel_event=cancel_event)
     serial = adb.connect()
@@ -60,25 +61,25 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
         if on_clip is not None:
             on_clip(ClipProgress(name, path, state, error))
 
-    def read_drive(hashes):
+    def read_drive(unit_ids):
         check_cancelled(cancel_event)
         try:
-            return drive_reader(hashes)
+            return drive_reader(unit_ids)
         except ImportCancelled:
             raise
         except Exception:
             raise ImportFailure("Google Driveの保存状況を確認できません。インターネット接続と事業所の設定を確認し、もう一度「接続」を押してください。") from None
 
-    def fresh_recording(content_hash):
-        return read_drive({content_hash}).get(content_hash)
+    def fresh_recording(unit_id):
+        return read_drive({unit_id}).get(unit_id)
 
-    def clean(name, content_hash, display_name):
+    def clean(name, unit_id, display_name):
         report(display_name, "deleting")
         log("Driveに保存済みの録画を確認し、スマートグラスから削除しています…")
         try:
             if adb.run("get-serialno") != serial:
                 raise ImportFailure("接続したスマートグラスが変わりました。もう一度「接続」を押してください。")
-            cleanup_recording(adb, root, name, content_hash, fresh_recording, log=log)
+            cleanup_recording(adb, root, name, unit_id, fresh_recording, log=log)
         except ImportCancelled:
             raise
         except (ImportFailure, OSError) as error:
@@ -103,8 +104,8 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                     counts["incomplete"] += 1
                     report(name, "incomplete")
                     continue
-                metadata = adb.metadata(remote)
-                complete[name] = metadata["content_hash"]
+                metadata = ensure_unit_id(adb, remote, site_id)
+                complete[name] = metadata["unit_id"]
             except ImportCancelled:
                 raise
             except (ImportFailure, OSError) as error:
@@ -112,24 +113,24 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                 report(name, "error", error=str(error))
         for item in pending:
             report(item.original_name, "deleting")
-        hashes = set(complete.values()) | {item.content_hash for item in pending}
+        unit_ids = set(complete.values()) | {item.unit_id for item in pending}
         log("スマートグラスの録画がDriveに保存されているか確認しています…")
-        snapshots = read_drive(hashes) if hashes else {}
+        snapshots = read_drive(unit_ids) if unit_ids else {}
         if on_drive_checked is not None:
             on_drive_checked(snapshots)
         for item in pending:
-            clean(item.name, item.content_hash, item.original_name)
-        for name, content_hash in complete.items():
+            clean(item.name, item.unit_id, item.original_name)
+        for name, unit_id in complete.items():
             check_cancelled(cancel_event)
-            if content_hash in snapshots:
-                clean(name, content_hash, name)
+            if unit_id in snapshots:
+                clean(name, unit_id, name)
                 continue
             try:
-                result = import_clip(adb, root, name, output, staging, log=log, on_clip=on_clip)
+                result = import_clip(adb, root, name, output, staging, site_id=site_id, log=log, on_clip=on_clip)
                 if result in ("imported", "existing"):
-                    if adb.metadata(root + "/" + name)["content_hash"] != content_hash:
+                    if adb.metadata(root + "/" + name)["unit_id"] != unit_id:
                         raise ImportFailure("接続中に録画情報が変わりました。もう一度「接続」を押してください。")
-                    sources[name] = DeviceSource(adb, serial, root, name, content_hash, staging)
+                    sources[unit_id] = DeviceSource(adb, serial, root, name, unit_id, staging)
                 counts[result] += 1
             except ImportCancelled:
                 raise
@@ -149,5 +150,5 @@ def cleanup_uploaded_recording(source, *, drive_reader, log=print, cancel_event=
     with import_lock(source.lock_directory):
         if source.adb.run("get-serialno") != source.serial:
             raise ImportFailure("接続したスマートグラスが変わりました。もう一度「接続」を押してください。")
-        return cleanup_recording(source.adb, source.root, source.name, source.content_hash,
-                                 lambda digest: drive_reader({digest}).get(digest), log=log)
+        return cleanup_recording(source.adb, source.root, source.name, source.unit_id,
+                                 lambda unit_id: drive_reader({unit_id}).get(unit_id), log=log)

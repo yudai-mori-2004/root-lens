@@ -27,7 +27,7 @@ export const UPLOADED_REVIEW_CONSENT_SUMMARY_VERSION = 'uploaded-review-consent-
 /// 同意が及ぶ範囲 (= 収集 / AI 学習利用 / 社外ライセンス・販売 / 越境提供)。 利用規約の利用目的条項と対。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
 
-/// 画面に表示する文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
+/// 画面に表示する文言を構成する i18n キー (= summarySha256 の算出対象。 表示順に固定)。
 const UPLOAD_SUMMARY_KEYS = [
   'upload.consentTitle',
   'upload.consentCheckLocation',
@@ -84,7 +84,7 @@ export async function recordUploadConsent(input: {
     ? UPLOADED_REVIEW_CONSENT_SUMMARY_VERSION
     : UPLOAD_CONSENT_SUMMARY_VERSION;
   const summaryText = summaryKeys.map((k) => t(k)).join('\n');
-  const summaryHash = bytesToHex(sha256(new TextEncoder().encode(summaryText)));
+  const summarySha256 = bytesToHex(sha256(new TextEncoder().encode(summaryText)));
 
   const res = await fetch(`${SERVER_URL}/api/v1/consents`, {
     method: 'POST',
@@ -97,9 +97,9 @@ export async function recordUploadConsent(input: {
       occurredAt: new Date().toISOString(),
       docSlug: 'terms-of-service',
       docVersion,
-      docContentHash: doc.hash,
+      docSha256: doc.hash,
       summaryVersion,
-      summaryHash,
+      summarySha256,
       scopes: UPLOAD_CONSENT_SCOPES,
       checkboxResults: input.checks,
       locale,

@@ -13,12 +13,12 @@ import type {
   DeleteClipResponse,
 } from "@/shared/api-types";
 
-// path param `id` = content_hash。
+// path param `id` = unit_id。
 interface Ctx {
   params: Promise<{ id: string }>;
 }
 
-// GET /api/clips/:contentHash ─ 単件取得 (所有アカウントのみ)
+// GET /api/clips/:unitId ─ 単件取得 (所有アカウントのみ)
 export async function GET(req: Request, ctx: Ctx) {
   let accountId: string;
   try {
@@ -26,12 +26,12 @@ export async function GET(req: Request, ctx: Ctx) {
   } catch (r) {
     return r as Response;
   }
-  const { id: contentHash } = await ctx.params;
+  const { id: unitId } = await ctx.params;
 
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.contentHash, contentHash), eq(clips.accountId, accountId)))
+    .where(and(eq(clips.unitId, unitId), eq(clips.accountId, accountId)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -44,7 +44,7 @@ const attachConsentSchema = z.object({
   consentEventId: z.string().regex(/^evt_[0-9a-f-]{36}$/i),
 }) satisfies z.ZodType<AttachClipConsentRequest>;
 
-// PATCH /api/clips/:contentHash ─ Mentra がアップロード済みのクリップへ、
+// PATCH /api/clips/:unitId ─ Mentra がアップロード済みのクリップへ、
 // 同じアカウントが iPhone で確認した同意イベントを後から結び付ける。
 export async function PATCH(req: Request, ctx: Ctx) {
   let accountId: string;
@@ -53,7 +53,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   } catch (r) {
     return r as Response;
   }
-  const { id: contentHash } = await ctx.params;
+  const { id: unitId } = await ctx.params;
 
   let raw: unknown;
   try {
@@ -69,7 +69,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const clipRows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.contentHash, contentHash), eq(clips.accountId, accountId)))
+    .where(and(eq(clips.unitId, unitId), eq(clips.accountId, accountId)))
     .limit(1);
   if (clipRows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -101,7 +101,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const context = event.context as Record<string, unknown> | null;
   if (
     !["consent", "reconsent"].includes(event.eventType)
-    || context?.clipLocalId !== contentHash
+    || context?.clipLocalId !== unitId
     || context?.recordingConfig !== "mentra"
   ) {
     return NextResponse.json({ error: "Consent event does not match this clip" }, { status: 409 });
@@ -111,7 +111,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     .update(clips)
     .set({ consentEventId: parsed.data.consentEventId })
     .where(and(
-      eq(clips.contentHash, contentHash),
+      eq(clips.unitId, unitId),
       eq(clips.accountId, accountId),
       isNull(clips.consentEventId),
     ))
@@ -124,7 +124,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return NextResponse.json(body);
 }
 
-// DELETE /api/clips/:contentHash ─ 撮影者本人が raw と一覧行を破棄する。
+// DELETE /api/clips/:unitId ─ 撮影者本人が raw と一覧行を破棄する。
 // R2 を先に消し、成功後だけ DB 行を消す。R2 失敗時は行を残して再試行可能にする。
 export async function DELETE(req: Request, ctx: Ctx) {
   let accountId: string;
@@ -133,12 +133,12 @@ export async function DELETE(req: Request, ctx: Ctx) {
   } catch (r) {
     return r as Response;
   }
-  const { id: contentHash } = await ctx.params;
+  const { id: unitId } = await ctx.params;
 
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.contentHash, contentHash), eq(clips.accountId, accountId)))
+    .where(and(eq(clips.unitId, unitId), eq(clips.accountId, accountId)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -153,16 +153,16 @@ export async function DELETE(req: Request, ctx: Ctx) {
   let deletedObjects: number;
   try {
     deletedObjects = await deleteRawSession(
-      clip.contentHash,
+      clip.unitId,
       rawBucketFor(recordingConfig),
     );
   } catch (error) {
-    console.error(`[DELETE /api/clips/${contentHash}] R2 deletion failed`, error);
+    console.error(`[DELETE /api/clips/${unitId}] R2 deletion failed`, error);
     return NextResponse.json({ error: "Could not delete clip data" }, { status: 502 });
   }
 
   await db.delete(clips).where(and(
-    eq(clips.contentHash, contentHash),
+    eq(clips.unitId, unitId),
     eq(clips.accountId, accountId),
   ));
 

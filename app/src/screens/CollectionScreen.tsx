@@ -78,7 +78,7 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
 const HISTORY_MOCKS: { clip: ServerClipStatus; source: ImageSourcePropType }[] = DESIGN_PREVIEW
   ? [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
       clip: {
-        contentHash: `hmock_${i}`,
+        unitId: `hmock_${i}`,
         createdAt: new Date(Date.now() - (i + 1) * 86_400_000 * 1.3).toISOString(),
         durationMs: ((i * 97) % 40 + 3) * 60_000,
       },
@@ -352,17 +352,17 @@ export const CollectionScreen: React.FC = () => {
     const parsedCreatedAt = clip.createdAt ? new Date(clip.createdAt).getTime() : Number.NaN;
     const consentEventId = await recordUploadConsent({
       checks,
-      clipLocalId: clip.contentHash,
+      clipLocalId: clip.unitId,
       clipCreatedAt: Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now(),
       recordingConfig: 'mentra',
       flow: 'uploaded-review',
     });
-    await attachClipConsent(clip.contentHash, consentEventId);
+    await attachClipConsent(clip.unitId, consentEventId);
     setGlassesReviewTarget(null);
     server.refresh();
   }, [server.refresh]);
   const onDeleteServerClip = useCallback(async (clip: ServerClipStatus) => {
-    await deleteServerClip(clip.contentHash);
+    await deleteServerClip(clip.unitId);
     setGlassesReviewTarget(null);
     setHistoryTarget(null);
     server.refresh();
@@ -413,7 +413,7 @@ export const CollectionScreen: React.FC = () => {
             >
               {history.map(({ clip, source }, i) => (
                 <View
-                  key={`${clip.contentHash}-${i}`}
+                  key={`${clip.unitId}-${i}`}
                   style={{ transform: [{ rotate: HISTORY_TILT[i % HISTORY_TILT.length] }] }}
                 >
                   <HistoryTile
@@ -491,7 +491,7 @@ export const CollectionScreen: React.FC = () => {
               >
                 {glassesPending.map((clip, i) => (
                   <View
-                    key={clip.contentHash}
+                    key={clip.unitId}
                     style={{ transform: [{ rotate: i % 2 === 0 ? '-0.8deg' : '0.7deg' }] }}
                   >
                     <GlassesReviewCard clip={clip} onOpen={() => setGlassesReviewTarget(clip)} />
@@ -577,7 +577,7 @@ const GlassesReviewCard: React.FC<{
   onOpen: () => void;
 }> = ({ clip, onOpen }) => {
   const t = useT();
-  const frame = useUploadedClipFrame(clip.contentHash, clip.contentHash);
+  const frame = useUploadedClipFrame(clip.unitId, clip.unitId);
   return (
     <Pressable onPress={onOpen} style={({ pressed }) => [styles.reviewCard, pressed && styles.tilePressed]}>
       <View style={styles.reviewThumb}>
@@ -614,7 +614,7 @@ const HistoryTile: React.FC<{
   onPress?: () => void;
 }> = ({ clip, source, selected, onPress }) => {
   // サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (= 端末に動画は置かない)。
-  const frame = useUploadedClipFrame(clip.contentHash, source ? null : clip.contentHash);
+  const frame = useUploadedClipFrame(clip.unitId, source ? null : clip.unitId);
   const resolved = source ?? (frame ? { uri: frame } : undefined);
   return (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>

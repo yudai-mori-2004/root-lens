@@ -5,11 +5,11 @@
 # の形に配置する。 R2 → Drive は Modal 内で完結し、 装着端末側の回線を消費しない。
 #
 # 冪等: 同 session-dir が既に存在すれば中のファイルを上書き。 session-dir 名は
-# YYYY-MM-DD_HHMM_<hash8>/ で、 clips.recorded_at (= 録画開始の壁時計 UTC) と
-# content_hash から一意に決まる。 domain も DB (accounts) から解決する。
+# YYYY-MM-DD_HHMM_<unit_suffix>/ で、 clips.recorded_at (= 録画開始の壁時計 UTC) と
+# unit_id から一意に決まる。 domain も DB (accounts) から解決する。
 #
 # 実行:
-#   modal run --detach tools/modal/sample-drive/sample_drive.py --content-hash <hash>
+#   modal run --detach tools/modal/sample-drive/sample_drive.py --unit-id <unit_id>
 #
 # 権限: サービスアカウント datasets-writer@rootlens-503301.iam.gserviceaccount.com が
 #   共有ドライブに「コンテンツ管理者」で招待されている前提。 招待が漏れると 404 になる。
@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import io
 import json
 import os
@@ -59,13 +60,13 @@ try:
             modal.Secret.from_name("supabase-db"),  # DATABASE_URL (clips / accounts 照合用)
         ],
     )
-    def upload_one(content_hash: str) -> dict:
-        return _upload_session(content_hash)
+    def upload_one(unit_id: str) -> dict:
+        return _upload_session(unit_id)
 
     @app.local_entrypoint()
-    def main(content_hash: str):
-        """--content-hash <hash> (domain は DB の accounts から解決)"""
-        print(json.dumps(upload_one.remote(content_hash), indent=2))
+    def main(unit_id: str):
+        """--unit-id <unit_id> (domain は DB の accounts から解決)"""
+        print(json.dumps(upload_one.remote(unit_id), indent=2))
 
 except ImportError:
     modal = None
@@ -219,10 +220,9 @@ def _blurred_rgb_from_mcap(mcap_path: str, meta: dict, out_mp4: str) -> dict:
     return {"bytes": os.path.getsize(out_mp4), "frames": frame_count, "fps": fps}
 
 
-def _clip_row(content_hash: str) -> dict:
+def _clip_row(unit_id: str) -> dict:
     """clips + accounts から現場と時刻を引く (= フォルダ名と manifest の源泉)。
-    未登録クリップ / accounts 行なし / recorded_at 未記録はすべて fail-loud
-    (recorded_at は fpvlabs.py か gen_manifest.py が rgb.mp4 の mvhd から埋める)。"""
+    未登録クリップ / accounts 行なし / recorded_at 未記録はすべて fail-loud。"""
     import psycopg2
 
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
@@ -231,14 +231,14 @@ def _clip_row(content_hash: str) -> dict:
             cur.execute(
                 "select c.recorded_at, c.created_at, a.domain"
                 " from clips c left join accounts a on a.id = c.account_id"
-                " where c.content_hash = %s",
-                (content_hash,),
+                " where c.unit_id = %s",
+                (unit_id,),
             )
             row = cur.fetchone()
     finally:
         conn.close()
     if not row:
-        raise RuntimeError(f"clip not registered in DB: {content_hash}")
+        raise RuntimeError(f"clip not registered in DB: {unit_id}")
     recorded_at, created_at, domain = row
     if domain is None:
         raise RuntimeError("account has no accounts row (domain/site); insert it first")
@@ -249,17 +249,16 @@ def _clip_row(content_hash: str) -> dict:
     return {"recorded_at": recorded_at, "created_at": created_at, "domain": domain}
 
 
-def _session_dirname(content_hash: str, recorded_at: "dt.datetime") -> str:
-    """YYYY-MM-DD_HHMM_<hash8>/。 clips.recorded_at (= rgb.mp4 の mvhd 由来の
-    録画開始時刻、 UTC) から決める。"""
-    return f"{recorded_at.strftime('%Y-%m-%d_%H%M')}_{content_hash[:8]}"
+def _session_dirname(unit_id: str, recorded_at: "dt.datetime") -> str:
+    """YYYY-MM-DD_HHMM_<unit suffix>/。unit発行時に固定した録画開始時刻から決める。"""
+    return f"{recorded_at.strftime('%Y-%m-%d_%H%M')}_{unit_id.rsplit('_', 1)[-1]}"
 
 
-def _upload_session(content_hash: str) -> dict:
+def _upload_session(unit_id: str) -> dict:
     from googleapiclient.errors import HttpError
 
     # 現場 (domain) と時刻は DB が正。 GPU こそ使わないが、 大きな転送が始まる前に fail-loud。
-    clip = _clip_row(content_hash)
+    clip = _clip_row(unit_id)
     domain = clip["domain"]
 
     s3 = _r2_client()
@@ -276,22 +275,34 @@ def _upload_session(content_hash: str) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         # ── metadata.json (manifest のカメラ情報に使う) ──
         meta_path = os.path.join(tmp, "metadata.json")
-        s3.download_file(bucket_raw, f"raw/{content_hash}/metadata.json", meta_path)
+        s3.download_file(bucket_raw, f"raw/{unit_id}/metadata.json", meta_path)
         with open(meta_path) as fh:
             meta = json.load(fh)
-        session_name = _session_dirname(content_hash, clip["recorded_at"])
+        session_name = _session_dirname(unit_id, clip["recorded_at"])
         session_id = _find_or_create_folder(drive, session_name, pipeline_id)
 
         # ── session.mcap を先に落とす。 rgb.mp4 のぼかし済み映像はここから取り出すので必須。 ──
         mcap_path = os.path.join(tmp, "session.mcap")
         try:
-            s3.download_file(bucket_fpv, f"{content_hash}/session.mcap", mcap_path)
+            s3.download_file(bucket_fpv, f"{unit_id}/session.mcap", mcap_path)
         except Exception as e:
             raise RuntimeError(
-                f"session.mcap missing for {content_hash[:8]}. "
+                f"session.mcap missing for {unit_id[:8]}. "
                 f"drive upload requires the blurred JPEG stream from mcap; "
                 f"run fpvlabs first: {e}"
             )
+        delivery = json.loads(s3.get_object(
+            Bucket=bucket_fpv, Key=f"{unit_id}/delivery-manifest.json")["Body"].read())
+        expected = next((item for item in delivery.get("files", [])
+                         if item.get("path") == "session.mcap"), None)
+        digest = hashlib.sha256()
+        with open(mcap_path, "rb") as source:
+            for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
+                digest.update(chunk)
+        if (delivery.get("unit_id") != unit_id or expected is None
+                or expected.get("bytes") != os.path.getsize(mcap_path)
+                or expected.get("sha256") != digest.hexdigest()):
+            raise RuntimeError("session.mcap does not match its delivery manifest")
 
         uploaded = []
 
@@ -307,7 +318,7 @@ def _upload_session(content_hash: str) -> dict:
         # ── manifest.json (human-readable な要約。 このドライブは公開想定なので、
         #    取引先名や内部インフラの命名を含む項目は入れない: バケット名や appVersion は載せない) ──
         manifest = {
-            "contentHash": content_hash,
+            "unitId": unit_id,
             "recordingConfig": meta.get("recording_config", "arkit"),
             "device": meta.get("device_model"),
             "os": meta.get("os_version"),
@@ -323,7 +334,7 @@ def _upload_session(content_hash: str) -> dict:
         uploaded.append(_upload_file(drive, session_id, "manifest.json", man_path, "application/json"))
 
         return {
-            "contentHash": content_hash,
+            "unitId": unit_id,
             "domain": domain,
             "pipeline": "arkit",
             "sessionFolder": session_name,

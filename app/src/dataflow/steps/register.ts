@@ -24,8 +24,10 @@ export async function registerClip(
       ...(await getAuthHeader()),
     },
     body: JSON.stringify({
-      contentHash: input.contentHash,
-      contentSize: input.contentSize,
+      unitId: input.unitId,
+      videoBytes: input.videoBytes,
+      sourceManifestSha256: input.sourceManifestSha256,
+      sourceFiles: input.sourceFiles,
       recordingConfig: input.recordingConfig,
       ...(input.durationMs != null ? { durationMs: input.durationMs } : {}),
       ...(input.deviceModel ? { deviceModel: input.deviceModel } : {}),
@@ -36,12 +38,12 @@ export async function registerClip(
     const text = await res.text().catch(() => '');
     throw new Error(`/api/clips ${res.status}: ${text.slice(0, 200)}`);
   }
-  const { clip } = (await res.json()) as { clip: { contentHash: string } };
+  const { clip } = (await res.json()) as { clip: { unitId: string } };
   sink({
     step: 'register-clip',
     level: 'success',
-    message: `clip 登録完了 content_hash=${clip.contentHash.slice(0, 12)}…`,
-    detail: { clipId: clip.contentHash },
+    message: `clip 登録完了 unit_id=${clip.unitId.slice(0, 12)}…`,
+    detail: { clipId: clip.unitId },
   });
-  return { clipId: clip.contentHash };
+  return { clipId: clip.unitId };
 }

@@ -1,7 +1,6 @@
 """Capture this app's own Qt widgets with an explicit synthetic video and fake upload."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import struct
@@ -54,7 +53,7 @@ def main(arguments=None):
 
     class DemoUploader:
         def upload_recording(self, path, on_progress, cancel_event):
-            digest = json.loads((path / "metadata.json").read_text())["content_hash"]
+            digest = json.loads((path / "metadata.json").read_text())["unit_id"]
             on_progress(UploadProgress(digest, "uploading", 8_400_000, 20_000_000, "rgb.mp4"))
             if not release.wait(30) or cancel_event.is_set():
                 raise ImportCancelled("Demonstration cancelled")
@@ -120,22 +119,22 @@ def main(arguments=None):
             root = recordings_directory(args.site_id, data / "data")
             video_bytes = sample.read_bytes()
             for index in range(3):
-                # An ignored MP4 free box gives each demonstration a distinct content identity.
+                # An ignored MP4 free box gives each demonstration distinct file bytes.
                 video = video_bytes + struct.pack(">I4sI", 12, b"free", index)
-                digest = hashlib.sha256(video).hexdigest()
-                clip = root / f"rec-20260911T0{index}0000.000Z-{digest[:12]}"
+                identity = f"unit_demo_20260911T0{index}0000000Z_0000000{index}"
+                clip = root / identity
                 clip.mkdir()
                 (clip / "rgb.mp4").write_bytes(video)
                 for filename in ("frames.jsonl", "imu.jsonl"):
                     (clip / filename).write_text('{"demonstration":true}\n', encoding="utf-8")
                 (clip / "metadata.json").write_text(json.dumps({"schema": "rootlens.mentra.raw.v1",
-                    "files": list(FILES), "content_hash": digest, "created_at": f"2026-09-11T0{index}:00:00.000Z",
+                    "files": list(FILES), "unit_id": identity, "created_at": f"2026-09-11T0{index}:00:00.000Z",
                     "actual_duration_ms": 8000}), encoding="utf-8")
             window.set_profile(SiteProfile(args.site_id, args.site_name, "https://drive.google.com/drive/folders/DEMONSTRATION_ONLY",
                                            service_account={"demonstration_only": True}))
             window._drive_checked({}, "")
-            for clip in sorted(root.iterdir()):
-                window._clip_progress(ClipProgress(clip.name.rsplit('-', 1)[0], clip, "ready"))
+            for index, clip in enumerate(sorted(root.iterdir())):
+                window._clip_progress(ClipProgress(f"rec-20260911T0{index}0000.000Z", clip, "ready"))
             window._flush_progress()
             window.status_label.setText("操作説明用サンプル：実際の撮影データではありません。")
             window.select_relative(1)

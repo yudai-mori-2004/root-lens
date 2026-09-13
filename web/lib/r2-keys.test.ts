@@ -5,17 +5,17 @@ import { RAW_SESSION_MANIFEST, rawSessionFileKey } from "./r2-keys";
 describe("Mentra raw upload contract", () => {
   it("presigns every file required by the device uploader", () => {
     expect(RAW_SESSION_MANIFEST.mentra).toEqual([
-      { filename: "rgb.mp4", contentType: "video/mp4" },
-      { filename: "frames.jsonl", contentType: "application/x-ndjson" },
-      { filename: "imu.jsonl", contentType: "application/x-ndjson" },
-      { filename: "metadata.json", contentType: "application/json" },
+      { filename: "rgb.mp4", contentType: "video/mp4", required: true },
+      { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "imu.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "metadata.json", contentType: "application/json", required: true },
     ]);
   });
 
-  it("uses the content-addressed raw prefix", () => {
-    const hash = "a".repeat(64);
-    expect(rawSessionFileKey(hash, "frames.jsonl")).toBe(
-      `raw/${hash}/frames.jsonl`,
+  it("uses the recording-unit raw prefix", () => {
+    const unitId = "unit_bakery-01_20260930T044055123Z_7K2M9Q4R";
+    expect(rawSessionFileKey(unitId, "frames.jsonl")).toBe(
+      `raw/${unitId}/frames.jsonl`,
     );
   });
 });
@@ -29,16 +29,16 @@ describe("iPhone RGB+IMU raw upload contract", () => {
 describe("ARKit raw upload contract", () => {
   it("presigns the complete current iPhone delivery manifest", () => {
     expect(RAW_SESSION_MANIFEST.arkit).toEqual([
-      { filename: "rgb.mp4", contentType: "video/mp4" },
-      { filename: "frames.jsonl", contentType: "application/x-ndjson" },
-      { filename: "realtime_handpose.jsonl", contentType: "application/x-ndjson" },
-      { filename: "imu.jsonl", contentType: "application/x-ndjson" },
-      { filename: "metadata.json", contentType: "application/json" },
-      { filename: "depth.tar", contentType: "application/x-tar" },
-      { filename: "pointcloud.jsonl", contentType: "application/x-ndjson" },
-      { filename: "mesh.jsonl", contentType: "application/x-ndjson" },
-      { filename: "arkit_imu.jsonl", contentType: "application/x-ndjson" },
-      { filename: "device_metrics.jsonl", contentType: "application/x-ndjson" },
+      { filename: "rgb.mp4", contentType: "video/mp4", required: true },
+      { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "realtime_handpose.jsonl", contentType: "application/x-ndjson", required: false },
+      { filename: "imu.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "metadata.json", contentType: "application/json", required: true },
+      { filename: "depth.tar", contentType: "application/x-tar", required: false },
+      { filename: "pointcloud.jsonl", contentType: "application/x-ndjson", required: false },
+      { filename: "mesh.jsonl", contentType: "application/x-ndjson", required: false },
+      { filename: "arkit_imu.jsonl", contentType: "application/x-ndjson", required: false },
+      { filename: "device_metrics.jsonl", contentType: "application/x-ndjson", required: false },
     ]);
   });
 });

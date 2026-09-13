@@ -5,7 +5,7 @@
 # ので、 装着端末側の回線を消費しない (= フィールドから触れる)。
 #
 # 実行:
-#   modal run tools/sample-select/stats.py --hashes hashA,hashB,hashC
+#   modal run tools/sample-select/stats.py --unit-ids unitA,unitB,unitC
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ try:
         cpu=2.0,
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def score_one(content_hash: str) -> dict:
+    def score_one(unit_id: str) -> dict:
         import boto3
         import numpy as np
 
@@ -49,16 +49,16 @@ try:
             # 404 なら旧名にフォールバック (fpvlabs.py と同じ扱い)。 どちらも欠けている
             # 半端な収録は "missing" マークで返し、 バッチ .map() を落とさない。
             try:
-                s3.download_file(bucket, f"raw/{content_hash}/frames.jsonl", fp)
+                s3.download_file(bucket, f"raw/{unit_id}/frames.jsonl", fp)
             except Exception:
                 try:
-                    s3.download_file(bucket, f"raw/{content_hash}/realtime_handpose.jsonl", fp)
+                    s3.download_file(bucket, f"raw/{unit_id}/realtime_handpose.jsonl", fp)
                 except Exception:
-                    return {"contentHash": content_hash, "missing": "frames.jsonl"}
+                    return {"unitId": unit_id, "missing": "frames.jsonl"}
             try:
-                s3.download_file(bucket, f"raw/{content_hash}/metadata.json", mp)
+                s3.download_file(bucket, f"raw/{unit_id}/metadata.json", mp)
             except Exception:
-                return {"contentHash": content_hash, "missing": "metadata.json"}
+                return {"unitId": unit_id, "missing": "metadata.json"}
 
             frames_ts, hands_present, tracking_normal, xyz = [], 0, 0, []
             with open(fp) as f:
@@ -93,7 +93,7 @@ try:
             y_range = 0.0
 
         return {
-            "contentHash": content_hash,
+            "unitId": unit_id,
             "device": meta.get("device_model"),
             "durationSec": dur_s,
             "durationMin": dur_s / 60,
@@ -108,10 +108,10 @@ try:
         }
 
     @app.local_entrypoint()
-    def main(hashes: str):
-        """--hashes hashA,hashB,hashC"""
-        hs = [h.strip() for h in hashes.split(",") if h.strip()]
-        results = list(score_one.map(hs))
+    def main(unit_ids: str):
+        """--unit-ids unitA,unitB,unitC"""
+        ids = [value.strip() for value in unit_ids.split(",") if value.strip()]
+        results = list(score_one.map(ids))
         print(json.dumps(results, indent=2))
 
 except ImportError:

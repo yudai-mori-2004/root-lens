@@ -87,7 +87,7 @@ export interface SummaryData {
 }
 
 /** /sample にぶら下がる 1 個のショーケース = 1 個の slug ぶんの URL 集合。
- *  slug はドライブのセッションフォルダ名末尾と同じ id (= content_hash 先頭 8 桁)。
+ *  slug はunit_id末尾のランダム8文字と同じ公開用id。
  *  R2 public bucket からの絶対 URL を持たせる (= LP は静的に配信するだけ)。 */
 export interface ShowcaseAssetUrls {
   slug: string;
@@ -101,7 +101,7 @@ export interface ShowcaseAssetUrls {
 
 /** ビューアで切替表示できる 1 セッション = ドライブ samples/ 配下の 1 フォルダに対応。 */
 export interface SessionOption {
-  /** セッション id (= content_hash 先頭 8 桁。 ドライブのフォルダ名末尾と同じ)。 */
+  /** セッション公開用id (= unit_id末尾のランダム8文字)。 */
   id: string;
   /** 撮影ドメインの表示ラベル (i18n 済み文字列。 例: パン屋)。 */
   domainLabel: string;

@@ -15,6 +15,8 @@ import {
   type RecordingConfigId,
   type RawSessionFilename,
 } from "./r2-keys";
+import { UNIT_ID_RE } from "./unit-id";
+import type { SourceFileIntegrity } from "./source-manifest";
 
 // Cloudflare R2 (= S3 互換) アクセス。
 //
@@ -68,23 +70,42 @@ export { rawMp4Key };
 /// 構成マニフェスト (RAW_SESSION_MANIFEST) のファイルだけを、 構成対応バケットに presign する。
 /// optional なファイル (= depth.tar 等) も presign には含め、 端末は実際に生成したものだけ PUT する。
 export async function presignRawSessionUploads(opts: {
-  contentHash: string;
+  unitId: string;
   recordingConfig: RecordingConfigId;
+  sourceManifestSha256: string;
+  sourceFiles: SourceFileIntegrity[];
   expiresInSec?: number;
 }): Promise<RawSessionUploadResponse> {
   const expiresIn = opts.expiresInSec ?? 3600;
   const bucket = rawBucketFor(opts.recordingConfig);
   const manifest = RAW_SESSION_MANIFEST[opts.recordingConfig];
+  const integrityByName = new Map(opts.sourceFiles.map((file) => [file.name, file]));
   const files: RawSessionUploadResponse["files"] = {};
   for (const { filename, contentType } of manifest) {
-    const key = rawSessionFileKey(opts.contentHash, filename);
+    const integrity = integrityByName.get(filename);
+    if (!integrity) continue;
+    const key = rawSessionFileKey(opts.unitId, filename);
+    const metadata = {
+      sha256: integrity.sha256,
+      "source-manifest-sha256": opts.sourceManifestSha256,
+    };
     const cmd = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       ContentType: contentType,
+      Metadata: metadata,
     });
     const url = await getSignedUrl(r2, cmd, { expiresIn });
-    files[filename] = { url, key, contentType };
+    files[filename] = {
+      url,
+      key,
+      contentType,
+      headers: {
+        "Content-Type": contentType,
+        "x-amz-meta-sha256": integrity.sha256,
+        "x-amz-meta-source-manifest-sha256": opts.sourceManifestSha256,
+      },
+    };
   }
   return {
     files,
@@ -95,11 +116,39 @@ export async function presignRawSessionUploads(opts: {
 
 export interface RawSessionUploadResponse {
   files: Partial<
-    Record<RawSessionFilename, { url: string; key: string; contentType: string }>
+    Record<RawSessionFilename, {
+      url: string;
+      key: string;
+      contentType: string;
+      headers: Record<string, string>;
+    }>
   >;
   /// presign したバケット名 (= デバッグ表示用)。
   bucket: string;
   expiresAt: string;
+}
+
+// Confirm that every expected object exists with the signed size/integrity
+// claims used for its presigned PUT. The processing pipeline separately reads
+// every byte and recomputes each SHA-256 before producing a delivery.
+export async function verifyRawSessionUploadMetadata(opts: {
+  unitId: string;
+  recordingConfig: RecordingConfigId;
+  sourceManifestSha256: string;
+  sourceFiles: SourceFileIntegrity[];
+}): Promise<void> {
+  const bucket = rawBucketFor(opts.recordingConfig);
+  for (const file of opts.sourceFiles) {
+    const head = await r2.send(new HeadObjectCommand({
+      Bucket: bucket,
+      Key: rawSessionFileKey(opts.unitId, file.name as RawSessionFilename),
+    }));
+    if (head.ContentLength !== file.bytes
+        || head.Metadata?.sha256 !== file.sha256
+        || head.Metadata?.["source-manifest-sha256"] !== opts.sourceManifestSha256) {
+      throw new Error(`R2 source integrity mismatch: ${file.name}`);
+    }
+  }
 }
 
 /// 任意のキーに対する raw GET 事前署名 URL (= 撮影者の履歴再生 / デバッグ用)。
@@ -125,14 +174,14 @@ export async function rawObjectExists(key: string, bucket: string): Promise<bool
   }
 }
 
-/// content hash 配下の raw 一式を削除する。DB 行より先に R2 を消すことで、
-/// API が成功を返したのに実データだけ残る状態を作らない。prefix は content hash からのみ組み立てる。
-export async function deleteRawSession(contentHash: string, bucket: string): Promise<number> {
-  if (!/^[0-9a-f]{64}$/i.test(contentHash)) {
-    throw new Error("Invalid content hash for R2 deletion");
+/// unit_id配下のraw一式を削除する。DB行より先にR2を消すことで、
+/// APIが成功を返したのに実データだけ残る状態を作らない。
+export async function deleteRawSession(unitId: string, bucket: string): Promise<number> {
+  if (!UNIT_ID_RE.test(unitId)) {
+    throw new Error("Invalid unit id for R2 deletion");
   }
 
-  const prefix = rawSessionPrefix(contentHash);
+  const prefix = rawSessionPrefix(unitId);
   const keys: string[] = [];
   let continuationToken: string | undefined;
   do {

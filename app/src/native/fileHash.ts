@@ -1,16 +1,16 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-// Thin wrapper around the native content-hash module.
+// Thin wrapper around the native large-file SHA-256 module.
 //
 // The native side reads the file sequentially and digests it with CryptoKit
 // SHA-256, so a multi-GB file takes seconds.
 
-interface ContentHashNativeModule {
+interface FileHashNativeModule {
   sha256File(path: string): Promise<string>;
   getMemoryMB(): number;
 }
 
-const native = requireOptionalNativeModule<ContentHashNativeModule>('ContentHash');
+const native = requireOptionalNativeModule<FileHashNativeModule>('FileHash');
 
 /**
  * Compute the SHA-256 (64-char hex) of a file natively.

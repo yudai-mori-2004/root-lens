@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 from typing import Any
@@ -24,6 +25,7 @@ from audit_historical_clock import (
 
 NS_PER_SECOND = 1_000_000_000
 REQUIRED_FILES = ("rgb.mp4", "frames.jsonl", "imu.jsonl", "metadata.json")
+UNIT_ID_RE = re.compile(r"^unit_[a-z0-9][a-z0-9_-]{0,63}_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-Z]{8}$")
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -40,6 +42,20 @@ def sha256_file(path: Path) -> str:
         while chunk := handle.read(4 * 1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def source_manifest(unit_id: str, folder: Path) -> tuple[list[dict[str, Any]], str]:
+    files = []
+    for name in sorted(REQUIRED_FILES):
+        path = folder / name
+        files.append({"name": name, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    canonical = {
+        "schema": "io.rootlens.source-manifest.v1",
+        "unit_id": unit_id,
+        "files": files,
+    }
+    payload = json.dumps(canonical, ensure_ascii=False, separators=(",", ":")).encode()
+    return files, hashlib.sha256(payload).hexdigest()
 
 
 def run(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -333,11 +349,13 @@ def audit_clip(
     if names != sorted(REQUIRED_FILES):
         raise ValueError(f"manifest mismatch: {names}")
     metadata = read_json(folder / "metadata.json")
-    if metadata.get("content_hash") != folder.name:
-        raise ValueError("folder name/content_hash mismatch")
-    actual_hash = sha256_file(folder / "rgb.mp4")
-    if actual_hash != metadata["content_hash"]:
-        raise ValueError("rgb.mp4 SHA-256 mismatch")
+    unit_id = folder.name
+    if not UNIT_ID_RE.fullmatch(unit_id) or metadata.get("unit_id") != unit_id:
+        raise ValueError("folder name/unit_id mismatch")
+    source_files, manifest_sha256 = source_manifest(unit_id, folder)
+    video = next(row for row in source_files if row["name"] == "rgb.mp4")
+    if video["bytes"] != metadata.get("video_bytes"):
+        raise ValueError("rgb.mp4 byte size mismatch")
     if metadata.get("timestamp_timebase", {}).get("mapping_method") is not None:
         raise ValueError("delivery metadata must not contain mapping_method")
     media = probe_media(folder / "rgb.mp4")
@@ -388,7 +406,9 @@ def audit_clip(
     return {
         "clip": f"clip-{sequence:03d}",
         "status": status,
-        "content_hash": actual_hash,
+        "unit_id": unit_id,
+        "source_manifest_sha256": manifest_sha256,
+        "source_files": source_files,
         "folder": str(folder),
         "media": media,
         "frame_intervals": frames["intervals"],

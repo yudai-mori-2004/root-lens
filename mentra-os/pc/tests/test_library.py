@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from rootlens_import import library
 from rootlens_import.core import FILES, ImportFailure
+from unit_fixtures import unit_id
 
 
 class LibraryTests(unittest.TestCase):
@@ -16,13 +17,15 @@ class LibraryTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def clip(self, name="rec-20260911T010203.000Z-" + "a" * 12, **fields):
+    def clip(self, name=None, **fields):
+        identity = fields.get("unit_id", unit_id())
+        name = identity if name is None else name
         directory = self.root / name
         directory.mkdir()
         for filename in FILES:
             (directory / filename).write_text("fixture", encoding="utf-8")
         metadata = {
-            "schema": "rootlens.mentra.raw.v1", "content_hash": "a" * 64,
+            "schema": "rootlens.mentra.raw.v1", "unit_id": identity,
             "files": list(FILES), "created_at": "2026-09-11T01:02:03.000Z",
             "actual_duration_ms": 3678000,
         }
@@ -86,12 +89,12 @@ class LibraryTests(unittest.TestCase):
 
     def test_recording_survives_disconnect_and_is_listed_in_shooting_order(self):
         later = self.clip()
-        earlier = self.clip(name="rec-20260910T010203.000Z-" + "a" * 12)
+        earlier = self.clip(name=unit_id(1), unit_id=unit_id(1), created_at="2026-09-10T01:02:03.000Z")
         self.assertEqual([row.path for row in library.scan_recordings(self.root)], [earlier, later])
         self.assertEqual([row.path for row in library.scan_recordings(self.root)], [earlier, later])
 
-    def test_mismatched_folder_hash_and_unrelated_folders_are_not_offered(self):
-        self.clip(content_hash="b" * 64)
+    def test_mismatched_folder_unit_id_and_unrelated_folders_are_not_offered(self):
+        self.clip(name=unit_id(), unit_id=unit_id(1))
         self.clip(name="unrelated-folder")
         self.assertEqual(library.scan_recordings(self.root), [])
 

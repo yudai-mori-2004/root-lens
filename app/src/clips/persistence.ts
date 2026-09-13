@@ -7,14 +7,14 @@
 // 仕様:
 //   - uploading の永続化は、 アプリ kill でタイマーが切れるため、
 //     起動時に error 扱い (= 「アプリ再起動中に中断されました」) にする。
-//   - 保存キーは変えない (= 既存端末のローカルクリップをそのまま引き継ぐ)。
+//   - v2 key separates the unit-id pipeline from pre-production upload state.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 
 import { dataflowStore, clipList, type Clip } from '../dataflow';
 
-const STORAGE_KEY = '@rootlens/clips/v1';
+const STORAGE_KEY = '@rootlens/clips/v2';
 const PERSIST_DEBOUNCE_MS = 400;
 
 let initialized = false;

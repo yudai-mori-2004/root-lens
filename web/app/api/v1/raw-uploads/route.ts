@@ -3,9 +3,9 @@
 // 端末のアップロード用 presigned PUT URL endpoint。
 //
 // 流れ:
-//   1. device が生 mp4 の SHA-256 を計算して content_hash を確定
-//   2. このエンドポイントに contentHash を投げ、 撮影構成ファイル分の presigned PUT を得る
-//   3. R2 (raw/<content_hash>/{rgb.mp4 + frames.jsonl + metadata.json + 等}) に並列 PUT
+//   1. server が unit_id を発行し、account + recording config に予約する
+//   2. device がsource manifestを確定する
+//   3. このendpointが予約所有者を確認してpresigned PUTを返す
 //
 // /api/clips とは別エンドポイントにする理由:
 //   端末は「アップロード可能か」 だけ先に確認したい (= 容量制限・帯域制限・空きスロット等の事前 reject)。
@@ -17,19 +17,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { presignRawSessionUploads } from "@/lib/r2";
 import { requireAccountId } from "@/lib/auth";
+import { UNIT_ID_RE } from "@/lib/unit-id";
+import { db } from "@/db/client";
+import { uploadUnits } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { SHA256_RE } from "@/lib/source-manifest";
+import { validateRawSourceManifest } from "@/lib/raw-source";
 
-const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
+const SourceFileSchema = z.object({
+  name: z.string().min(1).max(128),
+  bytes: z.number().int().positive(),
+  sha256: z.string().regex(SHA256_RE),
+});
 
 const RequestSchema = z.object({
-  contentHash: z.string().regex(CONTENT_ID_RE, "contentHash must be 64-char lowercase hex (SHA-256)"),
+  unitId: z.string().regex(UNIT_ID_RE, "invalid unit id"),
   // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる。
-  // 旧クライアント互換のため省略時は ultra_wide。
-  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]).default("ultra_wide"),
+  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]),
+  sourceManifestSha256: z.string().regex(SHA256_RE),
+  sourceFiles: z.array(SourceFileSchema).min(2).max(32),
 });
 
 export async function POST(req: NextRequest) {
+  let accountId: string;
   try {
-    await requireAccountId(req);
+    accountId = await requireAccountId(req);
   } catch (r) {
     return r as Response;
   }
@@ -49,10 +61,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const reservations = await db.select().from(uploadUnits).where(and(
+    eq(uploadUnits.unitId, parsed.data.unitId),
+    eq(uploadUnits.accountId, accountId),
+    eq(uploadUnits.recordingConfig, parsed.data.recordingConfig),
+  )).limit(1);
+  if (reservations.length === 0) {
+    return NextResponse.json({ error: "unit id is not reserved for this account and recording config" }, { status: 403 });
+  }
+  const manifestError = validateRawSourceManifest(parsed.data);
+  if (manifestError) {
+    return NextResponse.json({ error: manifestError }, { status: 400 });
+  }
+
   try {
     const presigned = await presignRawSessionUploads({
-      contentHash: parsed.data.contentHash,
+      unitId: parsed.data.unitId,
       recordingConfig: parsed.data.recordingConfig,
+      sourceManifestSha256: parsed.data.sourceManifestSha256,
+      sourceFiles: parsed.data.sourceFiles,
     });
     return NextResponse.json(presigned);
   } catch (e: unknown) {

@@ -31,11 +31,11 @@ PROGRESS_LABELS = {
 }
 
 
-def read_drive_recordings(profile, content_hashes, cancel_event):
+def read_drive_recordings(profile, unit_ids, cancel_event):
     """Fetch current Drive files without consulting local upload history."""
     uploader = DriveUploader(profile)
     try:
-        return uploader.current_recordings(content_hashes, cancel_event=cancel_event)
+        return uploader.current_recordings(unit_ids, cancel_event=cancel_event)
     finally:
         uploader.close()
 
@@ -94,6 +94,7 @@ class ImportWindow(QMainWindow):
         self.upload_saved = False
         self.progress_states = {}
         self.device_sources = {}
+        self.recording_names = {}
         self.blocked_names = set()
         self.busy = False
         self.job_kind = None
@@ -266,6 +267,7 @@ class ImportWindow(QMainWindow):
         self.recordings_root = directory
         self.progress_states.clear()
         self.device_sources.clear()
+        self.recording_names.clear()
         self.blocked_names.clear()
         self.upload_states.clear()
         self.upload_record = None
@@ -322,7 +324,11 @@ class ImportWindow(QMainWindow):
         item = self.recording_list.currentItem()
         path = item.data(0, Qt.ItemDataRole.UserRole) if item else None
         return next((record for record in self.records if str(record.path) == path
-                     and record.path.name.rsplit("-", 1)[0] not in self.blocked_names), None)
+                     and self._recording_name(record) not in self.blocked_names), None)
+
+    def _recording_name(self, record):
+        source = self.device_sources.get(record.unit_id)
+        return self.recording_names.get(record.unit_id, getattr(source, "name", record.unit_id))
 
     def refresh_recordings(self, rescan=True):
         selected = self.selected_recording()
@@ -337,14 +343,14 @@ class ImportWindow(QMainWindow):
                     self.all_records.append(read_recording(progress.path))
                 except (ImportFailure, OSError, ValueError, TypeError):
                     continue
-            self.all_records.sort(key=lambda record: record.path.name)
+            self.all_records.sort(key=lambda record: (record.created_text, record.unit_id))
         self.records = list(self.all_records)
         self.recording_list.blockSignals(True)
         self.recording_list.clear()
         selected_item = None
         ready_names = set()
         for record in self.records:
-            remote_name = record.path.name.rsplit("-", 1)[0]
+            remote_name = self._recording_name(record)
             ready_names.add(remote_name)
             progress = self.progress_states.get(remote_name)
             state = PROGRESS_LABELS.get(progress.state, "確認中") if progress else "確認中"
@@ -356,8 +362,8 @@ class ImportWindow(QMainWindow):
                 item.setText(1, "取り込みエラー")
             if progress and progress.error:
                 item.setToolTip(1, progress.error)
-            if record.content_hash in self.upload_states and remote_name not in self.blocked_names:
-                item.setText(1, self.upload_states[record.content_hash])
+            if record.unit_id in self.upload_states and remote_name not in self.blocked_names:
+                item.setText(1, self.upload_states[record.unit_id])
             self.recording_list.addTopLevelItem(item)
             if record.path == selected_path:
                 selected_item = item
@@ -370,7 +376,7 @@ class ImportWindow(QMainWindow):
             self.recording_list.addTopLevelItem(item)
         if selected_item is None:
             selected_item = next((self.recording_list.topLevelItem(index) for index, record in enumerate(self.records)
-                                  if record.path.name.rsplit("-", 1)[0] not in self.blocked_names), None)
+                                  if self._recording_name(record) not in self.blocked_names), None)
         self.recording_list.setCurrentItem(selected_item)
         self.recording_list.verticalScrollBar().setValue(scroll_value)
         self.recording_list.blockSignals(False)
@@ -419,7 +425,7 @@ class ImportWindow(QMainWindow):
         self.cancel_upload_button.setVisible(self.busy and self.job_kind == "upload")
         self.cancel_upload_button.setEnabled(self.busy and self.job_kind == "upload" and not self.cancel_event.is_set())
         allowed = [i for i, item in enumerate(self.records)
-                   if item.path.name.rsplit("-", 1)[0] not in self.blocked_names]
+                   if self._recording_name(item) not in self.blocked_names]
         self.previous_button.setEnabled(index >= 0 and any(i < index for i in allowed))
         self.next_button.setEnabled(index >= 0 and any(i > index for i in allowed))
 
@@ -428,6 +434,7 @@ class ImportWindow(QMainWindow):
             return
         self.busy = True
         self.device_sources.clear()
+        self.recording_names.clear()
         self.job_kind = "import"
         self.cancel_event.clear()
         self.progress_states.clear()
@@ -445,7 +452,8 @@ class ImportWindow(QMainWindow):
             try:
                 summary = self.importer(output=directory, log=self.signals.log.emit,
                                         cancel_event=self.cancel_event, on_clip=self.signals.clip.emit,
-                                        drive_reader=lambda hashes: self.drive_reader(profile, hashes, self.cancel_event),
+                                        site_id=profile.site_id,
+                                        drive_reader=lambda unit_ids: self.drive_reader(profile, unit_ids, self.cancel_event),
                                         on_drive_checked=lambda recordings: self.signals.drive_checked.emit(recordings, ""))
                 self.signals.done.emit(summary, "", False)
             except ImportCancelled:
@@ -466,9 +474,15 @@ class ImportWindow(QMainWindow):
     def _clip_progress(self, progress):
         selected = self.selected_recording()
         self.progress_states[progress.name] = progress
+        if progress.path is not None and progress.state in ("ready", "error"):
+            try:
+                record = read_recording(progress.path)
+                self.recording_names[record.unit_id] = progress.name
+            except (ImportFailure, OSError, ValueError, TypeError):
+                pass
         if progress.state == "error":
             self.blocked_names.add(progress.name)
-            if selected and selected.path.name.rsplit("-", 1)[0] == progress.name:
+            if selected and self._recording_name(selected) == progress.name:
                 self.preview.clear()
                 self._update_controls()
         elif progress.state == "ready":
@@ -492,8 +506,10 @@ class ImportWindow(QMainWindow):
             self.progress_states.clear()
             self.drive_synced = False
             self.device_sources.clear()
+            self.recording_names.clear()
         else:
             self.device_sources = dict(getattr(summary, "sources", {}))
+            self.recording_names.update({unit_id: source.name for unit_id, source in self.device_sources.items()})
         self.refresh_recordings()
         if self.closing:
             self.close()
@@ -531,7 +547,7 @@ class ImportWindow(QMainWindow):
         self.upload_record = record
         self.upload_saved = False
         self.cancel_event.clear()
-        self.upload_states[record.content_hash] = "録画を確認中"
+        self.upload_states[record.unit_id] = "録画を確認中"
         self.upload_status_label.setText(f"{record.created_text} の録画を確認しています…")
         self.upload_status_label.setVisible(True)
         self.upload_progress_bar.setRange(0, 0)
@@ -540,7 +556,7 @@ class ImportWindow(QMainWindow):
         self._update_controls()
         self.refresh_recordings(rescan=False)
         profile = self.profile
-        source = self.device_sources.get(record.path.name.rsplit("-", 1)[0])
+        source = self.device_sources.get(record.unit_id)
 
         def run():
             uploader = None
@@ -549,12 +565,12 @@ class ImportWindow(QMainWindow):
                 uploader = self.uploader_factory(profile)
                 result = uploader.upload_recording(record.path, on_progress=self.signals.upload_progress.emit,
                                                    cancel_event=self.cancel_event)
-                if isinstance(result, UploadResult) and result.content_hash == record.content_hash:
-                    self.signals.upload_progress.emit(UploadProgress(record.content_hash, "cleaning_device",
+                if isinstance(result, UploadResult) and result.unit_id == record.unit_id:
+                    self.signals.upload_progress.emit(UploadProgress(record.unit_id, "cleaning_device",
                                                       result.total_bytes, result.total_bytes))
                     self.signals.log.emit("保存を確認しました。スマートグラスから録画を削除しています…")
                     try:
-                        self.cleaner(source, drive_reader=lambda hashes: self.drive_reader(profile, hashes, self.cancel_event),
+                        self.cleaner(source, drive_reader=lambda unit_ids: self.drive_reader(profile, unit_ids, self.cancel_event),
                                      log=self.signals.log.emit, cancel_event=self.cancel_event)
                     except (ImportFailure, OSError):
                         cleanup_error = "アップロードは完了しました。端末からの削除は、次の接続で再試行します。"
@@ -579,7 +595,7 @@ class ImportWindow(QMainWindow):
 
     def _upload_progress(self, progress):
         if (not self.busy or self.job_kind != "upload" or self.upload_record is None
-                or progress.content_hash != self.upload_record.content_hash):
+                or progress.unit_id != self.upload_record.unit_id):
             return
         total = max(0, int(progress.total_bytes))
         transferred = min(total, max(0, int(progress.bytes_uploaded))) if total else 0
@@ -590,7 +606,7 @@ class ImportWindow(QMainWindow):
         if progress.state == "cleaning_device":
             self.upload_saved = True
         label = labels.get(progress.state, "アップロード中")
-        self.upload_states[progress.content_hash] = label
+        self.upload_states[progress.unit_id] = label
         self.upload_progress_bar.setRange(0, 100 if total else 0)
         if total:
             self.upload_progress_bar.setValue(percentage)
@@ -615,12 +631,13 @@ class ImportWindow(QMainWindow):
         self._refresh_timer.stop()
         self.upload_progress_bar.setVisible(False)
         verified = (record is not None and isinstance(result, UploadResult)
-                    and result.content_hash == record.content_hash and not error and not cancelled)
+                    and result.unit_id == record.unit_id and not error and not cancelled)
         if verified:
-            name = record.path.name.rsplit("-", 1)[0]
+            name = self._recording_name(record)
             self.progress_states[name] = ClipProgress(name, None,
                 "cleanup_pending" if cleanup_error else "drive_saved", cleanup_error)
-            self.device_sources.pop(name, None)
+            self.device_sources.pop(record.unit_id, None)
+            self.recording_names.pop(record.unit_id, None)
         self.refresh_recordings()
         if self.closing:
             self.close()
@@ -628,13 +645,13 @@ class ImportWindow(QMainWindow):
         if record is None:
             return
         if verified:
-            self.upload_states.pop(record.content_hash, None)
+            self.upload_states.pop(record.unit_id, None)
             text = cleanup_error or f"{record.created_text} のアップロードが完了しました。"
         elif cancelled:
-            self.upload_states[record.content_hash] = "中止・再開できます"
+            self.upload_states[record.unit_id] = "中止・再開できます"
             text = "アップロードを中止しました。同じ録画を選んで「アップロード」を押すと再開できます。"
         else:
-            self.upload_states[record.content_hash] = "再度アップロードできます"
+            self.upload_states[record.unit_id] = "再度アップロードできます"
             text = error or self.completion_error or "アップロードの完了を確認できませんでした。もう一度「アップロード」を押してください。"
         self.status_label.setText(text)
         self.upload_status_label.setText(text)

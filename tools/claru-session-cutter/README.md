@@ -11,9 +11,10 @@ Mac上で、RootLensの長時間iPhone収録にタスク境界を付け、Claru�
 - 開始点は直前のH.264 keyframeへ安全側にsnapする。実際の書出境界はUIに表示する。
 - video/IMUのraw timestampは変更せず、出力MP4のPTSと各sample indexだけを新しい
   ファイルの0始まりへ再構成する。
-- `content_hash`は各出力 `rgb.mp4` のSHA-256で再計算する。
+- 各出力には匿名`site_id`、録画開始UTC、乱数から`unit_id`を発行する。
+- 各出力の4ファイルは個別にSHA-256を計算し、`source_manifest_sha256`で一括検証する。
 - 長時間原本から切り出したことは `metadata.json.segmentation` に監査情報として残す。
-- 出力はR2と同じ `raw/<content_hash>/` 配置とし、クリップ内は
+- 出力はR2と同じ `raw/<unit_id>/` 配置とし、クリップ内は
   iPhone contractの4ファイルだけにする。
 
 この処理はbitstreamを再エンコードしませんが、長時間原本から時間区間を抽出する処理では
@@ -25,14 +26,16 @@ Mac上で、RootLensの長時間iPhone収録にタスク境界を付け、Claru�
 macOSにHomebrew版 `ffmpeg` / `ffprobe` があることを確認し、リポジトリrootから実行します。
 
 ```bash
-node tools/claru-session-cutter/server.mjs
+node tools/claru-session-cutter/server.mjs --site-id <匿名site_id>
 ```
 
 ブラウザで `http://127.0.0.1:4318` を開き、収録フォルダを選びます。起動時に既知の
 sessionを渡すこともできます。
 
 ```bash
-node tools/claru-session-cutter/server.mjs --source /path/to/rec-1234567890
+node tools/claru-session-cutter/server.mjs \
+  --site-id <匿名site_id> \
+  --source /path/to/rec-1234567890
 ```
 
 区間は追加・削除・復元のたびに、ブラウザ内の一時状態とは別に
@@ -47,6 +50,7 @@ raw video/IMU timestampは変えず、frameのIMU前後参照とmetadataだけ�
 
 ```bash
 node tools/claru-session-cutter/server.mjs \
+  --site-id <匿名site_id> \
   --source /path/to/rec-1234567890 \
   --calibration /path/to/iphone-ultrawide-calibration.json
 ```
@@ -55,7 +59,7 @@ iPhone原本のmetadataに`quality=good`の校正値がない場合、`--calibra
 区間入力と保存はその前でも行えますが、0msの既定値で提出物を作ることはできません。
 
 完成物は既定で `~/Downloads/RootLens-Claru-DELIVERY-YYYYMMDD-HHMMSS/` に作られ、
-その中に `raw/<content_hash>/` というR2 uploadと同じフォルダ構成で
+その中に `raw/<unit_id>/` というR2 uploadと同じフォルダ構成で
 クリップが並びます。
 
 ## キーボード
@@ -98,7 +102,7 @@ python3 tools/claru-session-cutter/scripts/audit_historical_clock.py \
 出力は最新納品仕様と共通の`rootlens.camera_imu_clock_model.v1`です。raw RGB、raw IMU、raw timestampは
 変更せず、原本ごとに一度確定したaffine modelを、その原本から作る全clipへ継承します。納品metadataは
 方法名を持たない共通schemaとし、CoreMedia platform conversionかmotion-signal affine estimationかの違いは
-原本hashへ紐づく社内audit JSONだけに残します。`quality=good`だけで自動適用せず、独立window・方法間一致・
+原本の全ファイルmanifestへ紐づく社内audit JSONだけに残します。`quality=good`だけで自動適用せず、独立window・方法間一致・
 holdoutを通過したmodelだけを使います。
 
 監査が`good`になり、修正版capture pathで同じ端末×超広角のresidual calibrationを取得した後、原本を
@@ -131,11 +135,12 @@ python3 tools/claru-session-cutter/scripts/canonicalize_camera_imu_clock.py \
 
 実収録全体のaffine監査が独立window・方法間一致・holdoutを通過し、各clipの独立検証を行う場合は、
 中間の長尺RGB copyを作らず原本から直接書き出せます。納品metadataはcanonical時刻を再現する
-数値モデルのみを持ち、推定方法、fit診断、sensor-validity分離の内部情報は原本hashへ紐づく
+数値モデルのみを持ち、推定方法、fit診断、sensor-validity分離の内部情報は原本の全ファイルmanifestへ紐づく
 社内audit JSONにのみ保存します。
 
 ```bash
 node tools/claru-session-cutter/scripts/export_with_clock_audit.mjs \
+  --site-id <匿名site_id> \
   --source /path/to/rec-1234567890 \
   --boundaries tools/claru-session-cutter/boundaries/rec-1234567890.boundaries.json \
   --clock-audit /path/to/rec-1234567890.clock-model.audit.json \

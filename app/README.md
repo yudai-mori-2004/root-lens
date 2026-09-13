@@ -95,11 +95,10 @@ recorder as production capture. Only a repeatable result is persisted. The
 stored residual is reused on that device until remeasurement and is used only
 for frame-to-IMU association; raw video and IMU timestamps are never rewritten.
 The calibration record is stored per device model and ultra-wide camera, and is
-copied into each clip's metadata for auditability. After the existing
-content-hash step identifies the immutable MP4, the iPhone config's own
-finalization hook adds `content_hash` and
-`video_bytes` to metadata before upload; the generic pipeline does not edit
-config-specific JSON.
+copied into each clip's metadata for auditability. Before upload, the server
+issues a `unit_id` from the anonymous site code and recording start time. The
+app writes it to metadata, hashes every source file, and fixes the resulting
+`source_manifest_sha256` before requesting upload URLs.
 
 ## Architecture
 
@@ -110,11 +109,11 @@ app/
 │   │                        AVCapture/Core Motion controllers. They share hand
 │   │                        tracking, orientation, and RGB-IMU residual analysis
 │   │                        while keeping camera-session implementations separate
-│   └── content-hash/        SHA-256 over multi-GB files via CryptoKit
+│   └── file-hash/           SHA-256 over multi-GB files via CryptoKit
 └── src/
     ├── dataflow/            UI-independent data layer: the clip store, the
     │                        recording-config registry, and the resumable upload
-    │                        pipeline (hash → presigned R2 upload → registration).
+    │                        pipeline (unit + manifest → verified R2 upload → registration).
     │                        Nothing here imports React
     ├── screens/             Capture, clip list, settings, login
     ├── components/          Clip cards, local upload consent, and remote Mentra review
@@ -122,16 +121,17 @@ app/
     └── domain/              Gesture debouncing
 ```
 
-A clip's identity is the SHA-256 of its raw mp4 bytes, computed on the device.
-It serves as the storage key and the database primary key, and gives end-to-end
-integrity for the video from device to consumer.
+A clip's identity is its server-issued `unit_id`, which is also the R2 prefix
+and database primary key. Identity is independent of file bytes. Integrity is
+checked per source file and across the canonical source manifest. Delivery
+files receive a separate delivery manifest after processing.
 
 For iPhone captures, the wearer reviews each local clip and records consent
-before upload. The upload is stage-resumable (hash, upload, register), so a
+before upload. The upload is stage-resumable (manifest, upload, register), so a
 failed or interrupted upload retries without redoing finished work. Mentra
 captures follow the field-device path: the glasses upload under the signed-in
 site account first, and the same account reviews the remote clip in this app.
-The resulting consent event is attached to that existing content-hash row;
+The resulting consent event is attached to that existing recording-unit row;
 unreviewed Mentra clips never appear in the consented history or its totals.
 
 ## Development

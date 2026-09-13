@@ -4,19 +4,27 @@
 // ─── 撮影構成 ───────────────────────────────────────────────────
 export type RecordingConfig = "ultra_wide" | "arkit" | "mentra" | "iphone";
 
+export interface SourceFileIntegrity {
+  name: string;
+  bytes: number;
+  sha256: string;
+}
+
 // ─── ClipDto ─────────────────────────────────────────────────────
 // サーバの clip 行はアップロード完了後にしか作られないので、 状態機械は持たない
 // (サーバ行はアップロード完了後にしか無いので state を持たない。 端末側のローカル state とは別物)。
 
 export interface ClipDto {
-  /// 識別子 (= raw mp4 の SHA-256 hex。 DB PK / R2 raw キーと同値)
-  contentHash: string;
+  /// 撮影単位の識別子 (= DB PK / R2 rawキー)
+  unitId: string;
   createdAt: string; // ISO 8601
 
   // ── 撮影ファクト (= 端末申告) ──
   recordingConfig: RecordingConfig;
   durationMs: number | null;
-  contentSize: number | null;
+  videoBytes: number;
+  sourceManifestSha256: string;
+  sourceFiles: SourceFileIntegrity[];
   deviceModel: string | null;
 
   /// このクリップのアップロード同意イベント id (= consent_events.id)
@@ -26,13 +34,15 @@ export interface ClipDto {
 // ─── API リクエスト / レスポンス ─────────────────────────────────────
 
 /// POST /api/clips
-/// 端末で content_hash 計算 + R2 アップロードを終えてから呼ぶ。
-/// 重複排除キーは (account, contentHash)、 既存行があれば idempotent に返す。
+/// unit_id発行、source manifest確定、R2アップロードを終えてから呼ぶ。
+/// 重複排除キーは (account, unitId)、 既存行があれば idempotent に返す。
 export interface CreateClipRequest {
-  /// 端末で計算した content_hash (= raw mp4 バイト列の SHA-256 hex)
-  contentHash: string;
+  /// Webが発行した撮影単位の識別子。
+  unitId: string;
   /// rgb.mp4 (= raw、 blur 無し) のサイズ (bytes)
-  contentSize: number;
+  videoBytes: number;
+  sourceManifestSha256: string;
+  sourceFiles: SourceFileIntegrity[];
   /// 採用された撮影構成 (= 'ultra_wide' | 'arkit' | 'mentra' | 'iphone')
   recordingConfig: RecordingConfig;
   /// 録画尺 (ms)。 端末が record stop−start から算出。
@@ -61,12 +71,29 @@ export type RawSessionFilename =
   | "device_metrics.jsonl";
 
 export interface RawUploadsRequest {
-  contentHash: string;
+  unitId: string;
+  recordingConfig: RecordingConfig;
+  sourceManifestSha256: string;
+  sourceFiles: SourceFileIntegrity[];
+}
+
+export interface IssueUnitRequest {
+  recordedAt: string;
   recordingConfig: RecordingConfig;
 }
 
+export interface IssueUnitResponse {
+  unitId: string;
+  siteId: string;
+}
+
 export interface RawSessionUploadResponse {
-  files: Partial<Record<RawSessionFilename, { url: string; key: string; contentType: string }>>;
+  files: Partial<Record<RawSessionFilename, {
+    url: string;
+    key: string;
+    contentType: string;
+    headers: Record<string, string>;
+  }>>;
   /// presign したバケット名 (= デバッグ表示用)。
   bucket: string;
   expiresAt: string; // ISO 8601
@@ -82,7 +109,7 @@ export interface ListClipsResponse {
   clips: ClipDto[];
 }
 
-/// PATCH /api/clips/:contentHash
+/// PATCH /api/clips/:unitId
 /// Mentra が先にアップロードしたクリップへ、 iPhone で取得した同意イベントを結び付ける。
 export interface AttachClipConsentRequest {
   consentEventId: string;
@@ -92,7 +119,7 @@ export interface AttachClipConsentResponse {
   clip: ClipDto;
 }
 
-/// DELETE /api/clips/:contentHash
+/// DELETE /api/clips/:unitId
 /// 撮影者がクリップを破棄する (= R2 raw 一式 + DB 行)。
 export interface DeleteClipResponse {
   ok: true;

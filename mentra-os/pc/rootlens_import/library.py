@@ -8,16 +8,16 @@ from pathlib import Path
 import re
 import sys
 
-from .core import FILES, ImportFailure, is_link, validate_local_files, validate_metadata
+from .core import FILES, ImportFailure, UNIT_ID, is_link, validate_local_files, validate_metadata
 
 
-LOCAL_CLIP = re.compile(r"rec-\d{8}T\d{6}\.\d{3}Z-[0-9a-f]{12}\Z")
+LOCAL_CLIP = UNIT_ID
 
 
 @dataclass(frozen=True)
 class Recording:
     path: Path
-    content_hash: str
+    unit_id: str
     created_text: str
     duration_text: str
 
@@ -62,8 +62,8 @@ def read_recording(directory):
     if metadata_path.stat().st_size > 1024 * 1024:
         raise ImportFailure("録画情報を読み込めません。管理者に確認してください。")
     metadata = validate_metadata(json.loads(metadata_path.read_text(encoding="utf-8")))
-    content_hash = metadata["content_hash"]
-    if not directory.name.endswith("-" + content_hash[:12]):
+    unit_id = metadata["unit_id"]
+    if directory.name != unit_id:
         raise ImportFailure("録画情報とフォルダ名が一致しません。管理者に確認してください。")
     try:
         timestamp = datetime.fromisoformat(metadata.get("created_at", "").replace("Z", "+00:00"))
@@ -72,7 +72,7 @@ def read_recording(directory):
         created = "日時情報なし"
     milliseconds = metadata.get("actual_duration_ms", 0)
     duration = int(milliseconds) // 1000 if isinstance(milliseconds, (int, float)) and 0 <= milliseconds <= 604800000 else 0
-    return Recording(directory, content_hash, created, f"{duration // 3600}:{duration // 60 % 60:02d}:{duration % 60:02d}")
+    return Recording(directory, unit_id, created, f"{duration // 3600}:{duration // 60 % 60:02d}:{duration % 60:02d}")
 
 
 def scan_recordings(root):
@@ -88,4 +88,5 @@ def scan_recordings(root):
             rows.append(read_recording(directory))
         except (ImportFailure, OSError, ValueError, TypeError):
             continue
+    rows.sort(key=lambda row: (row.created_text == "日時情報なし", row.created_text, row.unit_id))
     return rows

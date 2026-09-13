@@ -40,18 +40,17 @@ root-lens/
 
 ```
 [撮影端末: app/]
-  録画完了                → sha256(raw mp4) 計算 → content_hash 誕生
-  → R2 rootlens-raw-arkit へ並列 PUT (rgb.mp4 + frames.jsonl +
-     imu.jsonl + metadata.json + depth.tar)
+  録画完了 → Webが unit_id を発行 → 全rawファイルのSHA-256と
+  source_manifest_sha256を確定 → R2 rootlens-raw-arkitへ検証付きPUT
   → POST /api/clips で登録 (= state='uploaded')
 
 [サーバ: web/]
-  REST API のみ (自動後段処理なし)。 /api/clips で登録、 /api/v1/raw-uploads で presigned URL、
-  /api/v1/consents で同意証跡。
+  REST API のみ (自動後段処理なし)。 /api/v1/unitsでunit_idを予約し、
+  /api/v1/raw-uploadsで完全性情報を含むpresigned URLを発行、/api/clipsでR2実体を照合して登録。
 
 [運用: tools/modal/fpvlabs/]
-  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash>` 実行。
-  raw を落として EgoBlur (GPU L4) で顔ぼかし → Stera 互換 MCAP を組み立て → rootlens-fpvlabs に put。
+  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id>` 実行。
+  source manifestを検証してEgoBlurで顔ぼかし → Stera互換MCAPとdelivery manifestをput。
 
 [FPV Labs]
   rclone で rootlens-fpvlabs から MCAP を pull。 詳細は document/v0.1.4/fpvlabs-handoff/。
@@ -97,12 +96,11 @@ API 型 / スキーマ) は型と fail-loud チェックで強制し、 別文�
 
 ## Key design decisions
 
-### 識別子は content_hash (= sha256 of raw mp4)
+### 識別子と完全性を分離する
 
-v0.1.3 まで C2PA D1 署名のハッシュを identity として使っていたが、 task 12 で C2PA 全廃と同時に
-「生 mp4 のバイト列の SHA-256」 に置換。 端末で計算し、 R2 raw キー / DB PK として使う。
-値の意味が変わったので、 旧 raw/<signature_hash>/ の R2 オブジェクトは orphan として残置する
-(= 参照だけ切って新データは新 content_hash キーで再アップロード)。
+撮影単位は`unit_<匿名site_id>_<録画開始UTC>_<乱数>`形式の`unit_id`で識別し、R2 rawキーと
+DB主キーに使う。ファイルの内容は各rawファイルのSHA-256と`source_manifest_sha256`で検証する。
+加工後の配布物は別の`delivery_manifest_sha256`で検証し、撮影単位の名前にファイルハッシュを使わない。
 
 ### 顔ぼかしは EgoBlur (GPU L4、 Stera-10M と同じ)
 

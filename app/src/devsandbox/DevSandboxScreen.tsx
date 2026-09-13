@@ -217,7 +217,7 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [config, runAction]);
 
-  // 送信 = 段レジュームランナー (advanceClip)。 pending → hash (content_hash 誕生)
+  // 送信 = 段レジュームランナー (advanceClip)。 pending → source manifest
   // → R2 upload → POST /api/clips まで一気に駆動する。
   // 失敗した段は clip.state='error' に反映され、 もう一度押すとその段から再開する。
   const onRunPipeline1 = useCallback(() => {
@@ -310,7 +310,7 @@ export const DevSandboxScreen: React.FC = () => {
       {/* クリップ状態バー */}
       <View style={styles.statusBar}>
         <StatusRow label="clipId" value={clip?.id} />
-        <StatusRow label="content_hash" value={clip?.contentHash} mono />
+        <StatusRow label="unit_id" value={clip?.unitId} mono />
         <StatusRow label="stage" value={clip?.stage} />
         <StatusRow
           label="state"

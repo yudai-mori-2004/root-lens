@@ -4,7 +4,7 @@
 // IF NOT EXISTS なし) で既存 DB に当たって落ちる。 増分の 1 本だけ流したい時はこちらを使う。
 //
 // 使い方:
-//   node scripts/apply_one_migration.mjs 0003_content_hash_and_account.sql
+//   node scripts/apply_one_migration.mjs 0008_unit_identity.sql
 
 import { config } from "dotenv";
 import postgres from "postgres";

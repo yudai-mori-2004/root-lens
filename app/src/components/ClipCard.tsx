@@ -109,7 +109,7 @@ export function localVideoUri(clip: Clip): string | null {
   }
 }
 
-/** サムネのキャッシュキー。 clip.id はハッシュ確定時に rename される (local id → content hash) ので、
+/** サムネのキャッシュキー。 clip.id は unit id 発行時に置き換わるため、
  *  id をキーにするとアップロード開始直後にキャッシュが全ミスし、 数 GB の mp4 デコードが
  *  PUT と同時に走ってしまう。 rename をまたいで安定な録画ディレクトリ名 (rec-<ts>) を使う。 */
 function frameCacheKey(clip: Clip): string {

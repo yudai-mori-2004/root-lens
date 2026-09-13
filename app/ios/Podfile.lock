@@ -2,8 +2,6 @@ PODS:
   - arkit_capture (0.1.0):
     - ExpoModulesCore
   - boost (1.84.0)
-  - content_hash (0.1.0):
-    - ExpoModulesCore
   - DoubleConversion (1.1.6)
   - EXApplication (6.0.2):
     - ExpoModulesCore
@@ -317,6 +315,8 @@ PODS:
     - ExpoModulesCore
   - fast_float (6.1.4)
   - FBLazyVector (0.76.9)
+  - file_hash (0.1.0):
+    - ExpoModulesCore
   - fmt (11.0.2)
   - glog (0.3.5)
   - hermes-engine (0.76.9):
@@ -2251,7 +2251,6 @@ PODS:
 DEPENDENCIES:
   - arkit_capture (from `../modules/arkit-capture/ios`)
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
-  - content_hash (from `../modules/content-hash/ios`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - EXApplication (from `../node_modules/expo-application/ios`)
   - EXAV (from `../node_modules/expo-av/ios`)
@@ -2287,6 +2286,7 @@ DEPENDENCIES:
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
+  - file_hash (from `../modules/file-hash/ios`)
   - fmt (from `../node_modules/react-native/third-party-podspecs/fmt.podspec`)
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2374,8 +2374,6 @@ EXTERNAL SOURCES:
     :path: "../modules/arkit-capture/ios"
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
-  content_hash:
-    :path: "../modules/content-hash/ios"
   DoubleConversion:
     :podspec: "../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec"
   EXApplication:
@@ -2446,6 +2444,8 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/fast_float.podspec"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
+  file_hash:
+    :path: "../modules/file-hash/ios"
   fmt:
     :podspec: "../node_modules/react-native/third-party-podspecs/fmt.podspec"
   glog:
@@ -2593,7 +2593,6 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   arkit_capture: 70c9a7aa683dbdd385cb1fb78680a14205b1603e
   boost: 1dca942403ed9342f98334bf4c3621f011aa7946
-  content_hash: d23f5c7fe14a8eea2329894f14e040893868253b
   DoubleConversion: f16ae600a246532c4020132d54af21d0ddb2a385
   EXApplication: 4c72f6017a14a65e338c5e74fca418f35141e819
   EXAV: 4c41f0a6ae54a0b96597abc90e37962ab2ee0d85
@@ -2629,6 +2628,7 @@ SPEC CHECKSUMS:
   EXUpdatesInterface: 7c977640bdd8b85833c19e3959ba46145c5719db
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: 7605ea4810e0e10ae4815292433c09bf4324ba45
+  file_hash: 3929627a5f802343b8f42ae99a12c21ffda28187
   fmt: 01b82d4ca6470831d1cc0852a1af644be019e8f6
   glog: 08b301085f15bcbb6ff8632a8ebaf239aae04e6a
   hermes-engine: 9e868dc7be781364296d6ee2f56d0c1a9ef0bb11

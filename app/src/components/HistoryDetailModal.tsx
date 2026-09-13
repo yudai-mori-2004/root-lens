@@ -41,8 +41,8 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   const [deleteError, setDeleteError] = useState(false);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
-    clip ? clip.contentHash : null,
-    clip && !thumbSource ? clip.contentHash : null,
+    clip ? clip.unitId : null,
+    clip && !thumbSource ? clip.unitId : null,
   );
   const poster = thumbSource ?? (frame ? { uri: frame } : undefined);
 
@@ -55,7 +55,7 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
     let cancelled = false;
     (async () => {
       try {
-        const url = await fetchClipMediaUrl(clip.contentHash);
+        const url = await fetchClipMediaUrl(clip.unitId);
         if (!cancelled) setMediaUrl(url);
       } catch (e) {
         if (cancelled) return;
@@ -64,13 +64,13 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
       }
     })();
     return () => { cancelled = true; };
-  }, [visible, clip?.contentHash]);
+  }, [visible, clip?.unitId]);
 
   if (!clip) return null;
 
   const createdMs = clip.createdAt ? new Date(clip.createdAt).getTime() : null;
   const dur = formatDuration(clip.durationMs);
-  const sizeMb = clip.contentSize != null ? `${(clip.contentSize / 1_000_000).toFixed(0)} MB` : null;
+  const sizeMb = clip.videoBytes != null ? `${(clip.videoBytes / 1_000_000).toFixed(0)} MB` : null;
   const remove = async () => {
     if (deleting) return;
     setDeleting(true);

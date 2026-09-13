@@ -18,8 +18,8 @@
 ## 現在の状態
 
 - Webの `consent_events` は、撮影端末上のクリックラップ同意をアカウント、文書版、文書ハッシュ、対象スコープと結び付けてappend-onlyで保存する。
-- `clips.content_hash` はrawの `rgb.mp4` のSHA-256であり、R2とDBで使う撮影データの主識別子である。この意味は変更しない。
-- 現場PCアプリは、録画を構成する4ファイルのSHA-256を計算し、事業所専用のサービスアカウントでGoogle Driveの「承認済みデータ」へアップロードする。
+- 撮影単位は`unit_id`で識別し、rawを構成する全ファイルは`source_manifest_sha256`で検証する。R2とDBも`unit_id`で参照する。
+- 現場PCアプリは、録画を構成する4ファイルのSHA-256と`source_manifest_sha256`を計算し、事業所専用のサービスアカウントでGoogle Driveの「承認済みデータ」へアップロードする。
 - 現在のPCアプリから分かるのは事業所と対象データである。操作した現場監督者個人、表示した承認文、承認時刻を一体の記録として残していない。
 - 現場合意書と撮影参加に関する同意書は、署名済みファイルを運営側で個別に管理している。
 
@@ -53,8 +53,9 @@ RootLensのデータ面には氏名や署名画像を直接入れず、次の不
 | `site_id` | 撮影場所・事業所 |
 | `person_id` | 署名者又は現場監督者 |
 | `agreement_record_id` | 完了した現場合意又はスタッフ同意の一版 |
-| `content_hash` | raw `rgb.mp4` のSHA-256。既存仕様を維持 |
-| `capture_manifest_hash` | 一つの撮影ロットを構成する全ファイル情報のハッシュ |
+| `unit_id` | 一つの撮影単位を継続して参照する識別子 |
+| `source_manifest_sha256` | `unit_id`とraw全ファイルの名前、サイズ、SHA-256を正規化したmanifestのSHA-256 |
+| `delivery_manifest_sha256` | 加工後の納品ファイル一覧を正規化したmanifestのSHA-256 |
 | `approval_event_id` | 撮影ロットへの提供前承認イベント |
 | `evidence_id` | 納品用証跡ファイルの識別子 |
 
@@ -91,7 +92,7 @@ PCアプリで、撮影者や映り込んだスタッフをクリップごとに
 
 署名セッションを作成するとき、Webは `site_id` から現場合意と、その現場で取得した全スタッフの同意記録を取得する。各記録には署名日時と承認時点の状態を含める。
 
-Webは、適用する現場合意の `agreement_record_id` と、スタッフ同意一式の `agreement_record_id` を安定した順序で並べ、`consent_snapshot` として固定する。そのSHA-256を `consent_snapshot_hash` として保存し、現場合意と全スタッフの同意記録を確認できる権限制御付きURLも発行する。これにより、撮影ロットから現場合意、全スタッフの同意一式、クリップごとの承認記録をたどることができる。
+Webは、適用する現場合意の `agreement_record_id` と、スタッフ同意一式の `agreement_record_id` を安定した順序で並べ、`consent_snapshot` として固定する。そのSHA-256を `consent_snapshot_sha256` として保存し、現場合意と全スタッフの同意記録を確認できる権限制御付きURLも発行する。これにより、撮影ロットから現場合意、全スタッフの同意一式、クリップごとの承認記録をたどることができる。
 
 この対応は、クリップ内の人物と個々の同意者を一人ずつ対応付けるものではない。撮影前に現場単位で必要な同意を取得したことと、現場監督者が当該クリップを確認して提供を承認したことを記録する。
 
@@ -100,17 +101,17 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 現場監督者はPCアプリで撮影ロットを確認し、そのロットに対して電子署名する。PCアプリへ現場監督者の長期秘密鍵を保存する方式は採らず、本人だけが利用できるパスキーを署名鍵として使う。PCアプリは対象データの確定と署名画面への橋渡しを行い、パスキーによる署名検証と証跡の確定はWeb側で行う。
 
 1. PCアプリが `rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json` を再読込し、各ファイルのサイズとSHA-256を算出する。
-2. ファイル名、サイズ、SHA-256、`content_hash` を正規化した `capture_manifest` を作り、そのSHA-256を `capture_manifest_hash` とする。
-3. PCアプリがWeb APIへ署名セッションを作成する。Webは `site_id` から現場合意とスタッフ同意一式への参照を取得して `consent_snapshot` を確定し、`capture_manifest_hash`、`consent_snapshot_hash`、承認文のハッシュ、事業所、ランダムなnonceを一回限りのchallengeに結び付ける。PCアプリへは署名URLを返す。
+2. `unit_id`とファイル名、サイズ、SHA-256を正規化した`source_manifest`を作り、そのSHA-256を`source_manifest_sha256`とする。
+3. PCアプリがWeb APIへ署名セッションを作成する。Webは `site_id` から現場合意とスタッフ同意一式への参照を取得して `consent_snapshot` を確定し、`source_manifest_sha256`、`consent_snapshot_sha256`、承認文のSHA-256、事業所、ランダムなnonceを一回限りのchallengeに結び付ける。PCアプリへは署名URLを返す。
 4. PCアプリが既定ブラウザで署名URLを開く。画面には撮影日時、尺、対象ファイル、適用される現場合意とスタッフ同意一式の状態を表示する。
 5. 現場監督者は個人アカウントでログインし、次の承認文を確認して「署名して承認」を押す。
 
    `この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。`
 
-6. ブラウザはパスキーを呼び出し、challengeへWebAuthn署名を行う。challengeはサーバ側で `capture_manifest_hash` と `consent_snapshot_hash` に対応するため、署名者、承認文、対象データ、現場合意、スタッフ同意一式が一つの電子署名記録として結び付く。
-7. WebはWebAuthn署名を検証し、`person_id`、`site_id`、`capture_manifest_hash`、`consent_snapshot_hash`、承認文の版、承認時刻、credential ID、認証器のsign count、challengeのハッシュをappend-onlyの承認イベントとして保存する。
+6. ブラウザはパスキーを呼び出し、challengeへWebAuthn署名を行う。challengeはサーバ側で `source_manifest_sha256` と `consent_snapshot_sha256` に対応するため、署名者、承認文、対象データ、現場合意、スタッフ同意一式が一つの電子署名記録として結び付く。
+7. WebはWebAuthn署名を検証し、`person_id`、`site_id`、`source_manifest_sha256`、`consent_snapshot_sha256`、承認文の版、承認時刻、credential ID、認証器のsign count、challengeのSHA-256をappend-onlyの承認イベントとして保存する。
 8. Webは承認内容とWebAuthn署名のハッシュを含むreceiptを生成し、RootLensの証跡署名鍵で署名する。
-9. PCアプリは署名済みreceiptをAPIから取得し、receipt内の `capture_manifest_hash` が現在のローカルファイルと一致する場合だけアップロードを開始する。
+9. PCアプリは署名済みreceiptをAPIから取得し、receipt内の `source_manifest_sha256` が現在のローカルファイルと一致する場合だけアップロードを開始する。
 10. 一つでもファイル又は同意スナップショットが変わった場合は電子署名を無効とし、新しい撮影ロットとして再署名を求める。
 
 利用者から見ると、電子署名はPCアプリの「署名して承認」操作から始まり、完了後は同じPCアプリへ戻る。システムブラウザを使うのは、Qt製PCアプリへWebAuthnと秘密鍵管理を独自実装しないためである。パスキーの秘密鍵は認証器から取り出さない。承認者の権限は、RootLensが協力先との合意時に登録する。一般の自己登録や、事業所で共有するアカウントは使わない。
@@ -124,7 +125,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 5. `rootlens-evidence.json` のpayloadを正規化し、RootLensの証跡署名鍵で署名する。
 6. 納品データと `rootlens-evidence.json` を同じ撮影データのディレクトリへ格納する。
 
-加工や切り出しを行った場合も、元となった `content_hash` と `capture_manifest_hash` を残し、納品ファイルのハッシュを別に記録する。これにより、加工済みデータから承認対象だったrawへ戻れる。
+加工や切り出しを行った場合も、元となった`unit_id`と`source_manifest_sha256`を残し、納品ファイル一覧を`delivery_manifest_sha256`で別に記録する。これにより、加工済みデータから承認対象だったrawへ戻れる。
 
 ## `rootlens-evidence.json`
 
@@ -140,8 +141,8 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
   "evidence_id": "evd_...",
   "issued_at": "2026-09-13T09:00:00Z",
   "source": {
-    "content_hash": "<sha256 of raw rgb.mp4>",
-    "capture_manifest_hash": "<sha256 of canonical capture manifest>",
+    "unit_id": "unit_bakery-01_20260913T073000000Z_7K2M9Q4R",
+    "source_manifest_sha256": "<sha256 of canonical source manifest>",
     "recorded_at": "2026-09-13T07:30:00Z",
     "recording_config": "mentra",
     "site_id": "site_...",
@@ -188,13 +189,14 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
     "statement": "この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。",
     "statement_version": "lot-approval-ja-1",
     "signature_method": "webauthn",
-    "approved_capture_manifest_hash": "...",
-    "approved_consent_snapshot_hash": "...",
+    "approved_source_manifest_sha256": "...",
+    "approved_consent_snapshot_sha256": "...",
     "signed_payload_sha256": "...",
     "webauthn_assertion_sha256": "...",
     "receipt_sha256": "..."
   },
   "delivery": {
+    "delivery_manifest_sha256": "...",
     "files": [
       {"path": "session.mcap", "size": 123, "sha256": "..."}
     ],
@@ -300,7 +302,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 
 ### Phase 3: 証跡ファイル
 
-- `capture_manifest_hash` と同意スナップショットを確定する。
+- `source_manifest_sha256` と同意スナップショットを確定する。
 - 納品パイプラインで `rootlens-evidence.json` を生成し、KMS鍵で署名する。
 - rawから切り出し・加工済み納品物までのハッシュ関係を保存する。
 - 検証CLIと権限制御された検証ページを作る。

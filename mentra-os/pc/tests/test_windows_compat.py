@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rootlens_import import core, library, site, upload_state
+from unit_fixtures import unit_id
 
 
 class FileAdb(core.Adb):
@@ -135,9 +136,11 @@ except ImportFailure:
         for filename in core.FILES:
             (source / filename).write_bytes(b"synthetic fixture\n")
         metadata = {"schema": "rootlens.mentra.raw.v1", "files": list(core.FILES),
-                    "content_hash": core.checksum(source / "rgb.mp4"), "description": "Windowsの合成データ"}
+                    "unit_id": unit_id(), "site_id": "fixture",
+                    "created_at": "2026-09-11T08:30:00.000Z",
+                    "description": "Windowsの合成データ"}
         (source / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
-        destination = output / (name + "-" + metadata["content_hash"][:12])
+        destination = output / metadata["unit_id"]
         return remote_root, name, source, output, staging, destination
 
     def test_import_atomic_publish_reconnect_and_unicode_files_on_native_filesystem(self):
@@ -152,9 +155,9 @@ except ImportFailure:
             else:
                 self.assertFalse(destination.exists())
         self.assertEqual(core.import_clip(adb, str(remote), name, output, staging,
-                                         log=lambda _: None, on_clip=progress), "imported")
+                                         site_id="fixture", log=lambda _: None, on_clip=progress), "imported")
         self.assertEqual(core.import_clip(adb, str(remote), name, output, staging,
-                                         log=lambda _: None), "existing")
+                                         site_id="fixture", log=lambda _: None), "existing")
         self.assertEqual(adb.pulled, list(core.FILES))
         self.assertEqual(states[-1], "ready")
         self.assertEqual(list(staging.iterdir()), [])
@@ -166,14 +169,15 @@ except ImportFailure:
         adb.cancel_event = threading.Event()
         adb.cancel_after_pull = True
         with self.assertRaises(core.ImportCancelled):
-            core.import_clip(adb, str(remote), name, output, staging, log=lambda _: None)
+            core.import_clip(adb, str(remote), name, output, staging,
+                             site_id="fixture", log=lambda _: None)
         self.assertFalse(destination.exists())
         self.assertEqual(list(staging.iterdir()), [])
         self.assertTrue(all((source / name).is_file() for name in core.FILES))
         adb.cancel_after_pull = False
         adb.cancel_event.clear()
         self.assertEqual(core.import_clip(adb, str(remote), name, output, staging,
-                                         log=lambda _: None), "imported")
+                                         site_id="fixture", log=lambda _: None), "imported")
 
     @unittest.skipUnless(os.name == "nt", "native Windows junction test")
     def test_native_junction_cannot_redirect_site_or_staging_cleanup(self):

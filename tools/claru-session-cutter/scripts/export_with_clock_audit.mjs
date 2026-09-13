@@ -17,6 +17,7 @@ const sourceDir = path.resolve(argument('--source'));
 const boundariesPath = path.resolve(argument('--boundaries'));
 const auditPath = path.resolve(argument('--clock-audit'));
 const outputBase = path.resolve(argument('--output-base'));
+const siteId = argument('--site-id');
 
 const [session, boundaries, audit] = await Promise.all([
   loadSessionSummary(sourceDir),
@@ -32,6 +33,7 @@ const result = await exportSegments({
   segments: boundaries.segments,
   keyframes: session.keyframes,
   outputBase,
+  siteId,
   videoClockAudit: audit,
   onProgress(value) {
     const key = `${value.phase}:${value.clipIndex ?? ''}:${value.label ?? ''}`;

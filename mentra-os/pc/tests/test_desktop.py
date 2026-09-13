@@ -1,6 +1,5 @@
 """Qt workflow checks with isolated local data and a fake USB importer."""
 
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,6 +18,7 @@ from rootlens_import.core import ClipProgress, FILES, ImportCancelled, ImportFai
 from rootlens_import.device_sync import SyncSummary
 from rootlens_import.library import recordings_directory
 from rootlens_import.site import SiteProfile, save_site_profile
+from unit_fixtures import unit_id
 
 
 APPLICATION = QApplication.instance() or QApplication([])
@@ -34,17 +34,20 @@ def wait_for(condition, timeout=5):
     raise AssertionError("GUI work did not complete")
 
 
+def device_name(index=0):
+    return f"rec-20260911T0000{index:02}.000Z"
+
+
 def make_recording(root, index=0):
     video = f"Synthetic fixture {index}, not real footage.".encode()
-    digest = hashlib.sha256(video).hexdigest()
-    name = f"rec-20260911T0000{index:02}.000Z"
-    clip = root / f"{name}-{digest[:12]}"
+    identity = unit_id(index)
+    clip = root / identity
     clip.mkdir()
     (clip / "rgb.mp4").write_bytes(video)
     (clip / "frames.jsonl").write_text('{}\n')
     (clip / "imu.jsonl").write_text('{}\n')
     (clip / "metadata.json").write_text(json.dumps({
-        "schema": "rootlens.mentra.raw.v1", "files": list(FILES), "content_hash": digest,
+        "schema": "rootlens.mentra.raw.v1", "files": list(FILES), "unit_id": identity,
         "created_at": f"2026-09-11T00:00:{index:02}.000Z", "actual_duration_ms": 1000,
     }))
     return clip
@@ -76,8 +79,8 @@ class DesktopTests(unittest.TestCase):
         clips = [make_recording(root, i) for i in range(count)]
         self.window.set_profile(self.profile)
         self.window._drive_checked({}, "")
-        for clip in clips:
-            self.window._clip_progress(ClipProgress(clip.name.rsplit('-', 1)[0], clip, 'ready'))
+        for index, clip in enumerate(clips):
+            self.window._clip_progress(ClipProgress(device_name(index), clip, 'ready'))
         self.window._flush_progress()
         return clips
 
@@ -137,13 +140,14 @@ class DesktopTests(unittest.TestCase):
     def test_drive_read_is_requested_only_from_the_device_sync_worker(self):
         self.populate(1)
         order = []
-        snapshots = {'a' * 64: object()}
-        reader = Mock(side_effect=lambda profile, hashes, cancel: order.append('drive') or snapshots)
+        identity = unit_id(50)
+        snapshots = {identity: object()}
+        reader = Mock(side_effect=lambda profile, unit_ids, cancel: order.append('drive') or snapshots)
         self.window.drive_reader = reader
         def importer(**kwargs):
             order.append('device')
             self.assertNotIn('drive_recordings', kwargs)
-            result = kwargs['drive_reader']({'a' * 64})
+            result = kwargs['drive_reader']({identity})
             self.assertIs(result, snapshots)
             kwargs['on_drive_checked'](result)
             return SyncSummary(kwargs['output'])
@@ -151,13 +155,13 @@ class DesktopTests(unittest.TestCase):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual(order, ['device', 'drive'])
-        reader.assert_called_once_with(self.profile, {'a' * 64}, self.window.cancel_event)
+        reader.assert_called_once_with(self.profile, {identity}, self.window.cancel_event)
         self.assertTrue(self.window.drive_synced)
 
     def test_ready_progress_adds_clip_and_preserves_current_selection(self):
         clips = self.populate(1)
         added = make_recording(self.window.recordings_root, 1)
-        self.window._clip_progress(ClipProgress(added.name.rsplit('-', 1)[0], added, "ready"))
+        self.window._clip_progress(ClipProgress(device_name(1), added, "ready"))
         wait_for(lambda: len(self.window.records) == 2)
         self.assertEqual(len(self.window.records), 2)
         self.assertEqual(self.window.selected_recording().path, clips[0])
@@ -193,13 +197,13 @@ class DesktopTests(unittest.TestCase):
         position = scrollbar.value()
         self.assertGreater(position, 0)
         record = self.window.records[0]
-        self.window._clip_progress(ClipProgress(record.path.name.rsplit('-', 1)[0], record.path, 'verifying'))
+        self.window._clip_progress(ClipProgress(device_name(), record.path, 'verifying'))
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertEqual(scrollbar.value(), position)
 
     def test_failed_checksum_blocks_only_affected_recording_until_ready(self):
         clips = self.populate(2)
-        name = clips[0].name.rsplit('-', 1)[0]
+        name = device_name()
         self.window._clip_progress(ClipProgress(name, clips[0], 'error', 'checksum mismatch'))
         self.assertIsNone(self.window.preview.path)
         self.assertFalse(self.window.folder_button.isEnabled())
@@ -293,28 +297,28 @@ class DesktopTests(unittest.TestCase):
 
     def test_only_exact_device_verified_path_is_shown_with_same_recording_name(self):
         clips = self.populate(1)
-        old = clips[0].with_name(clips[0].name.rsplit('-', 1)[0] + '-' + 'f' * 12)
+        old = clips[0].with_name(unit_id(999))
         old.mkdir()
         for source in clips[0].iterdir():
             (old / source.name).write_bytes(source.read_bytes())
         metadata = json.loads((old / 'metadata.json').read_text())
-        metadata['content_hash'] = 'f' * 64
+        metadata['unit_id'] = unit_id(998)
         (old / 'metadata.json').write_text(json.dumps(metadata))
         self.window.refresh_recordings()
         self.assertEqual([r.path for r in self.window.records], clips)
 
     def test_ready_after_drive_metadata_mismatch_is_visible(self):
         clips = self.populate(1)
-        digest = self.window.records[0].content_hash
+        digest = self.window.records[0].unit_id
         self.window.set_profile(self.profile)
         self.window._drive_checked({digest: object()}, "")
-        self.window._clip_progress(ClipProgress(clips[0].name.rsplit('-', 1)[0], clips[0], 'ready'))
+        self.window._clip_progress(ClipProgress(device_name(), clips[0], 'ready'))
         self.window._flush_progress()
         self.assertEqual([r.path for r in self.window.records], clips)
 
     def test_drive_saved_device_clip_has_no_row_even_without_any_local_copy(self):
         self.window.set_profile(self.profile)
-        self.window._drive_checked({'a' * 64: object()}, "")
+        self.window._drive_checked({unit_id(50): object()}, "")
         self.window._clip_progress(ClipProgress('rec-20260911T000001.000Z', None, 'drive_saved'))
         self.window._flush_progress()
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)

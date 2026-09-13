@@ -14,11 +14,11 @@ export interface DataflowEvent {
   id: string;
   /** ms epoch */
   ts: number;
-  /** Which step emitted it ('record' | 'content-hash' | 'r2-upload' | 'register-clip' | ...). */
+  /** Which step emitted it ('record' | 'source-manifest' | 'r2-upload' | 'register-clip' | ...). */
   step: string;
   level: EventLevel;
   message: string;
-  /** Optional structured detail (content hash, byte counts, ...). */
+  /** Optional structured detail (unit id, byte counts, file digests, ...). */
   detail?: unknown;
 }
 

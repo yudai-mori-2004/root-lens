@@ -352,6 +352,7 @@ test('diagnostic unsplit alignment can export clips only with diagnostic lineage
   const keyframes = await probeKeyframes(path.join(diagnosticSource, 'rgb.mp4'));
   const result = await exportSegments({
     sourceDir: diagnosticSource,
+    siteId: 'test-site',
     keyframes,
     segments: [{ label: 'clip-001', startSeconds: 1.2, endSeconds: 4.8 }],
     outputBase: path.join(root, 'out'),
@@ -409,6 +410,7 @@ test('a good recording-level combined model exports delivery clips without a lon
   const keyframes = await probeKeyframes(path.join(source, 'rgb.mp4'));
   const result = await exportSegments({
     sourceDir: source,
+    siteId: 'test-site',
     keyframes,
     segments: [{ label: 'clip-001', startSeconds: 1.2, endSeconds: 4.8 }],
     outputBase: path.join(root, 'out'),
@@ -443,6 +445,7 @@ test('integration: lossless interval becomes a validated four-file R2-style clip
   const keyframes = await probeKeyframes(path.join(source, 'rgb.mp4'));
   const result = await exportSegments({
     sourceDir: source,
+    siteId: 'test-site',
     keyframes,
     segments: [{ label: 'ライン調理', startSeconds: 1.2, endSeconds: 4.8 }],
     outputBase: path.join(root, 'out'),
@@ -459,13 +462,14 @@ test('integration: lossless interval becomes a validated four-file R2-style clip
   });
   assert.equal(result.clips.length, 1);
   const clip = result.clips[0];
-  assert.match(path.basename(clip.folder), /^[a-f0-9]{64}$/);
+  assert.match(path.basename(clip.folder), /^unit_test-site_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-Z]{8}$/);
   assert.equal(path.basename(path.dirname(clip.folder)), 'raw');
   assert.deepEqual(await fs.readdir(result.outputRoot), ['raw']);
   assert.deepEqual(await fs.readdir(path.join(result.outputRoot, 'raw')), [path.basename(clip.folder)]);
   assert.deepEqual((await fs.readdir(clip.folder)).sort(), ['frames.jsonl', 'imu.jsonl', 'metadata.json', 'rgb.mp4']);
   const metadata = JSON.parse(await fs.readFile(path.join(clip.folder, 'metadata.json'), 'utf8'));
-  assert.equal(metadata.content_hash, path.basename(clip.folder));
+  assert.equal(metadata.unit_id, path.basename(clip.folder));
+  assert.equal(metadata.site_id, 'test-site');
   assert.equal(metadata.segmentation.internal_cuts, 0);
   assert.equal(metadata.segmentation.video_reencoded, false);
   assert.equal(metadata.segmentation.raw_imu_timestamps_modified, false);
@@ -479,7 +483,8 @@ test('integration: lossless interval becomes a validated four-file R2-style clip
     firstFrame.imu_association_timestamp_ns,
     firstFrame.camera_timestamp_mapped_system_uptime_ns + 20_000_000);
   const validation = await validateClipFolder(clip.folder);
-  assert.equal(validation.contentHash, metadata.content_hash);
+  assert.equal(validation.unitId, metadata.unit_id);
+  assert.match(validation.sourceManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(validation.frameCount, metadata.video_frame_count);
   if (process.env.KEEP_CLARU_FIXTURE) process.stdout.write(`fixture=${source}\n`);
 });

@@ -1,6 +1,7 @@
 # RootLens data access
 
-Recordings live in a Cloudflare R2 bucket. One recording per folder: `<id>/session.mcap`.
+Recordings live in a Cloudflare R2 bucket. One recording per `<unit_id>/` folder,
+containing `session.mcap` and `delivery-manifest.json`.
 `manifest.jsonl` at the bucket root lists every recording's attributes (one JSON object
 per line) so you can filter without listing folders. New recordings are added over time;
 re-run the download later to pick them up — the manifest is kept up to date automatically.
@@ -38,7 +39,7 @@ Each line of `manifest.jsonl` describes one recording:
 
 | field | meaning |
 |---|---|
-| `contentHash` | recording id = the folder name |
+| `unitId` | stable recording-unit id = the folder name |
 | `domain` | kind of work filmed: `home` (household chores) / `bakery` (bakery work) ...|
 | `site` | recording location id within the domain (e.g. `bakery-01`) |
 | `recordedAt` | recording start time, ISO 8601 UTC (read from the video container) |
@@ -49,6 +50,7 @@ Each line of `manifest.jsonl` describes one recording:
 | `device`, `osVersion` | capture device |
 | `blurred` | faces are blurred (always `true` in this bucket) |
 | `mcapBytes` | size of `session.mcap` |
+| `deliveryManifestSha256` | SHA-256 of the canonical delivery manifest |
 
 Face-blur details (detector, threshold, pipeline version) are recorded inside each
 MCAP on the `/rootlens/processing_info` topic.
@@ -56,7 +58,7 @@ MCAP on the `/rootlens/processing_info` topic.
 Example — list bakery recordings only:
 
 ```bash
-jq -r 'select(.domain=="bakery") | .contentHash' rootlens-data/manifest.jsonl
+jq -r 'select(.domain=="bakery") | .unitId' rootlens-data/manifest.jsonl
 ```
 
 ## Notes
@@ -66,4 +68,4 @@ jq -r 'select(.domain=="bakery") | .contentHash' rootlens-data/manifest.jsonl
   made under (collection, AI-training use, licensing, cross-border transfer), and
   faces are blurred before delivery.
 - Consent evidence is kept per recording as an append-only log and can be produced
-  for any `contentHash` on request.
+  for any `unitId` on request.

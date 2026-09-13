@@ -12,7 +12,8 @@ export type {
   ClipState,
   UploadStage,
   ServerClipStatus,
-  HashResult,
+  SourceFileIntegrity,
+  SourceManifestResult,
   UploadInput,
   UploadResult,
   RegisterInput,
@@ -49,7 +50,8 @@ export {
 
 // Individual steps
 export {
-  computeContentHash,
+  buildSourceManifest,
+  issueUnitId,
   uploadToR2,
   registerClip,
   fetchMyClips,
@@ -59,7 +61,7 @@ export {
   ClipApiError,
 } from './steps';
 
-// Stage-resumable upload runner (shared by "upload" and "try again": record → hash → upload + register)
+// Stage-resumable upload runner (record → source manifest → upload + register)
 export { enqueueRecording, enqueueAdvance, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
 
 // Store

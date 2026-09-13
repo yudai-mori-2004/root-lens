@@ -3,25 +3,26 @@
 # サンプルデータの正は共有ドライブ (samples/<domain>/<pipeline>/<セッション>/)。 LP の /sample は
 # その中の 1 本を選んでスキーマとスペックを見せるビューアで、 ここで作る 6 アセットは
 # ブラウザ再生のためのビュー変換にすぎない。 出力キーはドライブのフォルダ名末尾と同じ
-# <hash8> (= content_hash 先頭 8 桁) にして、 どのサンプルを表示しているかを id で辿れるようにする。
+# <unit_suffix> (= unit_id末尾のランダム8文字) にして、表示サンプルをunit_idから辿れるようにする。
 #
-#   入力: rootlens-raw-arkit の raw/<hash>/{frames.jsonl, imu.jsonl, metadata.json, depth.tar, mesh.jsonl}
-#         + rootlens-fpvlabs の <hash>/session.mcap (ぼかし済み映像の源泉。 無ければ実行拒否)
-#   出力: rootlens-public の lp-sample/<hash8>/{rgb.mp4, depth.mp4, mesh.glb,
+#   入力: rootlens-raw-arkit の raw/<unit_id>/{frames.jsonl, imu.jsonl, metadata.json, depth.tar, mesh.jsonl}
+#         + rootlens-fpvlabs の <unit_id>/session.mcap (ぼかし済み映像の源泉。 無ければ実行拒否)
+#   出力: rootlens-public の lp-sample/<unit_suffix>/{rgb.mp4, depth.mp4, mesh.glb,
 #         trajectory.json, timeseries.json, summary.json}
 #
 # rgb.mp4 は raw ではなく MCAP のぼかし済み JPEG 列から再構成する (sample-drive と同じ経路)。
 # 公開に出る映像はぼかし済みへ一本化し、 raw の未ぼかし rgb には触らない。
 #
 # 実行:
-#   Modal:  modal run --detach tools/lp-sample/lp_sample.py --content-hash <hash>
-#   ローカル: LP_SAMPLE_LOCAL=1 python tools/lp-sample/lp_sample.py <hash> [target_bucket]
+#   Modal:  modal run --detach tools/lp-sample/lp_sample.py --unit-id <unit_id>
+#   ローカル: LP_SAMPLE_LOCAL=1 python tools/lp-sample/lp_sample.py <unit_id> [target_bucket]
 #
 # 検証: --target-bucket <bucket> で本番以外の書けるバケットへ切り替え (fpvlabs.py と同じ流儀)。
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import math
@@ -96,13 +97,13 @@ SESSION_FILES = [
 REQUIRED_INPUTS = ["metadata.json"]  # 手ポーズ系はどちらかがあれば OK (下でチェック)
 
 
-def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[str, str]:
-    """raw/<hash>/ の全ファイルを dest_dir に落とし、 存在するものだけの {name: path} を返す。
+def download_raw(s3, bucket_raw: str, unit_id: str, dest_dir: str) -> dict[str, str]:
+    """raw/<unit_id>/ の全ファイルをdest_dirへ落とし、存在するものだけを返す。
     REQUIRED_INPUTS のどれかが欠けていたら RuntimeError で落とす。
     frames.jsonl / realtime_handpose.jsonl のどちらかが必須 (旧録画は後者)。"""
     got = {}
     for name in SESSION_FILES:
-        key = f"raw/{content_hash}/{name}"
+        key = f"raw/{unit_id}/{name}"
         dest = os.path.join(dest_dir, name)
         try:
             s3.download_file(bucket_raw, key, dest)
@@ -111,7 +112,7 @@ def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[
             if name in REQUIRED_INPUTS:
                 raise RuntimeError(f"required input missing: {key}")
     if "frames.jsonl" not in got and "realtime_handpose.jsonl" not in got:
-        raise RuntimeError(f"required input missing: raw/{content_hash}/frames.jsonl (or legacy realtime_handpose.jsonl)")
+        raise RuntimeError(f"required input missing: raw/{unit_id}/frames.jsonl (or legacy realtime_handpose.jsonl)")
     # 呼び出し側は frames.jsonl を鍵として使うので、 レガシー版はエイリアスで見えるようにする。
     if "frames.jsonl" not in got:
         got["frames.jsonl"] = got["realtime_handpose.jsonl"]
@@ -619,31 +620,43 @@ def build_summary(session_files: dict[str, str], asset_stats: dict[str, dict], o
 # メインエントリ
 # ══════════════════════════════════════════════════════════════════════
 
-def process_session(content_hash: str,
+def process_session(unit_id: str,
                     target_bucket: str | None = None) -> dict:
-    """raw/<hash>/ + fpvlabs の session.mcap を取得 → 6 アセットを組み立てて
-    lp-sample/<hash8>/ に put。 冪等: 再実行は同キーへの上書き。"""
+    """raw/<unit_id>/ + fpvlabs の session.mcap を取得 → 6 アセットを組み立てて
+    lp-sample/<unit_suffix>/ に put。 冪等: 再実行は同キーへの上書き。"""
     s3 = _r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
     bucket_fpv = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
     bucket_out = target_bucket or os.environ.get("R2_BUCKET_PUBLIC", DEFAULT_TARGET_BUCKET)
-    slug = content_hash[:8]  # ドライブのセッションフォルダ名末尾と同じ id 表記
+    slug = unit_id.rsplit("_", 1)[-1]
 
     with tempfile.TemporaryDirectory() as tmp:
         session_dir = os.path.join(tmp, "session")
         os.makedirs(session_dir)
-        session_files = download_raw(s3, bucket_raw, content_hash, session_dir)
+        session_files = download_raw(s3, bucket_raw, unit_id, session_dir)
 
         # session.mcap (必須): 公開に出る映像はぼかし済みの MCAP 経由のみ。
         mcap_path = os.path.join(tmp, "session.mcap")
         try:
-            s3.download_file(bucket_fpv, f"{content_hash}/session.mcap", mcap_path)
+            s3.download_file(bucket_fpv, f"{unit_id}/session.mcap", mcap_path)
         except Exception as e:
             raise RuntimeError(
-                f"session.mcap missing for {content_hash[:8]}. "
+                f"session.mcap missing for {unit_id[:8]}. "
                 f"the LP rgb is rebuilt from the blurred JPEG stream in the mcap; "
                 f"run fpvlabs first: {e}"
             )
+        delivery_manifest = json.loads(s3.get_object(
+            Bucket=bucket_fpv, Key=f"{unit_id}/delivery-manifest.json")["Body"].read())
+        expected = next((item for item in delivery_manifest.get("files", [])
+                         if item.get("path") == "session.mcap"), None)
+        digest = hashlib.sha256()
+        with open(mcap_path, "rb") as source:
+            for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
+                digest.update(chunk)
+        if (delivery_manifest.get("unit_id") != unit_id or expected is None
+                or expected.get("bytes") != os.path.getsize(mcap_path)
+                or expected.get("sha256") != digest.hexdigest()):
+            raise RuntimeError("session.mcap does not match its delivery manifest")
 
         with open(session_files["metadata.json"]) as f:
             meta = json.load(f)
@@ -699,7 +712,7 @@ def process_session(content_hash: str,
 
         return {
             "pipelineVersion": PIPELINE_VERSION,
-            "contentHash": content_hash,
+            "unitId": unit_id,
             "slug": slug,
             "uploaded": uploaded,
             "assets": asset_stats,
@@ -742,12 +755,12 @@ try:
         cpu=4.0,
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def lp_sample_process(content_hash: str, target_bucket: str = "") -> dict:
-        return process_session(content_hash, target_bucket=target_bucket or None)
+    def lp_sample_process(unit_id: str, target_bucket: str = "") -> dict:
+        return process_session(unit_id, target_bucket=target_bucket or None)
 
     @app.local_entrypoint()
-    def main(content_hash: str, target_bucket: str = ""):
-        print(json.dumps(lp_sample_process.remote(content_hash, target_bucket), indent=2))
+    def main(unit_id: str, target_bucket: str = ""):
+        print(json.dumps(lp_sample_process.remote(unit_id, target_bucket), indent=2))
 
 except ImportError:
     modal = None
@@ -757,8 +770,8 @@ if __name__ == "__main__" and (modal is None or os.environ.get("LP_SAMPLE_LOCAL"
     import sys
 
     if len(sys.argv) < 2:
-        print("usage: python lp_sample.py <content_hash> [target_bucket]", file=sys.stderr)
+        print("usage: python lp_sample.py <unit_id> [target_bucket]", file=sys.stderr)
         sys.exit(1)
-    hash_ = sys.argv[1]
+    unit_id_ = sys.argv[1]
     target_ = sys.argv[2] if len(sys.argv) > 2 else None
-    print(json.dumps(process_session(hash_, target_bucket=target_), indent=2))
+    print(json.dumps(process_session(unit_id_, target_bucket=target_), indent=2))

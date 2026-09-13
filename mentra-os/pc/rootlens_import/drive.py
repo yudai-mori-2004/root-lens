@@ -7,10 +7,12 @@ import re
 import threading
 from urllib.parse import parse_qs, urlsplit
 
-from .core import FILES, ImportCancelled, ImportFailure, check_cancelled, checksum, import_lock, verify_local
+from .core import (FILES, HASH, UNIT_ID, ImportCancelled, ImportFailure,
+                   check_cancelled, checksum, import_lock,
+                   source_manifest_sha256, verify_local)
 from .library import LOCAL_CLIP, read_recording
 from .site import drive_folder_id, validate_service_account
-from .upload_state import DRIVE_ID, HASH, UploadJournal, completed_hashes, state_directory
+from .upload_state import DRIVE_ID, UploadJournal, completed_unit_ids, state_directory
 
 API = "https://www.googleapis.com/drive/v3"
 UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files"
@@ -24,7 +26,7 @@ RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
 
 @dataclass(frozen=True)
 class UploadProgress:
-    content_hash: str
+    unit_id: str
     state: str
     bytes_uploaded: int
     total_bytes: int
@@ -33,17 +35,18 @@ class UploadProgress:
 
 @dataclass(frozen=True)
 class UploadResult:
-    content_hash: str
+    unit_id: str
     folder_id: str
     total_bytes: int
 
 
 @dataclass(frozen=True)
 class DriveRecording:
-    content_hash: str
+    unit_id: str
     folder_id: str
     name: str
     files: dict[str, dict]
+    source_manifest_sha256: str
 
 
 class _Retryable(ImportFailure):
@@ -125,13 +128,13 @@ class DriveUploader:
         condition = " or ".join(f"'{_drive_id(parent)}' in parents" for parent in parents)
         return self._list_files("trashed = false and (" + condition + ")")
 
-    def _list_target_folders(self, content_hashes):
-        hashes = " or ".join("appProperties has { key='rootlens_hash' and value='" + digest + "' }"
-                             for digest in content_hashes)
+    def _list_target_folders(self, unit_ids):
+        units = " or ".join("appProperties has { key='rootlens_unit_id' and value='" + unit_id + "' }"
+                            for unit_id in unit_ids)
         query = (f"'{self.parent_id}' in parents and trashed = false"
                  + " and appProperties has { key='rootlens_site' and value='" + self.profile.site_id + "' }"
                  + " and appProperties has { key='rootlens_kind' and value='recording' }"
-                 + " and (" + hashes + ")")
+                 + " and (" + units + ")")
         return self._list_files(query)
 
     def _list_files(self, query):
@@ -164,21 +167,20 @@ class DriveUploader:
             tokens.add(token)
             params["pageToken"] = token
 
-    def current_recordings(self, content_hashes, *, cancel_event=None):
+    def current_recordings(self, unit_ids, *, cancel_event=None):
         """Read only requested recordings; never enumerate the site's entire Drive.
 
-        Every returned folder has four complete Drive files with SHA-256 values,
-        and the video checksum equals its recording identity. Non-video hashes
-        describe the current Drive bytes, independently of any earlier upload
+        Every returned folder has four complete Drive files with SHA-256 values.
+        The unit id identifies the recording while the hashes describe current Drive bytes.
         history on this PC. Callers can compare them with the connected device.
         A result is an observation during this request, not a permanent receipt.
         """
         self.cancel = cancel_event if cancel_event is not None else threading.Event()
         try:
-            if isinstance(content_hashes, (str, bytes)):
+            if isinstance(unit_ids, (str, bytes)):
                 raise ValueError()
-            targets = set(content_hashes)
-            if any(not isinstance(digest, str) or not HASH.fullmatch(digest) for digest in targets):
+            targets = set(unit_ids)
+            if any(not isinstance(unit_id, str) or not UNIT_ID.fullmatch(unit_id) for unit_id in targets):
                 raise ValueError()
         except (TypeError, ValueError):
             raise ImportFailure("照合する録画情報を読み込めません。もう一度「接続」を押してください。") from None
@@ -192,7 +194,7 @@ class DriveUploader:
         except ImportFailure:
             raise ImportFailure("Google Driveの録画を確認できませんでした。インターネット接続と事業所の設定を確認し、もう一度「接続」を押してください。") from None
 
-    def _current_recordings(self, content_hashes):
+    def _current_recordings(self, unit_ids):
         check_cancelled(self.cancel)
         parent = self._get(self.parent_id)
         if (parent is None or parent.get("id") != self.parent_id or parent.get("mimeType") != FOLDER_MIME
@@ -200,31 +202,33 @@ class DriveUploader:
             raise ImportFailure("Google Driveの「承認済みデータ」を確認できません。管理者に保存先と共有設定を確認してもらってください。")
         self.drive_id = _drive_id(parent["driveId"])
         candidates = {}
-        for offset in range(0, len(content_hashes), QUERY_BATCH_SIZE):
-            batch = content_hashes[offset:offset + QUERY_BATCH_SIZE]
+        for offset in range(0, len(unit_ids), QUERY_BATCH_SIZE):
+            batch = unit_ids[offset:offset + QUERY_BATCH_SIZE]
             for folder in self._list_target_folders(batch):
                 properties = folder.get("appProperties", {})
                 if not isinstance(properties, dict):
                     continue
-                content_hash = properties.get("rootlens_hash")
+                unit_id = properties.get("rootlens_unit_id")
                 if (properties.get("rootlens_site") == self.profile.site_id
                         and properties.get("rootlens_kind") == "recording"
-                        and isinstance(content_hash, str) and content_hash in batch):
-                    candidates.setdefault(content_hash, []).append(folder)
+                        and isinstance(unit_id, str) and unit_id in batch):
+                    candidates.setdefault(unit_id, []).append(folder)
         folders = {}
         folder_observations = {}
-        for content_hash, matches in candidates.items():
+        for unit_id, matches in candidates.items():
             if len(matches) != 1:
                 continue
             folder = matches[0]
             name = folder.get("name")
+            source_manifest = folder.get("appProperties", {}).get("rootlens_source_manifest")
             if (folder.get("parents") == [self.parent_id] and folder.get("driveId") == self.drive_id
                     and folder.get("trashed") is False and folder.get("mimeType") == FOLDER_MIME
-                    and isinstance(name, str) and LOCAL_CLIP.fullmatch(name)
-                    and name.endswith("-" + content_hash[:12])
+                    and isinstance(name, str) and name == unit_id and LOCAL_CLIP.fullmatch(name)
+                    and isinstance(source_manifest, str) and HASH.fullmatch(source_manifest)
                     and folder.get("appProperties") == {"rootlens_site": self.profile.site_id,
-                        "rootlens_hash": content_hash, "rootlens_kind": "recording"}):
-                folders[folder["id"]] = (content_hash, name)
+                        "rootlens_unit_id": unit_id, "rootlens_kind": "recording",
+                        "rootlens_source_manifest": source_manifest}):
+                folders[folder["id"]] = (unit_id, name, source_manifest)
                 folder_observations[folder["id"]] = folder
         children = {folder_id: [] for folder_id in folders}
         folder_ids = list(folders)
@@ -237,34 +241,38 @@ class DriveUploader:
                         if isinstance(folder_id, str) and folder_id in children:
                             children[folder_id].append(item)
         result = {}
-        for folder_id, (content_hash, name) in folders.items():
+        for folder_id, (unit_id, name, source_manifest) in folders.items():
             check_cancelled(self.cancel)
-            files = self._current_files(children[folder_id], folder_id, content_hash)
+            files = self._current_files(children[folder_id], folder_id, unit_id)
             if files is None:
                 continue
-            result[content_hash] = DriveRecording(content_hash, folder_id, name, files)
+            source_files = {filename: {"size": item["size"], "sha256": item["sha256"]}
+                            for filename, item in files.items()}
+            if source_manifest_sha256(unit_id, source_files) != source_manifest:
+                continue
+            result[unit_id] = DriveRecording(unit_id, folder_id, name, files, source_manifest)
         check_cancelled(self.cancel)
         if not result:
             return result
         # A folder can move while its children are being read. Recheck membership
         # after reading the files before callers use this observation for cleanup.
         current_folders = {}
-        complete_hashes = sorted(result)
-        for offset in range(0, len(complete_hashes), QUERY_BATCH_SIZE):
-            batch = complete_hashes[offset:offset + QUERY_BATCH_SIZE]
+        complete_unit_ids = sorted(result)
+        for offset in range(0, len(complete_unit_ids), QUERY_BATCH_SIZE):
+            batch = complete_unit_ids[offset:offset + QUERY_BATCH_SIZE]
             for folder in self._list_target_folders(batch):
                 properties = folder.get("appProperties", {})
                 if not isinstance(properties, dict):
                     continue
-                digest = properties.get("rootlens_hash")
-                if isinstance(digest, str) and digest in batch:
-                    current_folders.setdefault(digest, []).append(folder)
+                unit_id = properties.get("rootlens_unit_id")
+                if isinstance(unit_id, str) and unit_id in batch:
+                    current_folders.setdefault(unit_id, []).append(folder)
         if self._folder_identity(self._get(self.parent_id)) != self._folder_identity(parent):
             raise ImportFailure("確認中にGoogle Driveの保存先が変更されました。もう一度接続してください。")
         check_cancelled(self.cancel)
-        return {digest: recording for digest, recording in result.items()
-                if len(current_folders.get(digest, [])) == 1
-                and self._folder_identity(current_folders[digest][0])
+        return {unit_id: recording for unit_id, recording in result.items()
+                if len(current_folders.get(unit_id, [])) == 1
+                and self._folder_identity(current_folders[unit_id][0])
                 == self._folder_identity(folder_observations[recording.folder_id])}
 
     @staticmethod
@@ -274,7 +282,7 @@ class DriveUploader:
         return {key: value.get(key) for key in
                 ("id", "name", "mimeType", "parents", "driveId", "trashed", "appProperties")}
 
-    def _current_files(self, children, folder_id, content_hash):
+    def _current_files(self, children, folder_id, unit_id):
         if len(children) != len(FILES):
             return None
         result = {}
@@ -288,13 +296,11 @@ class DriveUploader:
                     or not isinstance(mime_type, str) or not mime_type
                     or mime_type.startswith("application/vnd.google-apps.")
                     or item.get("appProperties") != {"rootlens_site": self.profile.site_id,
-                        "rootlens_hash": content_hash, "rootlens_kind": "file", "rootlens_file": name}
+                        "rootlens_unit_id": unit_id, "rootlens_kind": "file", "rootlens_file": name}
                     or not isinstance(size, str) or not re.fullmatch(r"[1-9][0-9]{0,19}", size)
                     or not isinstance(sha256, str) or not HASH.fullmatch(sha256)):
                 return None
             result[name] = {"id": item["id"], "size": int(size), "sha256": sha256}
-        if result["rgb.mp4"]["sha256"] != content_hash:
-            return None
         return result
 
     def _wait(self, attempt):
@@ -351,10 +357,12 @@ class DriveUploader:
 
     def _properties(self, filename=None):
         properties = {"rootlens_site": self.profile.site_id,
-                      "rootlens_hash": self.journal.value["content_hash"],
+                      "rootlens_unit_id": self.journal.value["unit_id"],
                       "rootlens_kind": "recording" if filename is None else "file"}
         if filename is not None:
             properties["rootlens_file"] = filename
+        else:
+            properties["rootlens_source_manifest"] = self.journal.value["source_manifest_sha256"]
         return properties
 
     def _find(self, parent, filename=None):
@@ -421,7 +429,7 @@ class DriveUploader:
 
     def _emit(self, state, filename="", current=0):
         if self.callback:
-            self.callback(UploadProgress(self.journal.value["content_hash"], state,
+            self.callback(UploadProgress(self.journal.value["unit_id"], state,
                                          self.done_bytes + current, self.total_bytes, filename))
 
     def _verify_remote(self, filename, info):
@@ -549,16 +557,16 @@ class DriveUploader:
             self.recording_name = directory.name
             self.total_bytes = sum((directory / name).stat().st_size for name in FILES)
             if self.callback:
-                self.callback(UploadProgress(recording.content_hash, "verifying", 0, self.total_bytes))
+                self.callback(UploadProgress(recording.unit_id, "verifying", 0, self.total_bytes))
             expected = {name: checksum(directory / name, self.cancel) for name in FILES}
             metadata = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
-            if expected["rgb.mp4"] != recording.content_hash or metadata.get("content_hash") != recording.content_hash:
+            if metadata.get("unit_id") != recording.unit_id:
                 raise ImportFailure("映像と録画情報が一致しません。管理者に確認してください。")
             manifest = {name: {"size": (directory / name).stat().st_size, "sha256": expected[name]} for name in FILES}
             lock_directory = state_directory(self.profile, self.state_dir)
             lock_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             with import_lock(lock_directory):
-                self.journal = UploadJournal(self.profile, recording.content_hash, manifest, self.state_dir)
+                self.journal = UploadJournal(self.profile, recording.unit_id, manifest, self.state_dir)
                 self.journal.value["completed"] = False
                 self.journal.save()
                 self.validate_destination()
@@ -589,7 +597,7 @@ class DriveUploader:
                 self.journal.value["completed"] = True
                 self.journal.save()
                 self._emit("completed")
-                return UploadResult(recording.content_hash, self.folder_id, self.total_bytes)
+                return UploadResult(recording.unit_id, self.folder_id, self.total_bytes)
         except ImportFailure:
             raise
         except (OSError, ValueError, TypeError, KeyError):

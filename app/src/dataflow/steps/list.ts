@@ -42,25 +42,25 @@ export async function fetchMyClips(): Promise<ServerClipStatus[]> {
   return clips;
 }
 
-/** 履歴再生 (= R2 の rgb.mp4 の presigned GET URL を取る)。 identifier は content hash。 */
+/** 履歴再生 (= R2 の rgb.mp4 の presigned GET URL を取る)。識別子は unit id。 */
 
-export async function fetchClipMediaUrl(contentHash: string): Promise<string> {
-  const cached = mediaUrlCache.get(contentHash);
+export async function fetchClipMediaUrl(unitId: string): Promise<string> {
+  const cached = mediaUrlCache.get(unitId);
   if (cached && cached.expiresAtMs > Date.now() + 60_000) return cached.url;
-  const running = mediaUrlInflight.get(contentHash);
+  const running = mediaUrlInflight.get(unitId);
   if (running) return running;
 
-  const request = fetchClipMediaUrlUncached(contentHash).finally(() => {
-    mediaUrlInflight.delete(contentHash);
+  const request = fetchClipMediaUrlUncached(unitId).finally(() => {
+    mediaUrlInflight.delete(unitId);
   });
-  mediaUrlInflight.set(contentHash, request);
+  mediaUrlInflight.set(unitId, request);
   return request;
 }
 
-async function fetchClipMediaUrlUncached(contentHash: string): Promise<string> {
+async function fetchClipMediaUrlUncached(unitId: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(`${SERVER_URL}/api/clips/${contentHash}/media`, {
+    res = await fetch(`${SERVER_URL}/api/clips/${unitId}/media`, {
       headers: await getAuthHeader(),
     });
   } catch (e) {
@@ -69,14 +69,14 @@ async function fetchClipMediaUrlUncached(contentHash: string): Promise<string> {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const detail = `GET /api/clips/:contentHash/media ${res.status}: ${text.slice(0, 200)}`;
+    const detail = `GET /api/clips/:unitId/media ${res.status}: ${text.slice(0, 200)}`;
     if (res.status === 404) throw new ClipApiError('not-found', detail);
     if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
     throw new ClipApiError('server', detail);
   }
   const { url, expiresAt } = (await res.json()) as { url: string; expiresAt?: string };
   const parsedExpiry = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
-  mediaUrlCache.set(contentHash, {
+  mediaUrlCache.set(unitId, {
     url,
     expiresAtMs: Number.isFinite(parsedExpiry) ? parsedExpiry : Date.now() + 50 * 60_000,
   });
@@ -84,10 +84,10 @@ async function fetchClipMediaUrlUncached(contentHash: string): Promise<string> {
 }
 
 /** 撮影者本人のクリップを R2 raw 一式とサーバ一覧から削除する。 */
-export async function deleteServerClip(contentHash: string): Promise<void> {
+export async function deleteServerClip(unitId: string): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`${SERVER_URL}/api/clips/${contentHash}`, {
+    res = await fetch(`${SERVER_URL}/api/clips/${unitId}`, {
       method: 'DELETE',
       headers: await getAuthHeader(),
     });
@@ -96,23 +96,23 @@ export async function deleteServerClip(contentHash: string): Promise<void> {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const detail = `DELETE /api/clips/:contentHash ${res.status}: ${text.slice(0, 200)}`;
+    const detail = `DELETE /api/clips/:unitId ${res.status}: ${text.slice(0, 200)}`;
     if (res.status === 404) throw new ClipApiError('not-found', detail);
     if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
     throw new ClipApiError('server', detail);
   }
-  mediaUrlCache.delete(contentHash);
-  mediaUrlInflight.delete(contentHash);
+  mediaUrlCache.delete(unitId);
+  mediaUrlInflight.delete(unitId);
 }
 
 /** Mentra がアップロード済みのクリップへ、 iPhone で取得した同意を結び付ける。 */
 export async function attachClipConsent(
-  contentHash: string,
+  unitId: string,
   consentEventId: string,
 ): Promise<ServerClipStatus> {
   let res: Response;
   try {
-    res = await fetch(`${SERVER_URL}/api/clips/${contentHash}`, {
+    res = await fetch(`${SERVER_URL}/api/clips/${unitId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ export async function attachClipConsent(
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const detail = `PATCH /api/clips/:contentHash ${res.status}: ${text.slice(0, 200)}`;
+    const detail = `PATCH /api/clips/:unitId ${res.status}: ${text.slice(0, 200)}`;
     if (res.status === 404) throw new ClipApiError('not-found', detail);
     if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
     throw new ClipApiError('server', detail);

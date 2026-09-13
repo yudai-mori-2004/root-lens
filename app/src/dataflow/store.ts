@@ -23,7 +23,7 @@ export type RecordingPhase =
 const MAX_EVENTS = 500;
 
 let localIdSeq = 0;
-/** Device-issued local clip id (renamed to the content hash via renameClipId once hashing completes). */
+/** Temporary local ledger id used before a server-issued unit id is assigned. */
 export function makeLocalClipId(): string {
   localIdSeq += 1;
   return `local_${Date.now().toString(36)}_${localIdSeq.toString(36)}`;
@@ -53,8 +53,8 @@ export interface DataflowState {
   upsertClip(clip: Clip): void;
   patchClip(id: string, patch: Partial<Clip>): void;
   removeClip(id: string): void;
-  /** Re-key a clip from its local id to the content hash (identity is born when hashing completes). */
-  renameClipId(localId: string, contentHash: string): void;
+  /** Re-key a local clip to its server-issued unit id. */
+  adoptUnitId(localId: string, unitId: string): void;
   /** Bulk hydrate from the persistence adapter (pours saved clips in at startup). */
   replaceClips(clips: Clip[]): void;
   /** Set which clip progress UIs should watch. */
@@ -106,15 +106,15 @@ export const dataflowStore = createStore<DataflowState>((set, get) => ({
       currentClipId: get().currentClipId === id ? null : get().currentClipId,
     });
   },
-  renameClipId(localId, contentHash) {
-    if (localId === contentHash) return;
+  adoptUnitId(localId, unitId) {
+    if (localId === unitId) return;
     const clips = get().clips;
     const cur = clips[localId];
     if (!cur) return;
     const { [localId]: _old, ...rest } = clips;
     set({
-      clips: { ...rest, [contentHash]: { ...cur, id: contentHash } },
-      currentClipId: get().currentClipId === localId ? contentHash : get().currentClipId,
+      clips: { ...rest, [unitId]: { ...cur, id: unitId } },
+      currentClipId: get().currentClipId === localId ? unitId : get().currentClipId,
     });
   },
   replaceClips(clips) {

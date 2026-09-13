@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from rootlens_import import core, device_sync
+from unit_fixtures import unit_id
 
 
 class DeviceFixture:
@@ -56,6 +57,9 @@ class DeviceFixture:
         self.pulled.append(name)
         shutil.copyfile(self.source / name, destination)
 
+    def write_metadata(self, remote, metadata):
+        (self.source / "metadata.json").write_text(json.dumps(metadata))
+
     def run(self, *args):
         assert args == ("get-serialno",)
         return "USB_FIXTURE"
@@ -73,9 +77,10 @@ class DeviceSyncTests(unittest.TestCase):
         (self.source / "rgb.mp4").write_bytes(b"complete video fixture")
         (self.source / "frames.jsonl").write_bytes(b'{"frame_index":0}\n')
         (self.source / "imu.jsonl").write_bytes(b'{"sensor":"gyroscope"}\n')
-        self.digest = core.checksum(self.source / "rgb.mp4")
+        self.unit_id = unit_id()
         (self.source / "metadata.json").write_text(json.dumps({
-            "schema": "rootlens.mentra.raw.v1", "content_hash": self.digest, "files": list(core.FILES)}))
+            "schema": "rootlens.mentra.raw.v1", "unit_id": self.unit_id,
+            "site_id": "fixture", "files": list(core.FILES)}))
         self.adb = DeviceFixture(self.source)
         self.events = []
         self.reader = Mock(return_value={})
@@ -88,13 +93,13 @@ class DeviceSyncTests(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
     def sync(self):
-        return device_sync.sync_recordings(self.output, drive_reader=self.reader,
+        return device_sync.sync_recordings(self.output, drive_reader=self.reader, site_id="fixture",
                                            log=lambda _: None, on_clip=self.events.append)
 
     def test_device_metadata_precedes_targeted_drive_read(self):
         def read(targets):
             self.assertGreater(self.adb.complete_calls, 0)
-            self.assertEqual(targets, {self.digest})
+            self.assertEqual(targets, {self.unit_id})
             return {}
         self.reader.side_effect = read
         result = self.sync()
@@ -102,23 +107,23 @@ class DeviceSyncTests(unittest.TestCase):
         self.assertEqual(self.reader.call_count, 1)
         self.assertEqual(self.adb.hashed, [core.FILES])
         self.assertEqual(self.adb.pulled, list(core.FILES))
-        self.assertIs(result.sources[self.name].adb, self.adb)
-        self.assertEqual(result.sources[self.name].serial, "USB_FIXTURE")
+        self.assertIs(result.sources[self.unit_id].adb, self.adb)
+        self.assertEqual(result.sources[self.unit_id].serial, "USB_FIXTURE")
 
     def test_saved_clip_goes_to_full_cleanup_without_copying(self):
         snapshot = object()
-        self.reader.return_value = {self.digest: snapshot}
-        def cleanup(adb, root, name, digest, reader, **kwargs):
+        self.reader.return_value = {self.unit_id: snapshot}
+        def cleanup(adb, root, name, unit_id, reader, **kwargs):
             self.assertIs(adb, self.adb)
-            self.assertEqual((name, digest), (self.name, self.digest))
-            self.assertIs(reader(digest), snapshot)
+            self.assertEqual((name, unit_id), (self.name, self.unit_id))
+            self.assertIs(reader(unit_id), snapshot)
         self.cleanup.side_effect = cleanup
         result = self.sync()
         self.assertEqual(result.cleaned, 1)
         self.assertEqual(result.sources, {})
         self.assertEqual(self.adb.pulled, [])
         self.assertEqual(self.events[-1].state, "drive_saved")
-        self.assertEqual(self.reader.call_args.args[0], {self.digest})
+        self.assertEqual(self.reader.call_args.args[0], {self.unit_id})
 
     def test_empty_device_does_not_read_drive_or_local_history(self):
         self.adb.clip_names = lambda root: []
@@ -155,19 +160,19 @@ class DeviceSyncTests(unittest.TestCase):
         self.cleanup.assert_not_called()
         self.assertEqual(self.adb.pulled, [])
 
-    def test_pending_cleanup_uses_device_hash_even_if_metadata_was_removed(self):
+    def test_pending_cleanup_uses_unit_id_even_if_metadata_was_removed(self):
         self.adb.clip_names = lambda root: []
         item = SimpleNamespace(name="pending-device-directory", original_name=self.name,
-                               content_hash=self.digest)
+                               unit_id=self.unit_id)
         self.pending.return_value = [item]
-        self.reader.return_value = {self.digest: object()}
+        self.reader.return_value = {self.unit_id: object()}
         result = self.sync()
         self.assertEqual(result.cleaned, 1)
-        self.assertEqual(self.reader.call_args.args[0], {self.digest})
-        self.assertEqual(self.cleanup.call_args.args[2:4], (item.name, self.digest))
+        self.assertEqual(self.reader.call_args.args[0], {self.unit_id})
+        self.assertEqual(self.cleanup.call_args.args[2:4], (item.name, self.unit_id))
 
     def test_cleanup_failure_stays_visible_without_retransmitting(self):
-        self.reader.return_value = {self.digest: object()}
+        self.reader.return_value = {self.unit_id: object()}
         self.cleanup.side_effect = core.ImportFailure("USB lost")
         result = self.sync()
         self.assertEqual((result.cleanup_pending, result.cleaned, result.failed), (1, 0, 0))
@@ -176,13 +181,13 @@ class DeviceSyncTests(unittest.TestCase):
         self.assertEqual(self.adb.pulled, [])
 
     def test_cleanup_cancel_propagates_without_claiming_all_originals_remain(self):
-        self.reader.return_value = {self.digest: object()}
+        self.reader.return_value = {self.unit_id: object()}
         self.cleanup.side_effect = core.ImportCancelled("cancelled")
         with self.assertRaises(core.ImportCancelled):
             self.sync()
 
     def test_changed_usb_serial_blocks_connect_cleanup(self):
-        self.reader.return_value = {self.digest: object()}
+        self.reader.return_value = {self.unit_id: object()}
         self.adb.run = lambda *args: "REPLACEMENT_DEVICE"
         result = self.sync()
         self.assertEqual(result.cleanup_pending, 1)
@@ -190,14 +195,14 @@ class DeviceSyncTests(unittest.TestCase):
 
     def test_upload_cleanup_keeps_original_transport(self):
         result = self.sync()
-        source = result.sources[self.name]
-        reader = Mock(return_value={self.digest: object()})
+        source = result.sources[self.unit_id]
+        reader = Mock(return_value={self.unit_id: object()})
         device_sync.cleanup_uploaded_recording(source, drive_reader=reader)
         self.assertIs(self.cleanup.call_args.args[0], self.adb)
-        self.assertEqual(self.cleanup.call_args.args[2:4], (self.name, self.digest))
+        self.assertEqual(self.cleanup.call_args.args[2:4], (self.name, self.unit_id))
 
     def test_upload_cleanup_rejects_replacement_serial(self):
-        source = self.sync().sources[self.name]
+        source = self.sync().sources[self.unit_id]
         self.adb.run = lambda *args: "REPLACEMENT_DEVICE"
         with self.assertRaises(core.ImportFailure):
             device_sync.cleanup_uploaded_recording(source, drive_reader=Mock())

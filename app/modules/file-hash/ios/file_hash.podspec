@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
-  s.name           = 'content_hash'
+  s.name           = 'file_hash'
   s.version        = '0.1.0'
-  s.summary        = 'Native streaming SHA-256 for raw clip files (content_hash)'
+  s.summary        = 'Native streaming SHA-256 for recording source files'
   s.homepage       = 'https://rootlens.io'
   s.license        = 'MIT'
   s.author         = 'RootLens'

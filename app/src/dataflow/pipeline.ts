@@ -1,13 +1,12 @@
 // Stage-resumable upload runner: one "advance" function shared by the first
 // upload attempt and every retry.
 //
-//   pending    → SHA-256 of the raw MP4      → 'hashed'     (the content hash is born;
-//                                                            the clip is re-keyed from its local id to the hash)
-//   hashed     → R2 upload + POST /api/clips → 'registered' (state='uploaded')
+//   pending    → unit id + source manifest   → 'manifested'
+//   manifested → R2 upload + POST /api/clips → 'registered' (state='uploaded')
 //   registered → nothing more happens on the device
 //
-// Idempotency: from 'hashed' on, the same content hash is reused, and the
-// server dedupes on (account, content hash), so retries can never create
+// Idempotency: from 'manifested' on, the same unit id and source manifest are
+// reused, and the server dedupes on unit id, so retries cannot create
 // duplicate clip rows.
 //
 // ⚠ Dataflow layer: must not import react / react-native.
@@ -17,11 +16,11 @@ import * as FileSystem from 'expo-file-system';
 import type { EventSink, DataflowEventInput } from './events';
 import { getRecordingConfig, type RecordingConfig, type RecordingSession } from './recording-configs';
 import type { UploadStage } from './types';
-import { computeContentHash } from './steps/hash';
+import { buildSourceManifest } from './steps/sourceManifest';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
-import { getMemoryMB } from '../native/contentHash';
+import { getMemoryMB, nativeSha256File } from '../native/fileHash';
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -64,7 +63,7 @@ function uploadFractionToProgress(f: number): number {
  * 'pending', keyed by a fresh local id).
  *
  * Nothing uploads automatically. The user reviews the preview in the clip list
- * and taps upload; advanceClip() then walks hash → R2 → register.
+ * and taps upload; advanceClip() then walks manifest → R2 → register.
  */
 export async function enqueueRecording(input: {
   config: RecordingConfig;
@@ -170,11 +169,16 @@ export async function recoverOrphanRecordings(): Promise<number> {
 
 /**
  * Resolve the stage a clip can actually resume from.
- * If the content hash has vanished from the store, demote to 'pending' and re-hash.
+ * If the unit id or manifest has vanished, demote to 'pending' and rebuild it.
  */
-function effectiveStage(stage: UploadStage, contentHash: string | undefined): UploadStage {
+function effectiveStage(
+  stage: UploadStage,
+  unitId: string | undefined,
+  sourceManifestSha256: string | undefined,
+  sourceFiles: unknown[] | undefined,
+): UploadStage {
   if (stage === 'registered') return 'registered';
-  if (stage === 'hashed' && contentHash) return 'hashed';
+  if (stage === 'manifested' && unitId && sourceManifestSha256 && sourceFiles?.length) return 'manifested';
   return 'pending';
 }
 
@@ -182,7 +186,7 @@ let advanceQueue = Promise.resolve();
 
 /**
  * Enqueue an advance so concurrent taps are serialized. The second clip waits
- * for the first to finish (hash → upload → register) before starting its own.
+ * for the first to finish (manifest → upload → register) before starting its own.
  * The clip is marked 'queued' immediately so the wait is visible on its card
  * (advanceClip flips it to 'uploading' when its turn starts); an already
  * queued / uploading clip is not enqueued twice.
@@ -199,8 +203,8 @@ export function enqueueAdvance(clipId: string, sink: EventSink): void {
 /**
  * Advance a clip from its current stage (shared by submit and retry).
  *
- *   pending → computeContentHash → 'hashed'     (the clip is re-keyed from its local id to the hash)
- *   hashed  → upload + register  → 'registered' (state='uploaded')
+ *   pending    → issue unit id + manifest → 'manifested'
+ *   manifested → upload + register        → 'registered'
  */
 export async function advanceClip(clipId: string, sink: EventSink): Promise<void> {
   const initial = dataflowStore.getState().clips[clipId];
@@ -241,7 +245,12 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
   };
 
   try {
-    let stage = effectiveStage(initial.stage ?? 'pending', initial.contentHash);
+    let stage = effectiveStage(
+      initial.stage ?? 'pending',
+      initial.unitId,
+      initial.sourceManifestSha256,
+      initial.sourceFiles,
+    );
 
     const memLog = (label: string) => {
       const mb = getMemoryMB();
@@ -249,47 +258,71 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
     };
     memLog('pipeline-start');
 
-    // ─── pending → hashed (the content hash is born) ──────────────────
+    let sourceFilesForUpload: Record<string, string> | undefined;
+
+    // ─── pending → manifested ──────────────────────────────────────────
     if (stage === 'pending') {
-      const rawMp4Uri = config.primaryVideoUri(session);
-      memLog('hash-begin');
-      const hashed = await computeContentHash(rawMp4Uri, progressSink, (f) => {
+      memLog('manifest-begin');
+      const manifested = await buildSourceManifest(
+        session,
+        config.outputFiles,
+        config.id,
+        initial.createdAt,
+        initial.unitId,
+        progressSink,
+        (f) => {
         patchProgress(hashFractionToProgress(f));
-      });
-      await config.attachContentIdentity?.(session, hashed, progressSink);
-      memLog('hash-done');
-      dataflowStore.getState().renameClipId(clipId, hashed.contentHash);
-      clipId = hashed.contentHash;
+        },
+      );
+      memLog('manifest-done');
+      sourceFilesForUpload = manifested.files;
+      dataflowStore.getState().adoptUnitId(clipId, manifested.unitId);
+      clipId = manifested.unitId;
       targetIdRef.id = clipId;
       dataflowStore.getState().patchClip(clipId, {
-        stage: 'hashed',
-        contentHash: hashed.contentHash,
-        contentSize: hashed.contentSize,
+        stage: 'manifested',
+        unitId: manifested.unitId,
+        videoBytes: manifested.videoBytes,
+        sourceManifestSha256: manifested.sourceManifestSha256,
+        sourceFiles: manifested.sourceFiles,
         uploadProgress: 0.4,
       });
-      stage = 'hashed';
+      stage = 'manifested';
     }
 
-    // ─── hashed → registered (R2 + POST /api/clips) ───────────────────
-    if (stage === 'hashed') {
+    // ─── manifested → registered (R2 + POST /api/clips) ───────────────
+    if (stage === 'manifested') {
       const cur = dataflowStore.getState().clips[clipId];
-      if (!cur?.contentHash) throw new Error('content_hash 未確定で登録段に進めません');
+      if (!cur?.unitId || !cur.sourceManifestSha256 || !cur.sourceFiles?.length) {
+        throw new Error('原本マニフェスト未確定で登録段に進めません');
+      }
 
       // PUT the recording config's output files to R2 in parallel. The primary
       // video is the raw mp4 from the session dir, sent as is.
-      const files: Record<string, string> = {};
-      for (const spec of config.outputFiles) {
-        const localUri = `${session.sessionDir}${spec.name}`;
-        const info = await FileSystem.getInfoAsync(localUri);
-        if (info.exists) {
-          files[spec.name] = localUri;
-        } else if (spec.required) {
-          throw new Error(`required output file missing: ${spec.name}`);
+      const files = sourceFilesForUpload ?? {};
+      if (!sourceFilesForUpload) {
+        for (const source of cur.sourceFiles) {
+          const localUri = `${session.sessionDir}${source.name}`;
+          const info = await FileSystem.getInfoAsync(localUri, { size: true });
+          if (!info.exists || (info as { size?: number }).size !== source.bytes) {
+            throw new Error(`manifested source file changed or missing: ${source.name}`);
+          }
+          const sha256 = await nativeSha256File(localUri);
+          if (sha256 !== source.sha256) {
+            throw new Error(`manifested source file content changed: ${source.name}`);
+          }
+          files[source.name] = localUri;
         }
       }
       memLog('upload-begin');
       await uploadToR2(
-        { contentHash: cur.contentHash, recordingConfig: config.id, files },
+        {
+          unitId: cur.unitId,
+          recordingConfig: config.id,
+          sourceManifestSha256: cur.sourceManifestSha256,
+          sourceFiles: cur.sourceFiles,
+          files,
+        },
         progressSink,
         (f) => patchProgress(uploadFractionToProgress(f)),
       );
@@ -297,8 +330,10 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
 
       await registerClip(
         {
-          contentHash: cur.contentHash,
-          contentSize: cur.contentSize ?? 0,
+          unitId: cur.unitId,
+          videoBytes: cur.videoBytes ?? 0,
+          sourceManifestSha256: cur.sourceManifestSha256,
+          sourceFiles: cur.sourceFiles,
           recordingConfig: config.id,
           durationMs: cur.durationMs ?? null,
           deviceModel: cur.deviceModel ?? null,

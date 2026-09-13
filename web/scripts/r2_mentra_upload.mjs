@@ -1,7 +1,7 @@
 // Upload one complete Mentra capture to the raw R2 contract and verify every object.
-// Usage: node scripts/r2_mentra_upload.mjs <clip-directory> <content-hash>
+// Usage: node scripts/r2_mentra_upload.mjs <clip-directory>
 import { spawnSync } from "node:child_process";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,11 +12,10 @@ const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: join(webRoot, ".env.local"), quiet: true });
 config({ path: join(webRoot, ".env"), quiet: true });
 
-const [, , clipDirectoryArg, contentHashArg] = process.argv;
-const contentHash = contentHashArg?.toLowerCase();
+const [, , clipDirectoryArg] = process.argv;
 
-if (!clipDirectoryArg || !/^[0-9a-f]{64}$/.test(contentHash ?? "")) {
-  console.error("usage: node scripts/r2_mentra_upload.mjs <clip-directory> <64-char-content-hash>");
+if (!clipDirectoryArg) {
+  console.error("usage: node scripts/r2_mentra_upload.mjs <clip-directory>");
   process.exit(2);
 }
 
@@ -40,17 +39,31 @@ for (const [name] of uploadFiles) {
   if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`missing capture file: ${path}`);
 }
 
+const metadata = JSON.parse(readFileSync(join(clipDirectory, "metadata.json"), "utf8"));
+const unitId = metadata.unit_id;
+if (!/^unit_[a-z0-9][a-z0-9_-]{0,63}_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-Z]{8}$/.test(unitId ?? "")) {
+  throw new Error("metadata.json does not contain a valid unit_id");
+}
+
 const sha256File = async (path) => {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(path)) hash.update(chunk);
   return hash.digest("hex");
 };
 
-const actualVideoHash = await sha256File(join(clipDirectory, "rgb.mp4"));
-if (actualVideoHash !== contentHash) {
-  throw new Error(`rgb.mp4 SHA-256 mismatch: expected ${contentHash}, got ${actualVideoHash}`);
+const sourceFiles = [];
+for (const [name] of uploadFiles) {
+  const path = join(clipDirectory, name);
+  sourceFiles.push({ name, bytes: statSync(path).size, sha256: await sha256File(path) });
 }
-console.log(`validated rgb.mp4 SHA-256: ${contentHash}`);
+sourceFiles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+const sourceManifest = JSON.stringify({
+  schema: "io.rootlens.source-manifest.v1",
+  unit_id: unitId,
+  files: sourceFiles,
+});
+const sourceManifestSha256 = createHash("sha256").update(sourceManifest).digest("hex");
+console.log(`validated source manifest: ${sourceManifestSha256}`);
 
 const r2 = new S3Client({
   region: "auto",
@@ -71,8 +84,9 @@ const awsEnvironment = {
 
 for (const [name, contentType] of uploadFiles) {
   const localPath = join(clipDirectory, name);
-  const key = `raw/${contentHash}/${name}`;
+  const key = `raw/${unitId}/${name}`;
   const size = statSync(localPath).size;
+  const sha256 = sourceFiles.find((file) => file.name === name).sha256;
   console.log(`uploading ${name} (${size} bytes) -> s3://${bucket}/${key}`);
 
   const result = spawnSync(
@@ -86,6 +100,8 @@ for (const [name, contentType] of uploadFiles) {
       endpoint,
       "--content-type",
       contentType,
+      "--metadata",
+      `sha256=${sha256},source-manifest-sha256=${sourceManifestSha256}`,
       "--only-show-errors",
       "--no-progress",
     ],
@@ -104,7 +120,10 @@ for (const [name, contentType] of uploadFiles) {
   if (head.ContentType !== contentType) {
     throw new Error(`R2 content type mismatch for ${name}: expected=${contentType}, remote=${head.ContentType}`);
   }
+  if (head.Metadata?.sha256 !== sha256 || head.Metadata?.["source-manifest-sha256"] !== sourceManifestSha256) {
+    throw new Error(`R2 integrity metadata mismatch for ${name}`);
+  }
   console.log(`verified ${name}: ${head.ContentLength} bytes, ${head.ContentType}`);
 }
 
-console.log(`upload complete: s3://${bucket}/raw/${contentHash}/`);
+console.log(`upload complete: s3://${bucket}/raw/${unitId}/`);

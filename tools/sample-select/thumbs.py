@@ -2,7 +2,7 @@
 # サンプルクリップ候補を目視で比較するためのだけの道具。
 #
 # 実行:
-#   modal run tools/sample-select/thumbs.py --content-hash <hash>
+#   modal run tools/sample-select/thumbs.py --unit-id <unit_id>
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ try:
         cpu=2.0,
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def extract(content_hash: str) -> dict:
+    def extract(unit_id: str) -> dict:
         import boto3
 
         s3 = boto3.client(
@@ -43,7 +43,7 @@ try:
 
         with tempfile.TemporaryDirectory() as tmp:
             src = os.path.join(tmp, "rgb.mp4")
-            s3.download_file(bucket_raw, f"raw/{content_hash}/rgb.mp4", src)
+            s3.download_file(bucket_raw, f"raw/{unit_id}/rgb.mp4", src)
 
             # 尺を取得。 ffprobe で JSON 出力。
             probe = subprocess.check_output([
@@ -70,7 +70,7 @@ try:
                     "-q:v", "3",
                     out,
                 ])
-                key = f"lp-sample/preview/{content_hash}_{i:02d}.jpg"
+                key = f"lp-sample/preview/{unit_id}_{i:02d}.jpg"
                 s3.upload_file(out, bucket_pub, key, ExtraArgs={"ContentType": "image/jpeg"})
                 uploaded.append({
                     "t": round(t, 1),
@@ -79,14 +79,14 @@ try:
                 })
 
             return {
-                "contentHash": content_hash,
+                "unitId": unit_id,
                 "durationSec": dur,
                 "thumbnails": uploaded,
             }
 
     @app.local_entrypoint()
-    def main(content_hash: str):
-        print(json.dumps(extract.remote(content_hash), indent=2))
+    def main(unit_id: str):
+        print(json.dumps(extract.remote(unit_id), indent=2))
 
 except ImportError:
     modal = None

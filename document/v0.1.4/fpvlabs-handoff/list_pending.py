@@ -1,7 +1,7 @@
 """未処理クリップを一覧する。
 
 rootlens-raw-arkit に上がっているが、 まだ rootlens-fpvlabs に session.mcap が無い
-content_hash を表示する (= これから modal で処理すべきもの)。
+unit_id を表示する (= これから modal で処理すべきもの)。
 
   python document/v0.1.4/fpvlabs-handoff/list_pending.py
 
@@ -42,8 +42,8 @@ RAW = "rootlens-raw-arkit"
 OUT = "rootlens-fpvlabs"
 
 
-def hashes_in(bucket, prefix=""):
-    """bucket 直下 (prefix 配下) の第1階層フォルダ名 = content_hash 集合。"""
+def units_in(bucket, prefix=""):
+    """bucket 直下 (prefix 配下) の第1階層フォルダ名 = unit_id 集合。"""
     got, sizes = {}, {}
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -59,8 +59,20 @@ def hashes_in(bucket, prefix=""):
 # 本命候補と小物 (= 中断/テスト録画) を分ける閾値 (GB)。 raw がこの未満は通常スキップ。
 MIN_REAL_GB = 0.3
 
-raw = hashes_in(RAW, "raw/")
-done = hashes_in(OUT, "")
+raw = units_in(RAW, "raw/")
+delivered_objects = {}
+for unit_id in units_in(OUT, ""):
+    delivered_objects[unit_id] = set()
+for page in s3.get_paginator("list_objects_v2").paginate(Bucket=OUT):
+    for obj in page.get("Contents", []):
+        key = obj["Key"]
+        if key.count("/") == 1:
+            unit_id, name = key.split("/", 1)
+            delivered_objects.setdefault(unit_id, set()).add(name)
+done = {
+    unit_id: 1 for unit_id, names in delivered_objects.items()
+    if {"session.mcap", "delivery-manifest.json"}.issubset(names)
+}
 pending = {h: sz for h, sz in raw.items() if h not in done}
 
 
@@ -69,7 +81,7 @@ def gb(n):
 
 
 def has_depth(h):
-    """raw/<hash>/depth.tar が存在し空でないか (= LiDAR 端末で撮れているか)。"""
+    """raw/<unit_id>/depth.tar が存在し空でないか (= LiDAR 端末で撮れているか)。"""
     try:
         o = s3.head_object(Bucket=RAW, Key=f"raw/{h}/depth.tar")
         return o["ContentLength"] > 0
@@ -92,7 +104,7 @@ if real:
     print("\n処理コマンド:")
     for h in sorted(real, key=lambda x: raw[x]):
         note = "" if depth_ok[h] else "   # ⚠ depth なし"
-        print(f"  modal run tools/modal/fpvlabs/fpvlabs.py --content-hash {h}{note}")
+        print(f"  modal run tools/modal/fpvlabs/fpvlabs.py --unit-id {h}{note}")
 else:
     print("本命候補なし (= 未処理の大物なし)")
 

@@ -33,10 +33,10 @@ const r2 = new S3Client({
 });
 const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
 const requiredFiles = new Set(["frames.jsonl", "imu.jsonl", "metadata.json", "rgb.mp4"]);
-const keyPattern = /^raw\/([0-9a-f]{64})\/([^/]+)$/;
+const keyPattern = /^raw\/(unit_[a-z0-9][a-z0-9_-]{0,63}_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-Z]{8})\/([^/]+)$/;
 
 async function listR2Prefixes() {
-  const filesByHash = new Map();
+  const filesByUnit = new Map();
   let continuationToken;
   do {
     const page = await r2.send(new ListObjectsV2Command({
@@ -47,20 +47,20 @@ async function listR2Prefixes() {
     for (const object of page.Contents ?? []) {
       const match = object.Key?.match(keyPattern);
       if (!match) continue;
-      const files = filesByHash.get(match[1]) ?? new Set();
+      const files = filesByUnit.get(match[1]) ?? new Set();
       files.add(match[2]);
-      filesByHash.set(match[1], files);
+      filesByUnit.set(match[1], files);
     }
     continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (continuationToken);
-  return filesByHash;
+  return filesByUnit;
 }
 
 try {
-  const [filesByHash, rows] = await Promise.all([
+  const [filesByUnit, rows] = await Promise.all([
     listR2Prefixes(),
     sql`
-      select content_hash, created_at, content_size
+      select unit_id, created_at, video_bytes
       from clips
       where recording_config = 'mentra'
       order by created_at asc
@@ -69,22 +69,22 @@ try {
 
   const completeR2 = new Set();
   const partialR2 = [];
-  for (const [hash, files] of filesByHash) {
+  for (const [unitId, files] of filesByUnit) {
     const missing = [...requiredFiles].filter((name) => !files.has(name));
-    if (missing.length === 0) completeR2.add(hash);
-    else partialR2.push({ hash, files: [...files].sort(), missing });
+    if (missing.length === 0) completeR2.add(unitId);
+    else partialR2.push({ unitId, files: [...files].sort(), missing });
   }
 
-  const dbHashes = new Set(rows.map((row) => row.content_hash));
+  const dbUnitIds = new Set(rows.map((row) => row.unit_id));
   const staleDb = rows
-    .filter((row) => !completeR2.has(row.content_hash))
+    .filter((row) => !completeR2.has(row.unit_id))
     .map((row) => ({
-      hash: row.content_hash,
+      unitId: row.unit_id,
       createdAt: row.created_at,
-      contentSize: Number(row.content_size ?? 0),
-      r2Files: [...(filesByHash.get(row.content_hash) ?? [])].sort(),
+      videoBytes: Number(row.video_bytes ?? 0),
+      r2Files: [...(filesByUnit.get(row.unit_id) ?? [])].sort(),
     }));
-  const r2WithoutDb = [...completeR2].filter((hash) => !dbHashes.has(hash)).sort();
+  const r2WithoutDb = [...completeR2].filter((unitId) => !dbUnitIds.has(unitId)).sort();
 
   console.log(JSON.stringify({
     mode: execute ? "execute" : "dry-run",
@@ -99,13 +99,13 @@ try {
   if (execute && staleDb.length > 0) {
     const deleted = [];
     await sql.begin(async (transaction) => {
-      for (const { hash } of staleDb) {
+      for (const { unitId } of staleDb) {
         const result = await transaction`
           delete from clips
-          where content_hash = ${hash} and recording_config = 'mentra'
-          returning content_hash
+          where unit_id = ${unitId} and recording_config = 'mentra'
+          returning unit_id
         `;
-        if (result[0]?.content_hash) deleted.push(result[0].content_hash);
+        if (result[0]?.unit_id) deleted.push(result[0].unit_id);
       }
     });
     if (deleted.length !== staleDb.length) {

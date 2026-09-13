@@ -3,7 +3,8 @@
 //
 // ⚠ Dataflow layer: must not import react / react-native.
 
-export { computeContentHash } from './hash';
+export { buildSourceManifest } from './sourceManifest';
+export { issueUnitId } from './unit';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
 export {

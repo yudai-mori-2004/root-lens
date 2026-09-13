@@ -77,14 +77,16 @@ class ImportClipTests(unittest.TestCase):
         (self.source / "imu.jsonl").write_bytes(b'{"sensor":"gyroscope"}\n')
         self.metadata = {
             "schema": "rootlens.mentra.raw.v1",
-            "content_hash": IMPORTER.checksum(self.source / "rgb.mp4"),
+            "unit_id": "unit_fixture_20260911T083000000Z_00000000",
+            "site_id": "fixture",
             "files": list(IMPORTER.FILES),
+            "created_at": "2026-09-11T08:30:00.000Z",
             "description": "撮影データ",
         }
         self.write_metadata()
         # Internal QA files stay on the device and must not leak into delivery.
         (self.source / "sync_report.json").write_bytes(b'{"internal":true}')
-        self.destination = self.output / (self.name + "-" + self.metadata["content_hash"][:12])
+        self.destination = self.output / self.metadata["unit_id"]
 
     def write_metadata(self):
         (self.source / "metadata.json").write_text(
@@ -94,7 +96,7 @@ class ImportClipTests(unittest.TestCase):
     def import_clip(self):
         return IMPORTER.import_clip(
             self.adb, str(self.remote_root), self.name, self.output, self.staging,
-            log=lambda message: None,
+            site_id="fixture", log=lambda message: None,
         )
 
     def tree_bytes(self):
@@ -124,7 +126,7 @@ class ImportClipTests(unittest.TestCase):
             events.append(event)
             self.assertEqual(self.destination.exists(), event.state == "ready")
         IMPORTER.import_clip(self.adb, str(self.remote_root), self.name, self.output,
-                             self.staging, log=lambda _: None, on_clip=progress)
+                             self.staging, site_id="fixture", log=lambda _: None, on_clip=progress)
         self.assertEqual([event.state for event in events],
                          ["discovering", "importing", "verifying", "ready"])
         self.assertEqual(events[-1].path, self.destination)
@@ -133,7 +135,7 @@ class ImportClipTests(unittest.TestCase):
         self.import_clip()
         events = []
         IMPORTER.import_clip(self.adb, str(self.remote_root), self.name, self.output,
-                             self.staging, log=lambda _: None, on_clip=events.append)
+                             self.staging, site_id="fixture", log=lambda _: None, on_clip=events.append)
         self.assertEqual([event.state for event in events], ["discovering", "verifying", "ready"])
         self.assertEqual(len(self.adb.pulled), 4)
 
@@ -142,7 +144,7 @@ class ImportClipTests(unittest.TestCase):
         events = []
         with self.assertRaises(IMPORTER.ImportFailure):
             IMPORTER.import_clip(self.adb, str(self.remote_root), self.name, self.output,
-                                 self.staging, log=lambda _: None, on_clip=events.append)
+                                 self.staging, site_id="fixture", log=lambda _: None, on_clip=events.append)
         self.assertNotIn("ready", [event.state for event in events])
         self.assertFalse(self.destination.exists())
 
@@ -253,8 +255,8 @@ class ImportClipTests(unittest.TestCase):
         self.assertEqual(self.adb.pulled, [])
         self.assert_nothing_exposed()
 
-    def test_incorrect_metadata_content_hash_is_rejected(self):
-        self.metadata["content_hash"] = "0" * 64
+    def test_incorrect_metadata_unit_id_is_rejected(self):
+        self.metadata["unit_id"] = "0" * 64
         self.write_metadata()
         with self.assertRaises(IMPORTER.ImportFailure):
             self.import_clip()

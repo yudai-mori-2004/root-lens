@@ -61,15 +61,14 @@ export interface HandTrackSubscription {
 
 /** Declares one file a recording config writes into the session dir. */
 export interface OutputFileSpec {
-  /** File name inside the session dir (uploaded under raw/<content_hash>/ with the same name). */
+  /** File name inside the session dir (uploaded under raw/<unit_id>/ with the same name). */
   name: string;
   /** Content-Type used for the upload. */
   contentType: string;
   /** true = required (upload fails loudly if missing);
    *  false = optional (uploaded when present, skipped when not). */
   required: boolean;
-  /** Whether this MP4 is the primary video: the file the content hash is
-   *  computed over and downstream processing targets (one per config). */
+  /** Whether this MP4 is the primary video used for preview and processing. */
   isPrimaryVideo?: boolean;
 }
 
@@ -106,17 +105,8 @@ export interface RecordingConfig {
   /** Stop recording. Resolves to the same session dir as startRecording. */
   stopRecording(sink: EventSink): Promise<RecordingSession>;
 
-  /** file:// URI of the primary video (the MP4 the content hash is computed over). */
+  /** file:// URI of the primary video. */
   primaryVideoUri(session: RecordingSession): string;
-
-  /** Optional config-owned finalization once the primary video's immutable
-   * content identity exists. Used when a metadata schema carries that identity;
-   * the pipeline never reaches into config-specific JSON itself. */
-  attachContentIdentity?(
-    session: RecordingSession,
-    identity: { contentHash: string; contentSize: number },
-    sink: EventSink,
-  ): Promise<void>;
 
   // ─── Realtime surface (what the gesture UX sits on; config-independent) ─────
   /** Subscribe to realtime hand tracking (~15-30 Hz). */

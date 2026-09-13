@@ -1,6 +1,6 @@
 # pipeline-fpvlabs: raw セッション → (任意) 顔ぼかし → ROS2 スキーマの納品 MCAP。
 #
-# FPV Labs へのデータ受け渡し用。 rootlens-raw-arkit の raw/<content_hash>/ を読み、
+# FPV Labs へのデータ受け渡し用。 rootlens-raw-arkit の raw/<unit_id>/ を読み、
 # 任意で顔ぼかしを適用した上で (= --blur/--no-blur、 既定オン) ROS2 スキーマの MCAP を
 # 時系列インターリーブで組み立て、 rootlens-fpvlabs バケットへ書く。
 # 撮影者は写っている人全員の許可を取得済み (= ぼかしは追加保護)。
@@ -9,11 +9,11 @@
 # GPU で batch 推論、 短辺リサイズを効かせて 1 時間あたり数十円を狙う (詳細は EGOBLUR_* 定数)。
 # 検出器の切替: --face-detector egoblur|mediapipe (mediapipe は CPU 動作の fallback)。
 #
-#   入力: raw/<hash>/{rgb.mp4, frames.jsonl, imu.jsonl, metadata.json[, depth.tar,
+#   入力: raw/<unit_id>/{rgb.mp4, frames.jsonl, imu.jsonl, metadata.json[, depth.tar,
 #         pointcloud.jsonl, mesh.jsonl, arkit_imu.jsonl, device_metrics.jsonl]}
 #         (frames.jsonl は旧収録では realtime_handpose.jsonl。 どちらか必須。
 #          arkit_imu / device_metrics は新収録のみ = 無いセッションではトピックが空になるだけ)
-#   出力: <hash>/session.mcap  (= 決定論的キー。 再実行は同キーへの上書き = 冪等)
+#   出力: <unit_id>/{session.mcap,delivery-manifest.json}
 #
 # チャンネルは CHANNELS の固定順で全て先行登録し (= データが無いトピックも登録だけは残る)、
 # メッセージは撮影時刻順にインターリーブして書く。 トピック一覧と型は CHANNELS を参照。
@@ -25,7 +25,7 @@
 #   /trajectory              5 秒ごとの増分 Path (書くたびにバッファを空にする)
 #   /rootlens/processing_info std_msgs/String (JSON: ぼかし有無・モデル・検出閾値・pipeline version)
 #
-# 冪等性: 出力キーは content_hash から決定論的。 ローカル一時ファイルに全て書いてから
+# 冪等性: 出力キーは unit_id から決定論的。 ローカル一時ファイルに全て書いてから
 # 1 回の put_object / multipart で上書きする (= 半端な状態がバケットに残らない)。
 # 設定を変えて再実行すれば同キーが新しい内容で置き換わり、 processing_info で判別できる。
 #
@@ -37,15 +37,16 @@
 #      https://github.com/facebookresearch/EgoBlur を clone するので、 gen2 ソースは自動で入る。
 #
 # 実行:
-#   ローカル:  python tools/modal/fpvlabs/fpvlabs.py <content_hash>   (R2 creds は env で、 ぼかしオン)
-#   Modal:    modal run --detach tools/modal/fpvlabs/fpvlabs.py --content-hash <hash>            (ぼかしオン)
-#             modal run --detach tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --no-blur  (ぼかしオフ)
+#   ローカル:  python tools/modal/fpvlabs/fpvlabs.py <unit_id>   (R2 creds は env で、 ぼかしオン)
+#   Modal:    modal run --detach tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id>            (ぼかしオン)
+#             modal run --detach tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id> --no-blur  (ぼかしオフ)
 #             (--detach: クライアント切断やセッション終了でジョブを道連れにしない)
 #   deploy:   modal deploy tools/modal/fpvlabs/fpvlabs.py
 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import io
 import json
 import os
@@ -56,7 +57,7 @@ import time
 PIPELINE_VERSION = "fpvlabs-7"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
 
 # ─── manifest (バケット同梱の属性テーブル) ─────────────────────────
-# 納品バケットはフラットな <hash>/session.mcap のまま、 セッションの属性 (ドメイン等) は
+# 納品バケットはフラットな <unit_id>/ 配置とし、 セッションの属性 (ドメイン等) は
 # バケット直下の manifest.jsonl 1 ファイルで伝える。 中身は毎回 DB + R2 の実状態から
 # まるごと再生成する派生物 (= どこにもメモを持たない)。 全再生成なので並列実行が
 # 同時に書いても last-writer-wins で収束し、 取りこぼしは次の実行が自己修復する。
@@ -1289,7 +1290,7 @@ def _r2_client():
     )
 
 
-def _clip_db_row(content_hash: str) -> dict:
+def _clip_db_row(unit_id: str) -> dict:
     """clips に accounts (現場属性) を join して引く。 未登録クリップ
     (= POST /api/clips を通っていないアップロード) と、 accounts に行が無い
     アカウント (= テスト端末など納品対象外) はどちらも fail-loud。"""
@@ -1299,86 +1300,86 @@ def _clip_db_row(content_hash: str) -> dict:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "select c.account_id, c.duration_ms, c.recorded_at, a.domain, a.site"
+                "select c.account_id, c.duration_ms, c.recorded_at, a.domain, a.site,"
+                " c.source_manifest_sha256, c.source_files"
                 " from clips c left join accounts a on a.id = c.account_id"
-                " where c.content_hash = %s",
-                (content_hash,),
+                " where c.unit_id = %s",
+                (unit_id,),
             )
             row = cur.fetchone()
     finally:
         conn.close()
     if not row:
-        raise RuntimeError(f"clip not registered in DB: {content_hash}")
-    account_id, duration_ms, recorded_at, domain, site = row
+        raise RuntimeError(f"clip not registered in DB: {unit_id}")
+    account_id, duration_ms, recorded_at, domain, site, source_manifest, source_files = row
     if domain is None:
         raise RuntimeError(
             f"account {account_id} has no accounts row; "
             f"insert (id, domain, site) before delivering its clips")
+    if not isinstance(source_manifest, str) or len(source_manifest) != 64 or not isinstance(source_files, list):
+        raise RuntimeError(f"clip has no valid source manifest: {unit_id}")
     return {"account_id": str(account_id), "duration_ms": duration_ms,
-            "recorded_at": recorded_at, "domain": domain, "site": site}
+            "recorded_at": recorded_at, "domain": domain, "site": site,
+            "source_manifest_sha256": source_manifest, "source_files": source_files}
 
 
-_QT_EPOCH = dt.datetime(1904, 1, 1, tzinfo=dt.timezone.utc)
+def _sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def _mp4_creation_time(path: str) -> dt.datetime | None:
-    """QuickTime ヘッダ (mvhd) の creation_time = 録画開始の壁時計 (UTC)。
-    AVAssetWriter は moov をファイル末尾に書くので末尾 16MB から探す。
-    mdat のバイト列がたまたま 'mvhd' に一致した誤検出は年代の妥当性 (2020-2035) で捨てる。"""
-    import struct
-
-    size = os.path.getsize(path)
-    with open(path, "rb") as fh:
-        fh.seek(max(0, size - 16_000_000))
-        buf = fh.read()
-        i = buf.rfind(b"mvhd")
-        if i < 0:
-            # 一部の録画は moov が先頭側にある (中断復旧などで書き直された個体)。
-            fh.seek(0)
-            buf = fh.read(16_000_000)
-            i = buf.rfind(b"mvhd")
-    if i < 0:
-        return None
-    version = buf[i + 4]
-    if version == 0:
-        secs = struct.unpack(">I", buf[i + 8:i + 12])[0]
-    else:
-        secs = struct.unpack(">Q", buf[i + 8:i + 16])[0]
-    ts = _QT_EPOCH + dt.timedelta(seconds=secs)
-    return ts if 2020 <= ts.year <= 2035 else None
-
-
-def _set_clip_recorded_at(content_hash: str, recorded_at: dt.datetime) -> None:
-    import psycopg2
-
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "update clips set recorded_at = %s"
-                " where content_hash = %s and recorded_at is null",
-                (recorded_at, content_hash),
-            )
-        conn.commit()
-    finally:
-        conn.close()
+def _verify_source_manifest(unit_id: str, directory: str, expected_files: list[dict], expected_hash: str) -> None:
+    if (not expected_files or not isinstance(expected_hash, str)
+            or len(expected_hash) != 64 or any(ch not in "0123456789abcdef" for ch in expected_hash)):
+        raise RuntimeError(f"registered source manifest is invalid: {unit_id}")
+    names = [item.get("name") for item in expected_files if isinstance(item, dict)]
+    if len(names) != len(expected_files) or len(set(names)) != len(names):
+        raise RuntimeError(f"registered source manifest has duplicate or invalid entries: {unit_id}")
+    files = []
+    for item in sorted(expected_files, key=lambda value: value.get("name", "")):
+        name = item.get("name")
+        path = os.path.join(directory, name) if isinstance(name, str) else ""
+        digest = item.get("sha256")
+        byte_count = item.get("bytes")
+        if (not name or "/" in name or "\\" in name or name in {".", ".."}
+                or not isinstance(byte_count, int) or isinstance(byte_count, bool) or byte_count <= 0
+                or not isinstance(digest, str) or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)
+                or not os.path.isfile(path) or os.path.getsize(path) != byte_count
+                or _sha256_file(path) != digest):
+            raise RuntimeError(f"source file does not match registered manifest: {name}")
+        files.append({"name": name, "bytes": byte_count, "sha256": digest})
+    payload = {"schema": "io.rootlens.source-manifest.v1", "unit_id": unit_id, "files": files}
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if hashlib.sha256(encoded).hexdigest() != expected_hash:
+        raise RuntimeError(f"source manifest does not match registered digest: {unit_id}")
 
 
 def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
     """manifest.jsonl を DB + R2 の実状態からまるごと作り直す。 行の材料:
-    <hash>/session.mcap の一覧 (サイズ) + clips テーブル (domain / 尺 / 登録時刻)
+    <unit_id>/ の納品manifest + clips テーブル (domain / 尺 / 登録時刻)
     + raw metadata.json (fps / 解像度 / 端末)。 raw や DB 行が欠けたセッションも
     行自体は残して欠損フィールドを null にする (集計を止めない)。
     スキーマを変えるときは README-for-fpv.md の表と gen_manifest.py を同時に更新する。"""
     import psycopg2
 
-    sessions: dict[str, int] = {}
+    objects: dict[str, dict] = {}
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=bucket):
         for obj in page.get("Contents") or []:
             key = obj["Key"]
-            if key.endswith("/session.mcap") and key.count("/") == 1:
-                sessions[key.split("/")[0]] = obj["Size"]
+            if key.count("/") != 1:
+                continue
+            unit_id, name = key.split("/", 1)
+            if name in {"session.mcap", "delivery-manifest.json"}:
+                objects.setdefault(unit_id, {})[name] = obj
+    sessions = {
+        unit_id: value for unit_id, value in objects.items()
+        if {"session.mcap", "delivery-manifest.json"}.issubset(value)
+    }
 
     rows: dict[str, dict] = {}
     if sessions:
@@ -1386,10 +1387,10 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select c.content_hash, c.duration_ms, c.created_at, c.recorded_at,"
+                    "select c.unit_id, c.duration_ms, c.created_at, c.recorded_at,"
                     " a.domain, a.site"
                     " from clips c left join accounts a on a.id = c.account_id"
-                    " where c.content_hash = any(%s)",
+                    " where c.unit_id = any(%s)",
                     (list(sessions),),
                 )
                 rows = {h: {"duration_ms": d, "created_at": c, "recorded_at": r,
@@ -1399,7 +1400,8 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
             conn.close()
 
     entries = []
-    for h, mcap_bytes in sessions.items():
+    for h, objects_for_unit in sessions.items():
+        mcap_bytes = objects_for_unit["session.mcap"]["Size"]
         db_row = rows.get(h)
         try:
             body = s3.get_object(Bucket=bucket_raw, Key=f"raw/{h}/metadata.json")["Body"].read()
@@ -1409,16 +1411,14 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
         uploaded = db_row["created_at"] if db_row else None
-        # recordedAt の正は clips.recorded_at (= rgb.mp4 の mvhd 由来)。 mvhd が読めなかった
-        # 行だけ「アップロード時刻 − 尺」で録画開始を近似する。
+        # recordedAt の正はunit発行時に固定したclips.recorded_at。
         recorded = db_row["recorded_at"] if db_row else None
         if recorded is not None:
             recorded = recorded.isoformat()
-        elif uploaded is not None:
-            recorded = (uploaded - dt.timedelta(
-                milliseconds=(db_row["duration_ms"] or 0))).isoformat()
+        delivery_head = s3.head_object(Bucket=bucket, Key=f"{h}/delivery-manifest.json")
+        delivery_manifest_sha256 = (delivery_head.get("Metadata") or {}).get("delivery-manifest-sha256")
         entries.append({
-            "contentHash": h,
+            "unitId": h,
             "domain": db_row["domain"] if db_row else None,
             "site": db_row["site"] if db_row else None,
             "recordedAt": recorded,
@@ -1432,8 +1432,9 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
             # 本番バケットには blur なしを置けない (process_session のガードで保証)。
             "blurred": True,
             "mcapBytes": mcap_bytes,
+            "deliveryManifestSha256": delivery_manifest_sha256,
         })
-    entries.sort(key=lambda e: (e.get("recordedAt") or "", e["contentHash"]))
+    entries.sort(key=lambda e: (e.get("recordedAt") or "", e["unitId"]))
     lines = "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n"
                     for e in entries)
     s3.put_object(Bucket=bucket, Key="manifest.jsonl", Body=lines.encode("utf-8"),
@@ -1441,10 +1442,10 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
     return len(entries)
 
 
-def process_session(content_hash: str, blur: bool = True,
+def process_session(unit_id: str, blur: bool = True,
                     face_detector: str = "egoblur", jpeg_quality: int = 80,
                     target_bucket: str | None = None) -> dict:
-    """raw/<hash>/ を取得 → build_mcap → <target_bucket>/<hash>/session.mcap に上書き。
+    """raw/<unit_id>/ を取得し、納品MCAPとmanifestを<target_bucket>/<unit_id>/へ保存する。
 
     blur=False で顔ぼかしを無効化 (= raw の生映像そのまま)。
     target_bucket が None のときは環境変数 R2_BUCKET_FPVLABS (既定 rootlens-fpvlabs = 本番) を使う。
@@ -1458,39 +1459,58 @@ def process_session(content_hash: str, blur: bool = True,
         raise RuntimeError("refusing --no-blur into the production delivery bucket; use --target-bucket")
 
     # DB 照合とドメイン解決は GPU を回す前に済ませる (未登録 / 属性未設定で即死させる)。
-    db_row = _clip_db_row(content_hash)
+    db_row = _clip_db_row(unit_id)
 
     with tempfile.TemporaryDirectory() as tmp:
         session_dir = os.path.join(tmp, "session")
         os.makedirs(session_dir)
-        for name in SESSION_FILES:
-            key = f"raw/{content_hash}/{name}"
+        if any(not isinstance(item, dict) for item in db_row["source_files"]):
+            raise RuntimeError(f"registered source manifest contains invalid entries: {unit_id}")
+        source_names = {item.get("name") for item in db_row["source_files"]}
+        if not source_names or not source_names.issubset(set(SESSION_FILES)):
+            raise RuntimeError(f"registered source manifest contains unsupported files: {unit_id}")
+        for name in sorted(source_names):
+            key = f"raw/{unit_id}/{name}"
             dest = os.path.join(session_dir, name)
             try:
                 s3.download_file(bucket_raw, key, dest)
             except Exception:
-                if name in ("rgb.mp4", "metadata.json"):
-                    raise RuntimeError(f"required input missing: {key}")
-                # frames.jsonl / realtime_handpose.jsonl は下でどちらか必須をチェック。
-                # depth.tar / imu.jsonl 等はオプショナル。
+                raise RuntimeError(f"required input missing: {key}")
+        _verify_source_manifest(unit_id, session_dir, db_row["source_files"],
+                                db_row["source_manifest_sha256"])
         if not os.path.exists(os.path.join(session_dir, "frames.jsonl")) and \
            not os.path.exists(os.path.join(session_dir, "realtime_handpose.jsonl")):
-            raise RuntimeError(f"required input missing: raw/{content_hash}/frames.jsonl (or legacy realtime_handpose.jsonl)")
-
-        # 録画開始時刻が未記録なら、 落としてきた rgb.mp4 の mvhd から読んで DB に埋める
-        # (= manifest の recordedAt の源泉。 追加ダウンロードなしで手に入る)。
-        if db_row["recorded_at"] is None:
-            rec = _mp4_creation_time(os.path.join(session_dir, "rgb.mp4"))
-            if rec is not None:
-                _set_clip_recorded_at(content_hash, rec)
+            raise RuntimeError(f"required input missing: raw/{unit_id}/frames.jsonl (or legacy realtime_handpose.jsonl)")
 
         out_path = os.path.join(tmp, "session.mcap")
         result = build_mcap(session_dir, out_path, blur=blur,
                             face_detector=face_detector, jpeg_quality=jpeg_quality)
 
-        out_key = f"{content_hash}/session.mcap"
-        s3.upload_file(out_path, bucket_out, out_key, ExtraArgs={"ContentType": "application/octet-stream"})
+        delivery_file = {"path": "session.mcap", "bytes": os.path.getsize(out_path),
+                         "sha256": _sha256_file(out_path)}
+        out_key = f"{unit_id}/session.mcap"
+        s3.upload_file(
+            out_path,
+            bucket_out,
+            out_key,
+            ExtraArgs={
+                "ContentType": "application/octet-stream",
+                "Metadata": {
+                    "sha256": delivery_file["sha256"],
+                    "source-manifest-sha256": db_row["source_manifest_sha256"],
+                },
+            },
+        )
+        delivery = {"schema": "io.rootlens.delivery-manifest.v1", "unit_id": unit_id,
+                    "source_manifest_sha256": db_row["source_manifest_sha256"],
+                    "files": [delivery_file]}
+        delivery_bytes = json.dumps(delivery, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        delivery_hash = hashlib.sha256(delivery_bytes).hexdigest()
+        s3.put_object(Bucket=bucket_out, Key=f"{unit_id}/delivery-manifest.json",
+                      Body=delivery_bytes, ContentType="application/json",
+                      Metadata={"delivery-manifest-sha256": delivery_hash})
         result["outputKey"] = f"{bucket_out}/{out_key}"
+        result["deliveryManifestSha256"] = delivery_hash
 
         # manifest を DB + R2 の実状態から再生成 (方式は冒頭の manifest セクションのコメント参照)。
         result["manifestEntries"] = regenerate_manifest(s3, bucket_out, bucket_raw)
@@ -1551,15 +1571,15 @@ try:
             modal.Secret.from_name("supabase-db"),  # DATABASE_URL (clips 照合用)
         ],
     )
-    def fpvlabs_process(content_hash: str, blur: bool = True,
+    def fpvlabs_process(unit_id: str, blur: bool = True,
                         face_detector: str = "egoblur", jpeg_quality: int = 80,
                         target_bucket: str = "") -> dict:
-        return process_session(content_hash, blur=blur,
+        return process_session(unit_id, blur=blur,
                                face_detector=face_detector, jpeg_quality=jpeg_quality,
                                target_bucket=target_bucket or None)
 
     @app.local_entrypoint()
-    def main(content_hash: str, blur: bool = True,
+    def main(unit_id: str, blur: bool = True,
              face_detector: str = "egoblur", jpeg_quality: int = 80,
              target_bucket: str = ""):
         # ぼかし切替:   --blur (既定) / --no-blur
@@ -1567,12 +1587,12 @@ try:
         # 出力先切替:   --target-bucket <bucket>  (空 = 既定 rootlens-fpvlabs = 本番)
         #              検証やチューニングは自分専用の別バケットを指定して本番に触れないようにする。
         print(json.dumps(
-            fpvlabs_process.remote(content_hash, blur, face_detector, jpeg_quality, target_bucket),
+            fpvlabs_process.remote(unit_id, blur, face_detector, jpeg_quality, target_bucket),
             indent=2,
         ))
 
 except ImportError:
-    modal = None  # ローカル実行 (= python fpvlabs.py <hash>) では modal 不要
+    modal = None  # ローカル実行 (= python fpvlabs.py <unit_id>) では modal 不要
 
 
 if __name__ == "__main__" and (modal is None or os.environ.get("FPVLABS_LOCAL")):

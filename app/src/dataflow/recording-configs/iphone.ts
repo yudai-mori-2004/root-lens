@@ -84,23 +84,6 @@ export const iphoneConfig: RecordingConfig = {
     return `${ensureTrailingSlash(session.sessionDir)}rgb.mp4`;
   },
 
-  async attachContentIdentity(session, identity, sink) {
-    const metadataUri = `${ensureTrailingSlash(session.sessionDir)}metadata.json`;
-    const metadata = JSON.parse(await FileSystem.readAsStringAsync(metadataUri)) as Record<string, unknown>;
-    if (metadata.recording_config !== 'iphone') {
-      throw new Error('iPhone metadata recording_config mismatch');
-    }
-    metadata.content_hash = identity.contentHash;
-    metadata.video_bytes = identity.contentSize;
-    await FileSystem.writeAsStringAsync(metadataUri, JSON.stringify(metadata, null, 2));
-    sink({
-      step: 'hash',
-      level: 'success',
-      message: 'metadata に content_hash を反映',
-      detail: { contentHash: identity.contentHash },
-    });
-  },
-
   subscribeHandTrack(listener: (event: HandTrackEvent) => void): HandTrackSubscription {
     return subscribeIphoneHandTrack(listener);
   },

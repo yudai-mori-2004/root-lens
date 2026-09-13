@@ -11,12 +11,14 @@ from unittest.mock import Mock
 from PySide6.QtCore import Qt
 
 from rootlens_import import desktop
-from rootlens_import.core import ClipProgress, FILES, ImportCancelled, ImportFailure
+from rootlens_import.core import (ClipProgress, FILES, ImportCancelled, ImportFailure,
+                                  source_manifest_sha256)
 from rootlens_import.device_sync import DeviceSource, SyncSummary
 from rootlens_import.drive import DriveRecording, UploadProgress, UploadResult
 from rootlens_import.library import read_recording, recordings_directory
 from rootlens_import.site import SiteProfile
 from test_desktop import APPLICATION, make_recording, wait_for
+from unit_fixtures import unit_id
 
 
 class UploadDesktopTests(unittest.TestCase):
@@ -38,50 +40,52 @@ class UploadDesktopTests(unittest.TestCase):
         directory = recordings_directory(self.profile.site_id, self.root / "data")
         self.clips = [make_recording(directory, i) for i in range(2)]
         self.records = [read_recording(path) for path in self.clips]
+        self.names = {record.unit_id: f"rec-20260911T0000{index:02}.000Z"
+                      for index, record in enumerate(self.records)}
         self.device_records = list(self.records)
         self.observe_device(self.records)
 
-    def read_drive(self, profile, content_hashes, cancel_event):
-        return {digest: snapshot for digest, snapshot in self.drive_snapshot.items() if digest in content_hashes}
+    def read_drive(self, profile, unit_ids, cancel_event):
+        return {identity: snapshot for identity, snapshot in self.drive_snapshot.items() if identity in unit_ids}
 
     def source_for(self, record):
         return DeviceSource(Mock(name='original-usb-transport'), 'original-device-serial',
-                            '/device/recordings', record.path.name.rsplit('-', 1)[0],
-                            record.content_hash, self.root / 'import-lock')
+                            '/device/recordings', self.names[record.unit_id],
+                            record.unit_id, self.root / 'import-lock')
 
     def clean_uploaded_device(self, source, **kwargs):
         self.device_records = [record for record in self.device_records
-                               if record.content_hash != source.content_hash]
+                               if record.unit_id != source.unit_id]
 
     def observe_device(self, records):
         self.window.set_profile(self.profile)
         self.window._drive_checked({}, "")
         for record in records:
-            name = record.path.name.rsplit("-", 1)[0]
+            name = self.names[record.unit_id]
             self.window._clip_progress(ClipProgress(name, record.path, "ready"))
         self.window._flush_progress()
-        self.window.device_sources = {record.path.name.rsplit('-', 1)[0]: self.source_for(record)
+        self.window.device_sources = {record.unit_id: self.source_for(record)
                                       for record in records}
 
     def import_current_device(self, **kwargs):
         ready = saved = 0
         current = list(self.device_records)
         for record in current:
-            kwargs['on_clip'](ClipProgress(record.path.name.rsplit('-', 1)[0], None, 'discovering'))
+            kwargs['on_clip'](ClipProgress(self.names[record.unit_id], None, 'discovering'))
         try:
-            snapshots = kwargs['drive_reader']({record.content_hash for record in current})
+            snapshots = kwargs['drive_reader']({record.unit_id for record in current})
         except ImportFailure:
             raise ImportFailure('Google Driveの保存状況を確認できません') from None
         kwargs['on_drive_checked'](snapshots)
         sources = {}
         for record in current:
-            name = record.path.name.rsplit('-', 1)[0]
-            state = 'drive_saved' if record.content_hash in snapshots else 'ready'
+            name = self.names[record.unit_id]
+            state = 'drive_saved' if record.unit_id in snapshots else 'ready'
             kwargs['on_clip'](ClipProgress(name, record.path, state))
             saved += state == 'drive_saved'
             ready += state == 'ready'
             if state == 'ready':
-                sources[name] = self.source_for(record)
+                sources[record.unit_id] = self.source_for(record)
             else:
                 self.device_records.remove(record)
         return SyncSummary(kwargs['output'], existing=ready, cleaned=saved, sources=sources)
@@ -91,9 +95,12 @@ class UploadDesktopTests(unittest.TestCase):
         files = {name: {"id": "fake-" + name, "size": (path / name).stat().st_size,
                         "sha256": hashlib.sha256((path / name).read_bytes()).hexdigest()}
                  for name in FILES}
-        self.drive_snapshot[record.content_hash] = DriveRecording(
-            record.content_hash, "folder", path.name, files)
-        return UploadResult(record.content_hash, "folder", sum(info["size"] for info in files.values()))
+        source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                        for name, item in files.items()}
+        self.drive_snapshot[record.unit_id] = DriveRecording(
+            record.unit_id, "folder", path.name, files,
+            source_manifest_sha256(record.unit_id, source_files))
+        return UploadResult(record.unit_id, "folder", sum(info["size"] for info in files.values()))
 
     def new_window(self):
         return desktop.ImportWindow(self.root / "absent.json", self.root / "data",
@@ -164,14 +171,14 @@ class UploadDesktopTests(unittest.TestCase):
 
     def test_progress_does_not_hide_recording_before_verified_upload_result(self):
         self.begin_held_upload()
-        digest = self.records[0].content_hash
+        digest = self.records[0].unit_id
         self.window._upload_progress(UploadProgress(digest, "uploading", 1024, 4096, "rgb.mp4"))
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertEqual(self.window.upload_progress_bar.value(), 25)
         self.assertIn("25%", self.window.recording_list.topLevelItem(0).text(1))
         self.assertIn("1.0 KB / 4.0 KB", self.window.status_label.text())
         before = self.window.status_label.text()
-        self.window._upload_progress(UploadProgress("f" * 64, "uploading", 4096, 4096))
+        self.window._upload_progress(UploadProgress(unit_id(999), "uploading", 4096, 4096))
         self.assertEqual(self.window.status_label.text(), before)
         self.window._upload_progress(UploadProgress(digest, "completed", 4096, 4096))
         wait_for(lambda: not self.window._refresh_timer.isActive())
@@ -215,7 +222,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
         self.assertEqual(self.window.count_label.text(), "アップロード待ち 1 件")
         self.assertNotIn('drive_recordings', self.importer.call_args.kwargs)
-        self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].content_hash})
+        self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
 
     def test_drive_deletion_does_not_resurrect_a_removed_device_clip_from_local_copy(self):
@@ -228,14 +235,14 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.window.count_label.text(), 'アップロード待ち 1 件')
-        self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].content_hash})
+        self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
 
     def test_cleanup_uses_original_source_even_when_preview_selection_changes(self):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.drive_reader.reset_mock()
-        original = self.window.device_sources[self.clips[0].name.rsplit('-', 1)[0]]
+        original = self.window.device_sources[self.records[0].unit_id]
         self.begin_held_upload()
         self.window.select_relative(1)
         self.release.set()
@@ -243,8 +250,8 @@ class UploadDesktopTests(unittest.TestCase):
         self.cleaner.assert_called_once()
         self.assertIs(self.cleaner.call_args.args[0], original)
         self.assertIs(self.cleaner.call_args.kwargs['cancel_event'], self.window.cancel_event)
-        self.cleaner.call_args.kwargs['drive_reader']({original.content_hash})
-        self.drive_reader.assert_called_once_with(self.profile, {original.content_hash}, self.window.cancel_event)
+        self.cleaner.call_args.kwargs['drive_reader']({original.unit_id})
+        self.drive_reader.assert_called_once_with(self.profile, {original.unit_id}, self.window.cancel_event)
         self.assertEqual(self.window.selected_recording().path, self.clips[1])
 
     def test_cleanup_failure_keeps_drive_success_as_non_uploadable_pending_row(self):
@@ -262,14 +269,14 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertIsNone(self.window.preview.path)
         self.assertIn('アップロードは完了', self.window.status_label.text())
         self.assertIn('次の接続', self.window.status_label.text())
-        self.assertIn(self.records[0].content_hash, self.drive_snapshot)
+        self.assertIn(self.records[0].unit_id, self.drive_snapshot)
         self.window.start_upload()
         self.assertEqual(self.uploader.upload_recording.call_count, 1)
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.uploader.upload_recording.call_count, 1)
-        self.assertTrue(all(record.content_hash != self.records[0].content_hash for record in self.device_records))
+        self.assertTrue(all(record.unit_id != self.records[0].unit_id for record in self.device_records))
 
     def test_cancel_during_cleanup_preserves_upload_success_and_allows_next_connection(self):
         self.observe_device(self.records[:1])
@@ -297,7 +304,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.upload_button.isEnabled())
         self.assertTrue(self.window.connect_button.isEnabled())
         self.assertIsNone(self.window.preview.path)
-        self.assertIn(self.records[0].content_hash, self.drive_snapshot)
+        self.assertIn(self.records[0].unit_id, self.drive_snapshot)
 
     def test_closing_after_upload_success_cancels_cleanup_before_window_release(self):
         self.observe_device(self.records[:1])
@@ -316,9 +323,9 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertTrue(self.window.cancel_event.is_set())
         wait_for(lambda: not self.window.busy)
         self.assertIsNone(self.window.preview.path)
-        self.assertEqual(self.window.progress_states[self.clips[0].name.rsplit('-', 1)[0]].state,
+        self.assertEqual(self.window.progress_states[self.names[self.records[0].unit_id]].state,
                          'cleanup_pending')
-        self.assertIn(self.records[0].content_hash, self.drive_snapshot)
+        self.assertIn(self.records[0].unit_id, self.drive_snapshot)
         self.uploader.close.assert_called_once()
 
     def test_unexpected_cleanup_error_keeps_saved_state_without_exposing_details(self):
@@ -334,7 +341,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.upload_button.isEnabled())
 
     def test_invalid_or_mismatched_upload_result_does_not_hide_recording(self):
-        for result in (None, UploadResult("f" * 64, "folder", 100)):
+        for result in (None, UploadResult(unit_id(999), "folder", 100)):
             with self.subTest(result=result):
                 self.uploader.upload_recording.return_value = result
                 self.window.start_upload()

@@ -4,11 +4,13 @@
 import argparse
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shlex
 import shutil
 import socket
@@ -26,6 +28,9 @@ DESKTOP_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 PACKAGES = ("io.rootlens.mentra.debug", "io.rootlens.mentra")
 CLIP_NAME = re.compile(r"rec-\d{8}T\d{6}\.\d{3}Z\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
+UNIT_ID = re.compile(r"unit_[a-z0-9][a-z0-9_-]{0,63}_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-Z]{8}\Z")
+SITE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
+UNIT_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 DEFAULT_OUTPUT = Path.home() / "Downloads" / "RootLens" / "Mentra"
 
 
@@ -262,13 +267,63 @@ class Adb:
     def pull(self, remote, local):
         self.run("pull", remote, str(local), timeout=6 * 3600)
 
+    def write_metadata(self, remote, metadata):
+        """Atomically add PC-issued identity to a finalized device recording."""
+        payload = json.dumps(metadata, ensure_ascii=False, indent=2) + "\n"
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as temporary:
+            temporary.write(payload)
+            path = Path(temporary.name)
+        partial = remote + "/metadata.json.rootlens-partial"
+        try:
+            self.run("push", str(path), partial, timeout=60)
+            self.shell(
+                f"test -s {shlex.quote(partial)} && "
+                f"mv {shlex.quote(partial)} {shlex.quote(remote + '/metadata.json')}"
+            )
+        finally:
+            path.unlink(missing_ok=True)
+
+
+def create_unit_id(site_id, created_at):
+    if not isinstance(site_id, str) or not SITE_ID.fullmatch(site_id):
+        raise ImportFailure("事業所の設定に誤りがあります。管理者に確認してください。")
+    try:
+        timestamp = datetime.fromisoformat(str(created_at).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        raise ImportFailure("録画日時を読み込めません。管理者に確認してください。") from None
+    compact = timestamp.strftime("%Y%m%dT%H%M%S") + f"{timestamp.microsecond // 1000:03d}Z"
+    suffix = "".join(secrets.choice(UNIT_ALPHABET) for _ in range(8))
+    return f"unit_{site_id}_{compact}_{suffix}"
+
+
+def ensure_unit_id(adb, remote, site_id):
+    metadata = adb.metadata(remote)
+    unit_id = metadata.get("unit_id")
+    if unit_id is not None and not unit_id.startswith(f"unit_{site_id}_"):
+        raise ImportFailure("録画識別子と事業所の設定が一致しません。管理者に確認してください。")
+    if unit_id is not None and metadata.get("site_id") == site_id:
+        return metadata
+    metadata = {
+        **metadata,
+        "unit_id": unit_id or create_unit_id(site_id, metadata.get("created_at")),
+        "site_id": site_id,
+    }
+    adb.write_metadata(remote, metadata)
+    current = adb.metadata(remote)
+    if current != metadata:
+        raise ImportFailure("録画識別子を端末へ保存できませんでした。管理者に確認してください。")
+    return current
+
 
 def validate_metadata(metadata):
     if not isinstance(metadata, dict) or metadata.get("schema") != "rootlens.mentra.raw.v1":
         raise ImportFailure("この録画には対応していません。管理者にアプリのバージョンを確認してもらってください。")
-    content_hash = metadata.get("content_hash")
-    if not isinstance(content_hash, str) or not HASH.fullmatch(content_hash):
+    unit_id = metadata.get("unit_id")
+    if unit_id is not None and (not isinstance(unit_id, str) or not UNIT_ID.fullmatch(unit_id)):
         raise ImportFailure("録画情報を読み込めません。管理者に確認してください。")
+    site_id = metadata.get("site_id")
+    if site_id is not None and (not isinstance(site_id, str) or not SITE_ID.fullmatch(site_id)):
+        raise ImportFailure("録画情報の事業所IDを読み込めません。管理者に確認してください。")
     names = metadata.get("files")
     if not isinstance(names, list) or sorted(names) != sorted(FILES):
         raise ImportFailure("録画情報に記載されたファイルが揃っていません。管理者に確認してください。")
@@ -282,6 +337,21 @@ def checksum(path, cancel_event=None):
             check_cancelled(cancel_event)
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def source_manifest_sha256(unit_id, files):
+    if not UNIT_ID.fullmatch(unit_id) or set(files) != set(FILES):
+        raise ImportFailure("原本マニフェストを作成できません。管理者に確認してください。")
+    manifest_files = []
+    for name in sorted(files):
+        item = files[name]
+        if (type(item.get("size")) is not int or item["size"] <= 0
+                or not isinstance(item.get("sha256"), str) or not HASH.fullmatch(item["sha256"])):
+            raise ImportFailure("原本マニフェストを作成できません。管理者に確認してください。")
+        manifest_files.append({"name": name, "bytes": item["size"], "sha256": item["sha256"]})
+    payload = {"schema": "io.rootlens.source-manifest.v1", "unit_id": unit_id, "files": manifest_files}
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def validate_local_files(directory):
@@ -304,7 +374,7 @@ def verify_local(directory, expected, metadata, cancel_event=None):
         local_metadata = validate_metadata(json.loads((directory / "metadata.json").read_text(encoding="utf-8")))
     except (ValueError, TypeError) as error:
         raise ImportFailure("PCにコピーした録画情報を読み込めません。管理者に確認してください。") from error
-    if local_metadata != metadata or expected["rgb.mp4"] != metadata["content_hash"]:
+    if local_metadata != metadata:
         raise ImportFailure("映像と録画情報が一致しません。管理者に確認してください。")
 
 
@@ -337,7 +407,7 @@ def import_lock(staging_root):
                 msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
-def import_clip(adb, remote_root, name, output, staging_root, log=print, on_clip=None):
+def import_clip(adb, remote_root, name, output, staging_root, site_id="local", log=print, on_clip=None):
     check_cancelled(adb.cancel_event)
     def report(state, path=None):
         if on_clip is not None:
@@ -349,8 +419,8 @@ def import_clip(adb, remote_root, name, output, staging_root, log=print, on_clip
         log("端末で録画の保存が完了していないため、この録画は取り込みませんでした。")
         report("incomplete")
         return "incomplete"
-    metadata = adb.metadata(remote)
-    destination = output / (name + "-" + metadata["content_hash"][:12])
+    metadata = ensure_unit_id(adb, remote, site_id)
+    destination = output / metadata["unit_id"]
     if destination.exists() or is_link(destination):
         log("取り込み済みの録画を確認しています…")
         report("verifying", destination)
@@ -402,7 +472,7 @@ def open_folder(directory):
         subprocess.run(["xdg-open", str(directory)], check=True)
 
 
-def import_recordings(output=DEFAULT_OUTPUT, adb_path=None, package=None, clip=None,
+def import_recordings(output=DEFAULT_OUTPUT, adb_path=None, package=None, clip=None, site_id="local",
                       log=print, cancel_event=None, on_clip=None):
     check_cancelled(cancel_event)
     adb = Adb(find_adb(adb_path), cancel_event=cancel_event)
@@ -433,7 +503,7 @@ def import_recordings(output=DEFAULT_OUTPUT, adb_path=None, package=None, clip=N
         for name in names:
             check_cancelled(cancel_event)
             try:
-                result = import_clip(adb, root, name, output, staging_root, log=log, on_clip=on_clip)
+                result = import_clip(adb, root, name, output, staging_root, site_id=site_id, log=log, on_clip=on_clip)
                 results[result] += 1
             except ImportCancelled:
                 raise
@@ -454,11 +524,12 @@ def main(argv=None):
     parser.add_argument("--adb", help="ADB の実行ファイル")
     parser.add_argument("--package", choices=PACKAGES, help="撮影アプリのパッケージ")
     parser.add_argument("--clip", help="取り込むクリップ名を1つに限定（例: rec-20260910T185832.079Z）")
+    parser.add_argument("--site-id", default="local", help="匿名の事業所ID")
     parser.add_argument("--open", action="store_true", help="完了後に保存先を開く")
     args = parser.parse_args(argv)
     try:
         result = import_recordings(
-            output=args.output, adb_path=args.adb, package=args.package, clip=args.clip,
+            output=args.output, adb_path=args.adb, package=args.package, clip=args.clip, site_id=args.site_id,
             log=lambda message: print(message, flush=True),
         )
         print(f"\n新規 {result.imported}件 / 取り込み済み {result.existing}件 / "

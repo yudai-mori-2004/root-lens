@@ -23,9 +23,9 @@
 | `occurred_at` | 発生時刻(UTC) |
 | `doc_slug` | 対象文書(`tester-consent` / `privacy-policy` / `terms-of-service` 等) |
 | `doc_version` | 同意した**正本全文**のバージョン |
-| `doc_content_hash` | 正本全文の SHA-256(改竄検知・「どの文面に同意したか」の証跡) |
+| `doc_sha256` | 正本全文の SHA-256(改竄検知・「どの文面に同意したか」の証跡) |
 | `summary_version` | 画面に表示した**要約(層1)**のバージョン |
-| `summary_hash` | 要約の SHA-256(「何を見せたか」の証跡) |
+| `summary_sha256` | 要約の SHA-256(「何を見せたか」の証跡) |
 | `scopes` | 同意スコープの配列(`collection` / `ai_training_use` / `license_sale` / `cross_border`) |
 | `checkbox_results` | 各チェック項目(例: `age18`, `no_third_party`, `agree_terms`)の真偽 |
 | `locale` | 表示言語(`ja` / `en`) |
@@ -53,7 +53,7 @@
 ## 6. 取扱い上の注意
 
 - 同意ログ自体が**個人データ**であり、保護・保持期間管理の対象。
-- `doc_content_hash` / `summary_hash` の算出対象(正規化方法・対象範囲)を実装で固定し、文書側の改訂履歴と一致させる。
+- `doc_sha256` / `summary_sha256` の算出対象(正規化方法・対象範囲)を実装で固定し、文書側の改訂履歴と一致させる。
 
 ## 7. 連携
 

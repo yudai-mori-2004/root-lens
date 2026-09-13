@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { clips } from "@/db/schema";
+import { clips, uploadUnits } from "@/db/schema";
 import { requireAccountId } from "@/lib/auth";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
+import { verifyRawSessionUploadMetadata } from "@/lib/r2";
+import { validateRawSourceManifest } from "@/lib/raw-source";
+import { SHA256_RE } from "@/lib/source-manifest";
+import { UNIT_ID_RE } from "@/lib/unit-id";
 import type {
   CreateClipRequest,
   CreateClipResponse,
@@ -13,7 +17,7 @@ import type {
 
 // GET /api/clips
 // 撮影アカウント (= Bearer token の sub) の所有クリップ一覧を新しい順に返す。
-// optional query: contentHash を渡すと絞り込む (= 端末の冪等チェック用)。
+// optional query: unitId を渡すと絞り込む (= 端末の冪等チェック用)。
 export async function GET(req: Request) {
   let accountId: string;
   try {
@@ -23,10 +27,10 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const contentHash = url.searchParams.get("contentHash");
+  const unitId = url.searchParams.get("unitId");
 
   const conditions = [eq(clips.accountId, accountId)];
-  if (contentHash) conditions.push(eq(clips.contentHash, contentHash));
+  if (unitId) conditions.push(eq(clips.unitId, unitId));
 
   const rows = await db
     .select()
@@ -40,12 +44,19 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// 端末で content_hash 計算 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
-// content_hash が PK (= ストレージの raw/<content_hash>/ と 1:1)。 同一 hash の再登録は
+// unit_id発行、source manifest確定、R2 rawアップロード後に呼ぶ登録endpoint。
+// unit_idがPK (= ストレージのraw/<unit_id>/と1:1)。同一IDの再登録は
 // 同一アカウントなら idempotent に既存行を返し、 別アカウントなら 409。
+const sourceFileSchema = z.object({
+  name: z.string().min(1).max(128),
+  bytes: z.number().int().positive(),
+  sha256: z.string().regex(SHA256_RE),
+});
 const createSchema = z.object({
-  contentHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
-  contentSize: z.number().int().positive(),
+  unitId: z.string().regex(UNIT_ID_RE, "invalid unit id"),
+  videoBytes: z.number().int().positive(),
+  sourceManifestSha256: z.string().regex(SHA256_RE),
+  sourceFiles: z.array(sourceFileSchema).min(2).max(32),
   recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]),
   durationMs: z.number().int().positive().optional(),
   deviceModel: z.string().min(1).max(64).optional(),
@@ -75,37 +86,86 @@ export async function POST(req: Request) {
     );
   }
 
-  // 重複排除 (= content_hash は世界一意)。
+  const manifestError = validateRawSourceManifest(parsed.data);
+  if (manifestError) {
+    return NextResponse.json({ error: manifestError }, { status: 400 });
+  }
+  const video = parsed.data.sourceFiles.find((file) => file.name === "rgb.mp4");
+  if (video?.bytes !== parsed.data.videoBytes) {
+    return NextResponse.json({ error: "rgb.mp4 byte size mismatch" }, { status: 400 });
+  }
+
+  // 重複排除 (= unit_id は世界一意)。
   const existing = await db
     .select()
     .from(clips)
-    .where(eq(clips.contentHash, parsed.data.contentHash))
+    .where(eq(clips.unitId, parsed.data.unitId))
     .limit(1);
   if (existing.length > 0) {
     if (existing[0].accountId !== accountId) {
       return NextResponse.json(
-        { error: "content_hash already registered by another account" },
+        { error: "unit_id already registered by another account" },
         { status: 409 },
       );
+    }
+    if (existing[0].recordingConfig !== parsed.data.recordingConfig
+        || existing[0].sourceManifestSha256 !== parsed.data.sourceManifestSha256) {
+      return NextResponse.json({ error: "unit_id is already registered with different source data" }, { status: 409 });
     }
     const body: CreateClipResponse = { clip: clipToDto(existing[0]) };
     return NextResponse.json(body);
   }
 
-  // 新規作成。 端末は R2 アップロード完了後にのみ登録する (= presign は /api/v1/raw-uploads の役目)。
-  const [inserted] = await db
-    .insert(clips)
-    .values({
-      contentHash: parsed.data.contentHash,
-      accountId,
-      consentEventId: parsed.data.consentEventId ?? null,
-      recordingConfig: parsed.data.recordingConfig,
-      contentSize: parsed.data.contentSize,
-      durationMs: parsed.data.durationMs ?? null,
-      deviceModel: parsed.data.deviceModel ?? null,
-    })
-    .returning();
+  const reservations = await db.select().from(uploadUnits).where(and(
+    eq(uploadUnits.unitId, parsed.data.unitId),
+    eq(uploadUnits.accountId, accountId),
+    eq(uploadUnits.recordingConfig, parsed.data.recordingConfig),
+  )).limit(1);
+  if (reservations.length === 0) {
+    return NextResponse.json({ error: "unit id is not reserved for this account and recording config" }, { status: 403 });
+  }
 
-  const body: CreateClipResponse = { clip: clipToDto(inserted) };
-  return NextResponse.json(body, { status: 201 });
+  try {
+    await verifyRawSessionUploadMetadata({
+      unitId: parsed.data.unitId,
+      recordingConfig: parsed.data.recordingConfig,
+      sourceManifestSha256: parsed.data.sourceManifestSha256,
+      sourceFiles: parsed.data.sourceFiles,
+    });
+  } catch (error) {
+    console.error("[POST /api/clips] R2 source verification failed:", error);
+    return NextResponse.json({ error: "uploaded source files failed integrity verification" }, { status: 409 });
+  }
+
+  // 新規作成。 端末は R2 アップロード完了後にのみ登録する (= presign は /api/v1/raw-uploads の役目)。
+  const result = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(clips).values({
+        unitId: parsed.data.unitId,
+        accountId,
+        consentEventId: parsed.data.consentEventId ?? null,
+        recordingConfig: parsed.data.recordingConfig,
+        videoBytes: parsed.data.videoBytes,
+        sourceManifestSha256: parsed.data.sourceManifestSha256,
+        sourceFiles: parsed.data.sourceFiles,
+        durationMs: parsed.data.durationMs ?? null,
+        deviceModel: parsed.data.deviceModel ?? null,
+        recordedAt: reservations[0].recordedAt,
+      }).onConflictDoNothing().returning();
+    if (created) {
+      await tx.delete(uploadUnits).where(eq(uploadUnits.unitId, parsed.data.unitId));
+      return { row: created, inserted: true };
+    }
+    const [concurrent] = await tx.select().from(clips)
+      .where(eq(clips.unitId, parsed.data.unitId)).limit(1);
+    if (!concurrent
+        || concurrent.accountId !== accountId
+        || concurrent.recordingConfig !== parsed.data.recordingConfig
+        || concurrent.sourceManifestSha256 !== parsed.data.sourceManifestSha256) {
+      throw new Error("unit id registration conflict");
+    }
+    return { row: concurrent, inserted: false };
+  });
+
+  const responseBody: CreateClipResponse = { clip: clipToDto(result.row) };
+  return NextResponse.json(responseBody, { status: result.inserted ? 201 : 200 });
 }

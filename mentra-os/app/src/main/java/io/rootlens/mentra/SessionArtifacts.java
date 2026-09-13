@@ -13,11 +13,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -25,8 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -245,13 +241,10 @@ final class SessionArtifacts implements java.io.Closeable {
                     probe, rawImu, extracted, alignment, mapping, calibration);
             writeJson(new File(directory, "sync_report.json"), syncReport);
 
-            String contentHash = sha256(video);
-            writeText(new File(directory, "content_hash.txt"), contentHash + "\n");
             JSONObject metadata = new JSONObject();
             try {
                 metadata.put("schema", "rootlens.mentra.raw.v1");
                 metadata.put("capture_app_version", probe.json.getJSONObject("capture_app_version"));
-                metadata.put("content_hash", contentHash);
                 metadata.put("created_at", ISO_FORMAT.format(new Date(recorderStartWallMs)));
                 metadata.put("stopped_at", ISO_FORMAT.format(new Date(recorderStopWallMs)));
                 metadata.put("actual_duration_ms", Math.max(1, recorderStopWallMs - recorderStartWallMs));
@@ -892,24 +885,6 @@ final class SessionArtifacts implements java.io.Closeable {
     private static void move(File source, File destination) throws IOException {
         if (!source.isFile()) throw new IOException("Missing capture artifact: " + source);
         Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    private static String sha256(File file) throws IOException {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[1024 * 1024];
-            try (BufferedInputStream input = new BufferedInputStream(new FileInputStream(file), buffer.length)) {
-                int count;
-                while ((count = input.read(buffer)) >= 0) {
-                    if (count > 0) digest.update(buffer, 0, count);
-                }
-            }
-            StringBuilder output = new StringBuilder(64);
-            for (byte value : digest.digest()) output.append(String.format(Locale.US, "%02x", value & 0xff));
-            return output.toString();
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IOException("SHA-256 unavailable", impossible);
-        }
     }
 
     static void writeJson(File file, JSONObject json) throws IOException {

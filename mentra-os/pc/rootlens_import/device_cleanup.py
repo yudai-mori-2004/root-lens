@@ -11,18 +11,18 @@ import json
 import re
 import shlex
 
-from .core import CLIP_NAME, FILES, HASH, PACKAGES, ImportCancelled, ImportFailure
+from .core import CLIP_NAME, FILES, HASH, UNIT_ID, PACKAGES, ImportCancelled, ImportFailure, source_manifest_sha256
 
 
 AUXILIARY_FILES = (
-    "camera_frames.raw.jsonl", "content_hash.txt", "sync_report.json",
+    "camera_frames.raw.jsonl", "sync_report.json",
     "camera_capture_failures.txt", "camera_index.bin", "video_index.bin",
     "accelerometer_index.bin", "gyroscope_index.bin",
 )
 KNOWN_FILES = frozenset((*FILES, *AUXILIARY_FILES))
 PENDING_PREFIX = ".rootlens-cleanup-"
 PENDING_NAME = re.compile(
-    r"\.rootlens-cleanup-(rec-\d{8}T\d{6}\.\d{3}Z)-([0-9a-f]{64})-([0-9a-f]{64})\Z"
+    r"\.rootlens-cleanup-(rec-\d{8}T\d{6}\.\d{3}Z)-(unit_[A-Za-z0-9_-]+)-([0-9a-f]{64})\Z"
 )
 DRIVE_ID = re.compile(r"[A-Za-z0-9_-]{1,256}\Z")
 STAT_FORMAT = "%s|%d|%i|%y|%z"
@@ -36,20 +36,20 @@ CANCELLED = "端末からの削除を中止しました。次の接続で残り�
 class PendingClip:
     name: str
     original_name: str
-    content_hash: str
+    unit_id: str
     manifest_digest: str
 
 
 @dataclass(frozen=True)
 class CleanupResult:
     name: str
-    content_hash: str
+    unit_id: str
 
 
 @dataclass(frozen=True)
 class CleanupProgress:
     name: str
-    content_hash: str
+    unit_id: str
     state: str
     error: str = ""
 
@@ -103,7 +103,7 @@ def discover_pending(adb, root):
         if not name.startswith(PENDING_PREFIX):
             continue
         match = PENDING_NAME.fullmatch(name)
-        if match is None:
+        if match is None or not UNIT_ID.fullmatch(match.group(2)):
             raise ImportFailure(INVALID)
         # Reject links before a caller treats the entry as resumable work.
         _shell(adb, _directory_guard(root, root + "/" + name))
@@ -137,15 +137,16 @@ def _snapshot(adb, root, remote):
     return result
 
 
-def _manifest(drive_reader, content_hash, original_name):
+def _manifest(drive_reader, unit_id, original_name):
     """Validate structural fields; the reader checks current destination membership."""
-    descriptor = drive_reader(content_hash)
-    if descriptor is None or getattr(descriptor, "content_hash", None) != content_hash:
+    descriptor = drive_reader(unit_id)
+    if descriptor is None or getattr(descriptor, "unit_id", None) != unit_id:
         raise ImportFailure(DRIVE_CHANGED)
     folder_id = getattr(descriptor, "folder_id", None)
     files = getattr(descriptor, "files", None)
     if (not isinstance(folder_id, str) or not DRIVE_ID.fullmatch(folder_id)
-            or getattr(descriptor, "name", None) != original_name + "-" + content_hash[:12]
+            or getattr(descriptor, "name", None) != unit_id
+            or not isinstance(getattr(descriptor, "source_manifest_sha256", None), str)
             or not isinstance(files, Mapping) or set(files) != set(FILES)):
         raise ImportFailure(DRIVE_CHANGED)
     normalized = {}
@@ -161,27 +162,23 @@ def _manifest(drive_reader, content_hash, original_name):
             raise ImportFailure(DRIVE_CHANGED)
         ids.add(file_id)
         normalized[name] = dict(id=file_id, size=size, sha256=digest)
-    if normalized["rgb.mp4"]["sha256"] != content_hash:
+    source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                    for name, item in normalized.items()}
+    if source_manifest_sha256(unit_id, source_files) != descriptor.source_manifest_sha256:
         raise ImportFailure(DRIVE_CHANGED)
     encoded = json.dumps(dict(folder_id=folder_id, files=normalized), sort_keys=True,
                          separators=(",", ":"), ensure_ascii=True).encode("ascii")
     return normalized, hashlib.sha256(encoded).hexdigest()
 
 
-def _verify_files(adb, root, remote, content_hash, files, *, complete):
+def _verify_files(adb, root, remote, unit_id, files, *, complete):
     before = _snapshot(adb, root, remote)
     present = tuple(name for name in FILES if name in before)
     if complete and set(present) != set(FILES):
         raise ImportFailure(INVALID)
     if "metadata.json" in before:
         _check(adb)
-        if adb.metadata(remote)["content_hash"] != content_hash:
-            raise ImportFailure(INVALID)
-    if "content_hash.txt" in before:
-        if before["content_hash.txt"][0] not in (64, 65):
-            raise ImportFailure(INVALID)
-        text = _shell(adb, "cat " + shlex.quote(remote + "/content_hash.txt"))
-        if text != content_hash:
+        if adb.metadata(remote)["unit_id"] != unit_id:
             raise ImportFailure(INVALID)
     if any(before[name][0] != files[name]["size"] for name in present):
         raise ImportFailure(DRIVE_CHANGED)
@@ -195,7 +192,7 @@ def _verify_files(adb, root, remote, content_hash, files, *, complete):
     return before
 
 
-def cleanup_recording(adb, root, name, expected_hash, drive_reader, log=print, on_progress=None):
+def cleanup_recording(adb, root, name, expected_unit_id, drive_reader, log=print, on_progress=None):
     """Verify, persist a resumable name, then unlink only explicitly known files.
 
     The caller supplies a live Drive lookup, never a local completion journal or
@@ -203,37 +200,37 @@ def cleanup_recording(adb, root, name, expected_hash, drive_reader, log=print, o
     they may be retired only after the four payload files have been verified.
     """
     _validate_root(root)
-    if not isinstance(name, str) or not isinstance(expected_hash, str) or not HASH.fullmatch(expected_hash):
+    if not isinstance(name, str) or not isinstance(expected_unit_id, str) or not UNIT_ID.fullmatch(expected_unit_id):
         raise ImportFailure(INVALID)
     pending = PENDING_NAME.fullmatch(name)
     if pending is not None:
-        original_name, content_hash, expected_manifest = pending.groups()
-        if content_hash != expected_hash:
+        original_name, unit_id, expected_manifest = pending.groups()
+        if unit_id != expected_unit_id:
             raise ImportFailure(INVALID)
     elif CLIP_NAME.fullmatch(name):
-        original_name, content_hash, expected_manifest = name, expected_hash, None
+        original_name, unit_id, expected_manifest = name, expected_unit_id, None
     else:
         raise ImportFailure(INVALID)
 
     def report(state, error=""):
         if on_progress is not None:
-            on_progress(CleanupProgress(original_name, content_hash, state, error))
+            on_progress(CleanupProgress(original_name, unit_id, state, error))
 
     try:
         _check(adb)
         report("verifying")
         remote = root + "/" + name
-        files, manifest_digest = _manifest(drive_reader, content_hash, original_name)
+        files, manifest_digest = _manifest(drive_reader, unit_id, original_name)
         if expected_manifest is not None and manifest_digest != expected_manifest:
             raise ImportFailure(DRIVE_CHANGED)
-        before = _verify_files(adb, root, remote, content_hash, files, complete=pending is None)
+        before = _verify_files(adb, root, remote, unit_id, files, complete=pending is None)
         _check(adb)
-        if _manifest(drive_reader, content_hash, original_name)[1] != manifest_digest:
+        if _manifest(drive_reader, unit_id, original_name)[1] != manifest_digest:
             raise ImportFailure(DRIVE_CHANGED)
         if _snapshot(adb, root, remote) != before:
             raise ImportFailure(CHANGED)
         if pending is None:
-            pending_name = f"{PENDING_PREFIX}{original_name}-{content_hash}-{manifest_digest}"
+            pending_name = f"{PENDING_PREFIX}{original_name}-{unit_id}-{manifest_digest}"
             if len(pending_name.encode("ascii")) > 255:
                 raise ImportFailure(INVALID)
             target = root + "/" + pending_name
@@ -249,7 +246,7 @@ def cleanup_recording(adb, root, name, expected_hash, drive_reader, log=print, o
         if _snapshot(adb, root, remote) != before:
             raise ImportFailure(CHANGED)
         _check(adb)
-        if _manifest(drive_reader, content_hash, original_name)[1] != manifest_digest:
+        if _manifest(drive_reader, unit_id, original_name)[1] != manifest_digest:
             raise ImportFailure(DRIVE_CHANGED)
         report("deleting")
         for filename in (*AUXILIARY_FILES, *FILES):
@@ -270,7 +267,7 @@ def cleanup_recording(adb, root, name, expected_hash, drive_reader, log=print, o
         _shell(adb, _directory_guard(root, remote) + " && rmdir -- " + shlex.quote(remote))
         report("deleted")
         log("Driveへの保存を確認し、スマートグラスから録画を削除しました。")
-        return CleanupResult(original_name, content_hash)
+        return CleanupResult(original_name, unit_id)
     except ImportCancelled:
         report("cancelled", CANCELLED)
         raise ImportCancelled(CANCELLED) from None
