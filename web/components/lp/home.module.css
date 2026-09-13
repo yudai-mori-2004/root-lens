@@ -13,13 +13,7 @@
 .introTitle,
 .introBody {
   min-width: 0;
-  padding: var(--space-lg) var(--page-gutter);
-}
-
-.introTitle {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
+  padding: var(--space-lg) var(--content-gutter);
 }
 
 .introBody {
@@ -47,12 +41,16 @@
   overflow-wrap: anywhere;
 }
 
+:global(html[lang="en"]) .introTitle h1 {
+  max-width: 34ch;
+}
+
 .introTitleLine {
   display: block;
 }
 
 .overview {
-  padding: var(--space-sm) var(--page-gutter);
+  padding: var(--space-sm) var(--content-gutter);
   text-align: center;
 }
 
@@ -93,7 +91,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg) var(--page-gutter);
+  padding: var(--space-lg) var(--content-gutter);
   border-bottom: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--public-section-size);
   font-weight: 600;

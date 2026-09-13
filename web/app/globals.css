@@ -29,6 +29,8 @@
   --page-bg: var(--color-paper);
   --public-body-size: clamp(1rem, 1.35vw, 1.12rem);
   --public-section-size: clamp(1.2rem, 2vw, 1.5rem);
+  --content-max: 64rem;
+  --content-gutter: max(var(--page-gutter), calc((100vw - var(--content-max)) / 2));
 }
 
 *,
@@ -56,6 +58,28 @@ body {
   background: var(--color-paper);
   --font-lp-heading: var(--font-geist-sans, sans-serif);
   --font-lp-mono: var(--font-geist-mono, monospace);
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3,
+summary {
+  text-wrap: balance;
+}
+
+html[lang="ja"] body {
+  line-break: strict;
+  word-break: normal;
+}
+
+html[lang="en"] body {
+  hyphens: none;
+  overflow-wrap: break-word;
 }
 
 a {

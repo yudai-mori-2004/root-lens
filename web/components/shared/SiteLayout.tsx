@@ -23,7 +23,7 @@ export default async function SiteLayout({
 
   return (
     <>
-      <NavBar items={navItems} secondaryItems={secondaryNavItems} />
+      <NavBar items={navItems} secondaryItems={secondaryNavItems} locale={ja ? "ja" : "en"} />
       {children}
       <SiteFooter />
     </>

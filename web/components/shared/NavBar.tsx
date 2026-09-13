@@ -13,11 +13,19 @@ export interface NavItem {
 export default function NavBar({
   items,
   secondaryItems,
+  locale,
 }: {
   items: NavItem[];
   secondaryItems: NavItem[];
+  locale: "ja" | "en";
 }) {
   const [open, setOpen] = useState(false);
+
+  const changeLocale = (nextLocale: "ja" | "en") => {
+    if (nextLocale === locale) return;
+    document.cookie = `NEXT_LOCALE=${nextLocale}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    window.location.reload();
+  };
 
   return (
     <nav className={s.nav}>
@@ -33,6 +41,25 @@ export default function NavBar({
           />
         </Link>
         <div className={s.navSpacer} />
+        <div className={s.navLocale} aria-label={locale === "ja" ? "表示言語" : "Display language"}>
+          <button
+            type="button"
+            className={locale === "ja" ? s.navLocaleCurrent : s.navLocaleButton}
+            aria-pressed={locale === "ja"}
+            onClick={() => changeLocale("ja")}
+          >
+            JA
+          </button>
+          <span aria-hidden="true">/</span>
+          <button
+            type="button"
+            className={locale === "en" ? s.navLocaleCurrent : s.navLocaleButton}
+            aria-pressed={locale === "en"}
+            onClick={() => changeLocale("en")}
+          >
+            EN
+          </button>
+        </div>
         <button
           type="button"
           className={s.navBurger}
