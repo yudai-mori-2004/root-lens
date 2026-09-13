@@ -1,4 +1,4 @@
-import { getImageProps } from "next/image";
+import Image from "next/image";
 import { getLocale } from "next-intl/server";
 import { publicLocale, publicPages } from "../../content/publicPages";
 import s from "./home.module.css";
@@ -6,25 +6,23 @@ import s from "./home.module.css";
 export default async function HomePage() {
   const locale = publicLocale(await getLocale());
   const pageCopy = publicPages[locale].home;
-  const illustrationAlt = locale === "ja"
-    ? "パンを並べながら撮影機材を装着して働くスタッフのイラスト"
-    : "Illustration of a worker arranging bread while wearing capture equipment";
-  const { props: { srcSet: desktopSrcSet } } = getImageProps({
-    src: "/illustrations/bakery-work-desktop.jpg",
-    alt: illustrationAlt,
-    width: 1536,
-    height: 1024,
-    sizes: "(min-width: 1024px) 1024px, 100vw",
-    priority: true,
-  });
-  const { props: mobileImageProps } = getImageProps({
-    src: "/illustrations/bakery-work-mobile.jpg",
-    alt: illustrationAlt,
-    width: 1536,
-    height: 1024,
-    sizes: "100vw",
-    priority: true,
-  });
+  const workplaceIllustrations = [
+    {
+      src: "/illustrations/work-bakery.jpg",
+      alt: locale === "ja" ? "パンを並べる作業のイラスト" : "Illustration of arranging bread",
+      className: s.illustrationLeft,
+    },
+    {
+      src: "/illustrations/work-grocery.jpg",
+      alt: locale === "ja" ? "青果を陳列する作業のイラスト" : "Illustration of stocking produce",
+      className: s.illustrationCenter,
+    },
+    {
+      src: "/illustrations/work-restaurant.jpg",
+      alt: locale === "ja" ? "料理を盛り付ける作業のイラスト" : "Illustration of plating food",
+      className: s.illustrationRight,
+    },
+  ];
 
   return (
     <main className={s.page}>
@@ -40,14 +38,19 @@ export default async function HomePage() {
       </header>
 
       <figure className={s.workplaceFigure}>
-        <picture>
-          <source
-            media="(min-width: 641px)"
-            sizes="(min-width: 1024px) 1024px, 100vw"
-            srcSet={desktopSrcSet}
-          />
-          <img {...mobileImageProps} alt={illustrationAlt} className={s.workplaceIllustration} />
-        </picture>
+        <div className={s.illustrationCluster}>
+          {workplaceIllustrations.map((illustration) => (
+            <div className={`${s.illustrationCircle} ${illustration.className}`} key={illustration.src}>
+              <Image
+                src={illustration.src}
+                alt={illustration.alt}
+                fill
+                sizes="(max-width: 640px) 34vw, 17rem"
+                priority
+              />
+            </div>
+          ))}
+        </div>
       </figure>
 
       <section className={s.overview} aria-label={locale === "ja" ? "RootLensについて" : "About RootLens"}>
