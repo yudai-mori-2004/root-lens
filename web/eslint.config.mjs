@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party browser assets retain their upstream source and license headers.
+    "public/aruco/**",
   ]),
 ]);
 
