@@ -287,7 +287,11 @@
 
 .policySummary {
   padding: var(--space-lg) var(--content-gutter);
-  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
+  text-align: center;
+}
+
+.policyOverview {
+  border-bottom: 0;
 }
 
 .policySummary > h2,
@@ -329,29 +333,22 @@
   max-width: 64rem;
   margin: 0 auto;
   list-style: none;
-  text-align: left;
+  text-align: center;
 }
 
 .policyOverviewList li + li {
   margin-top: var(--space-md);
 }
 
-.policyOverviewList a {
-  display: inline-block;
-  padding-bottom: 0.1rem;
-  border-bottom: var(--rule-thin) solid currentColor;
-  font-size: var(--public-section-size);
+.policyOverviewList strong {
+  font-size: var(--public-body-size);
   font-weight: 600;
-  line-height: 1.5;
-}
-
-.policyOverviewList a:hover {
-  background: var(--color-surface-hover);
+  line-height: 1.7;
 }
 
 .policyOverviewList p {
   max-width: 56rem;
-  margin-top: var(--space-xs);
+  margin: var(--space-xs) auto 0;
   font-size: var(--public-body-size);
   line-height: 1.75;
 }

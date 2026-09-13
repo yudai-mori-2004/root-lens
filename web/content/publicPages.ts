@@ -142,8 +142,9 @@ export const publicPages = {
         "撮影データの取得には、二種類の同意を必要としています。撮影場所を管理する事業者（協力先）との合意と、現場スタッフ個人の同意です。",
         "協力先との合意は現場合意書として取り交わします。現場スタッフの同意は、撮影機材を装着するスタッフおよび撮影中に映り込む可能性のある現場スタッフから取得します。",
       ],
-      siteDoc: ["現場合意書", "撮影場所を管理する事業者と当社の間で取り交わす合意書です。"],
-      staffDoc: ["撮影参加に関する同意書", "撮影機材を装着する方、および撮影中に映り込む可能性のある方が確認し、署名する同意書です。"],
+      siteDoc: ["現場合意書", "撮影場所を管理する事業者と当社の間で締結する合意書です。撮影の対象範囲、撮影データの用途と利用制限、撮影協力費の条件、提供前のデータ承認の手順、中止・削除時の対応、撮影機材の貸与と返却、秘密保持について定めています。"],
+      staffDoc: ["撮影参加に関する同意書", "撮影機材を装着する方、および撮影中に映り込む可能性のある方が確認し、署名する同意書です。記録されるデータの種類、利用目的、国内外の企業・研究機関への提供、参加の中止方法、撮影データの削除の申し出と、提供済みデータに関する制約について説明しています。"],
+      documentsAction: "書類の全文を請求する",
       approvalTitle: "02 提供前の確認・承認",
       approvalBody: [
         "撮影されたデータは、協力先の現場監督者がすべて確認した上で、提供してよいものだけを承認します。承認は、当社が提供するアプリケーション上で行います。",
@@ -295,8 +296,9 @@ export const publicPages = {
         "Two forms of consent are required to collect filming data: an agreement with the business that manages the filming location (the participating workplace) and individual consent from staff.",
         "The agreement with the workplace is recorded in a workplace agreement. Individual consent is obtained from staff who wear the capture device and staff who may appear in the recording.",
       ],
-      siteDoc: ["Workplace agreement", "An agreement between RootLens and the business that manages the filming location."],
-      staffDoc: ["Filming participation consent", "A consent form reviewed and signed by people who wear the capture device or may appear in a recording."],
+      siteDoc: ["Workplace agreement", "An agreement between RootLens and the business that manages the filming location. It defines the scope of filming, permitted uses and restrictions, filming cooperation fees, approval before data provision, procedures for stopping and deletion, equipment lending and return, and confidentiality."],
+      staffDoc: ["Filming participation consent", "A consent form reviewed and signed by people who wear the capture device or may appear in a recording. It explains the recorded data, permitted purposes, provision to companies and research institutions in and outside Japan, how to stop participating, deletion requests, and the limits that apply after data has already been provided."],
+      documentsAction: "Request the full documents",
       approvalTitle: "02 Review and approval before provision",
       approvalBody: [
         "A site supervisor at the participating workplace reviews all recorded data and approves only data that may be provided. Approval takes place in an application supplied by RootLens.",

@@ -4,9 +4,6 @@ import { ActionLink, infoStyles as s } from "../../components/info/PageFrame";
 import SiteLayout from "../../components/shared/SiteLayout";
 import { publicLocale, publicPages } from "../../content/publicPages";
 
-const SITE_AGREEMENT = "/documents/rootlens-site-agreement.pdf";
-const STAFF_CONSENT = "/documents/rootlens-staff-consent.pdf";
-
 export async function generateMetadata(): Promise<Metadata> {
   const locale = publicLocale(await getLocale());
   const copy = publicPages[locale].policy;
@@ -23,16 +20,16 @@ export default async function DataPolicyPage() {
   return (
     <SiteLayout>
       <main className={s.accordionPage}>
-        <header className={s.contributeOverview}>
+        <header className={`${s.contributeOverview} ${s.policyOverview}`}>
           <h1>{copy.label}</h1>
           <p>{copy.summary}</p>
         </header>
 
         <section className={s.policySummary} aria-label={locale === "ja" ? "データ提供の三段階" : "Three stages of data provision"}>
           <ol className={s.policyOverviewList}>
-            {copy.steps.map((step, index) => (
+            {copy.steps.map((step) => (
               <li key={step.title}>
-                <a href={`#policy-step-${index + 1}`}>{step.title}</a>
+                <strong>{step.title}</strong>
                 <p>{step.short}</p>
               </li>
             ))}
@@ -48,17 +45,12 @@ export default async function DataPolicyPage() {
                 <section>
                   <h2>{copy.siteDoc[0]}</h2>
                   <p>{copy.siteDoc[1]}</p>
-                  <ActionLink href={SITE_AGREEMENT} download>
-                    {locale === "ja" ? "PDFをダウンロード" : "Download PDF"}
-                  </ActionLink>
                 </section>
                 <section>
                   <h2>{copy.staffDoc[0]}</h2>
                   <p>{copy.staffDoc[1]}</p>
-                  <ActionLink href={STAFF_CONSENT} download>
-                    {locale === "ja" ? "PDFをダウンロード" : "Download PDF"}
-                  </ActionLink>
                 </section>
+                <ActionLink href="/contact">{copy.documentsAction}</ActionLink>
               </div>
             </div>
           </details>
