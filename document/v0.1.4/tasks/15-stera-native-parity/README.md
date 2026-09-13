@@ -23,8 +23,8 @@ Apache 2.0) と、 うちの収録 + MCAP 組み立てを**内部のネイティ
     - `coordination/MetadataAssembler.swift`
   - `packages/stera_recorder/lib/src/data/models/recording_config.dart` (実効デフォルトは Dart 側が正)
 - 直す先
-  - `app/modules/arkit-capture/ios/ArSessionController.swift` (+ `PixelEncoders.swift`, `DepthTarWriter.swift`, `MeshExporter.swift`)
-  - `app/src/services/captureSettings.ts`
+  - `mobile/modules/arkit-capture/ios/ArSessionController.swift` (+ `PixelEncoders.swift`, `DepthTarWriter.swift`, `MeshExporter.swift`)
+  - `mobile/src/services/captureSettings.ts`
   - `tools/modal/fpvlabs/fpvlabs.py`
 - 検証
   - `stera-sdk` の `MCAPSession(check_format=True)` (REFERENCE_TOPICS 11 本)
@@ -202,7 +202,7 @@ FFI 経路の autoExposure 脱落。
 ## 進捗
 
 - 2026-07-30: stera-app / うち両実装の呼び出しレベル棚卸し完了、 差分と決定事項を本 README に固定。
-  tf 回転の app/sdk 矛盾を発見 (決定事項 5)。 実装未着手。
+  tf 回転の mobile/sdk 矛盾を発見 (決定事項 5)。 実装未着手。
 - 2026-07-30 (改訂): 解像度は 1440 維持で確定 (stera の選択関数に cap=1440 を渡す形で
   アルゴリズム一致と両立)。 16:9 化と画角の実機確認基準を撤回。 depth ソースは要確定に変更
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。

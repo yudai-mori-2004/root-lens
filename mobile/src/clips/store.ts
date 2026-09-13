@@ -1,0 +1,161 @@
+// Local clip and recording state (Zustand vanilla).
+//
+// The single source of truth for the clip collection, the recording lifecycle,
+// and the event log. Being a vanilla store it has no React dependency, so
+// non-React capture and submission code can read and write it too. The UI
+// subscribes through hooks (src/clips/hooks.ts) via useStore(clipStore, selector).
+
+import { createStore } from 'zustand/vanilla';
+
+import { makeEvent, type ClipEvent, type ClipEventInput, type EventSink } from './events';
+import type { Clip } from './types';
+import type { CaptureMethodId, RecordingSession } from '../capture';
+
+/** Recording lifecycle. */
+export type RecordingPhase =
+  | 'idle'            // no session yet
+  | 'session-active'  // preview running, not recording
+  | 'recording'       // recording
+  | 'recorded';       // stopped, not yet handed to the upload pipeline
+
+const MAX_EVENTS = 500;
+
+let localIdSeq = 0;
+/** Temporary local ledger id used before a server-issued unit id is assigned. */
+export function makeLocalClipId(): string {
+  localIdSeq += 1;
+  return `local_${Date.now().toString(36)}_${localIdSeq.toString(36)}`;
+}
+
+export interface ClipStoreState {
+  // ─── Recording session lifecycle (one at a time) ────────────────────
+  recording: RecordingPhase;
+  captureMethodId: CaptureMethodId | null;
+  session: RecordingSession | null;
+
+  // ─── Clip collection (many; the single source of truth) ─────────────
+  clips: Record<string, Clip>;
+  /** Id of the clip currently moving through recording → upload (what progress UIs watch). */
+  currentClipId: string | null;
+
+  /** Label of the action in flight (blocks double taps, drives spinners). null when idle. */
+  busy: string | null;
+  events: ClipEvent[];
+
+  // ─── Recording actions ───────────────────────────────────────────────
+  setRecording(phase: RecordingPhase): void;
+  setSession(session: RecordingSession | null): void;
+  setCaptureMethodId(id: CaptureMethodId | null): void;
+
+  // ─── Clip collection actions ─────────────────────────────────────────
+  upsertClip(clip: Clip): void;
+  patchClip(id: string, patch: Partial<Clip>): void;
+  removeClip(id: string): void;
+  /** Re-key a local clip to its server-issued unit id. */
+  adoptUnitId(localId: string, unitId: string): void;
+  /** Bulk hydrate from the persistence adapter (pours saved clips in at startup). */
+  replaceClips(clips: Clip[]): void;
+  /** Set which clip progress UIs should watch. */
+  setCurrentClipId(id: string | null): void;
+
+  // ─── events / busy ──────────────────────────────────────────────────
+  appendEvent(e: ClipEventInput): void;
+  clearEvents(): void;
+  setBusy(label: string | null): void;
+
+  /** Stop tracking the in-flight clip only (for starting a new recording; the collection stays). */
+  resetCurrent(): void;
+  /** Full reset (the dev sandbox's "reset" button). */
+  reset(): void;
+}
+
+const INITIAL: Pick<
+  ClipStoreState,
+  'recording' | 'captureMethodId' | 'session' | 'clips' | 'currentClipId' | 'busy' | 'events'
+> = {
+  recording: 'idle',
+  captureMethodId: null,
+  session: null,
+  clips: {},
+  currentClipId: null,
+  busy: null,
+  events: [],
+};
+
+export const clipStore = createStore<ClipStoreState>((set, get) => ({
+  ...INITIAL,
+
+  setRecording(phase) { set({ recording: phase }); },
+  setSession(session) { set({ session }); },
+  setCaptureMethodId(id) { set({ captureMethodId: id }); },
+
+  upsertClip(clip) {
+    set({ clips: { ...get().clips, [clip.id]: clip } });
+  },
+  patchClip(id, patch) {
+    const cur = get().clips[id];
+    if (!cur) return;
+    set({ clips: { ...get().clips, [id]: { ...cur, ...patch } } });
+  },
+  removeClip(id) {
+    const { [id]: _removed, ...rest } = get().clips;
+    set({
+      clips: rest,
+      currentClipId: get().currentClipId === id ? null : get().currentClipId,
+    });
+  },
+  adoptUnitId(localId, unitId) {
+    if (localId === unitId) return;
+    const clips = get().clips;
+    const cur = clips[localId];
+    if (!cur) return;
+    const { [localId]: _old, ...rest } = clips;
+    set({
+      clips: { ...rest, [unitId]: { ...cur, id: unitId } },
+      currentClipId: get().currentClipId === localId ? unitId : get().currentClipId,
+    });
+  },
+  replaceClips(clips) {
+    const map: Record<string, Clip> = {};
+    for (const c of clips) map[c.id] = c;
+    set({ clips: map });
+  },
+  setCurrentClipId(id) { set({ currentClipId: id }); },
+
+  appendEvent(input) {
+    const event = makeEvent(input);
+    const events = get().events.concat(event);
+    set({ events: events.length > MAX_EVENTS ? events.slice(-MAX_EVENTS) : events });
+  },
+  clearEvents() { set({ events: [] }); },
+  setBusy(label) { set({ busy: label }); },
+
+  resetCurrent() { set({ currentClipId: null }); },
+  reset() { set({ ...INITIAL, clips: {}, events: [] }); },
+}));
+
+// ─── Selectors (pure; UI hooks wrap them in useMemo) ───────────────────
+
+/** Clip list, newest first. Callers should memoize with s.clips as the dependency. */
+export function clipList(clips: Record<string, Clip>): Clip[] {
+  return Object.values(clips).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Look up a clip by id (null when absent). */
+export function selectClip(state: ClipStoreState, id: string | null | undefined): Clip | null {
+  if (!id) return null;
+  return state.clips[id] ?? null;
+}
+
+/** The in-flight clip (whatever currentClipId points at). */
+export function selectCurrentClip(state: ClipStoreState): Clip | null {
+  return state.currentClipId ? state.clips[state.currentClipId] ?? null : null;
+}
+
+/**
+ * EventSink that appends into the store. Hand this to steps / orchestrators.
+ * Wrap it with teeToConsole from events.ts to also mirror to the console.
+ */
+export const storeEventSink: EventSink = (e) => {
+  clipStore.getState().appendEvent(e);
+};

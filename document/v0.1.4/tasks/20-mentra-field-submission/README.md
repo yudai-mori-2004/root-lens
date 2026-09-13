@@ -8,16 +8,16 @@ Mentra Live の録画を USB で PC に取り込み、映像と音声を確認�
 
 ## 読むべきファイル
 
-- `mentra-os/pc/README.md`（アプリの操作と責務）
-- `mentra-os/pc/rootlens_import/core.py`（USB 取り込みの正本）
-- `mentra-os/pc/rootlens_import/site.py`（事業所設定）
-- `mentra-os/pc/rootlens_import/library.py`（保存した録画の一覧）
-- `mentra-os/pc/rootlens_import/desktop.py`（録画一覧・プレビュー・画面操作）
-- `mentra-os/pc/rootlens_import/drive.py`（サービスアカウント認証・再開可能なアップロード・保存後の照合）
-- `mentra-os/pc/rootlens_import/upload_state.py`（録画ごとの送信位置と完了状態）
-- `mentra-os/pc/packaging/`（OS 別ビルド）
-- `mentra-os/pc/docs/`（現場での操作、PC の初回設定、管理者の運用）
-- `mentra-os/pc/docs/drive-layout.md`（共有ドライブの配置とリンク）
+- `desktop/README.md`（アプリの操作と責務）
+- `desktop/rootlens_import/core.py`（USB 取り込みの正本）
+- `desktop/rootlens_import/site.py`（事業所設定）
+- `desktop/rootlens_import/library.py`（保存した録画の一覧）
+- `desktop/rootlens_import/desktop.py`（録画一覧・プレビュー・画面操作）
+- `desktop/rootlens_import/drive.py`（サービスアカウント認証・再開可能なアップロード・保存後の照合）
+- `desktop/rootlens_import/upload_state.py`（録画ごとの送信位置と完了状態）
+- `desktop/packaging/`（OS 別ビルド）
+- `desktop/docs/`（現場での操作、PC の初回設定、管理者の運用）
+- `desktop/docs/drive-layout.md`（共有ドライブの配置とリンク）
 - Downloads の `①現場合意書（8次修正0910）.docx` と `②スタッフ同意書（4次修正0829）.docx`
   （この手順が参照する文面。契約原本は変更しない）
 
@@ -189,7 +189,7 @@ RootLens 管理者2名と専用サービスアカウントだけの権限を確�
 
 ユーザーから、`local-test` の表記をなくし、RootLens のアイコンと、初めて使う日本人に自然な文言で
 提供できる形にするよう依頼を受けた。既存の録画・設定・アップロードの仕組みを保ち、0.4.1 で表示と配布物を更新した。
-アプリアイコンには `app/assets/icon.png` の既存ロゴを使う。フォームや確認項目は増やさない。
+アプリアイコンには `mobile/assets/icon.png` の既存ロゴを使う。フォームや確認項目は増やさない。
 
 一般的な Mac 配布の準備はしないというユーザーの補足に従い、Apple の署名・公証の準備は中止した。
 現在の事業所フォルダでの配布方法を保ち、通常のファイル名・RootLens のアイコン・自然な日本語へ整える。

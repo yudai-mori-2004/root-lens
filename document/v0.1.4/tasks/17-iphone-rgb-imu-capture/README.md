@@ -9,12 +9,12 @@
 
 ## 読むべきファイル
 
-- `app/src/dataflow/recording-configs/types.ts`
-- `app/src/dataflow/recording-configs/{index,arkit,iphone}.ts`
-- `app/modules/arkit-capture/ios/{ArSessionController,IphoneCaptureController,IphoneCaptureRecorder,CameraImuTimeCalibrator}.swift`
-- `mentra-os/app/src/main/java/io/rootlens/mentra/{SessionArtifacts,RawImuRecorder}.java`
+- `mobile/src/dataflow/recording-configs/types.ts`
+- `mobile/src/dataflow/recording-configs/{index,arkit,iphone}.ts`
+- `mobile/modules/arkit-capture/ios/{ArSessionController,IphoneCaptureController,IphoneCaptureRecorder,CameraImuTimeCalibrator}.swift`
+- `glasses/app/src/main/java/io/rootlens/mentra/{SessionArtifacts,RawImuRecorder}.java`
 - `web/lib/{r2-keys,r2}.ts`
-- `app/README.md`
+- `mobile/README.md`
 
 ## スコープ
 
@@ -36,7 +36,7 @@
 - 開始・終了操作を`gesture / voice / hardware_button`の並列なCaptureFlowとして登録する。
 - `hardware_button`はiOS 17.2以降の`AVCaptureEventInteraction`で音量±を同じトグルとして受け、
   システム音量を変更せず、開始・終了の効果音だけを鳴らす。
-- app/web双方の4ファイルmanifestと`iphone` config IDを一致させる。
+- mobile/web双方の4ファイルmanifestと`iphone` config IDを一致させる。
 - 実機で映像・AAC・IMU・frame対応・metadataを検証してからTestFlightへ提出する。
 
 ### やらないこと
@@ -76,7 +76,7 @@ native側では`ArkitCaptureController`と`IphoneCaptureController`をpeerとし
 
 - [x] 設定/registry/UIへ3撮影方法を追加
 - [x] iPhone AVCapture + Core Motion backendを追加
-- [x] Mentra同一4ファイルmanifestをapp/webで固定
+- [x] Mentra同一4ファイルmanifestをmobile/webで固定
 - [x] RGB–IMU残差計測とmetadata監査フィールドを接続
 - [x] 音声記録の権限文言・利用規約・プライバシー表示を確定方針へ同期
 - [x] TypeScript/dataflow/web contract test

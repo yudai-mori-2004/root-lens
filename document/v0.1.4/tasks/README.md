@@ -1,6 +1,6 @@
 # RootLens v0.1.4 タスク一覧
 
-v0.1.4は、撮影データの収集、現場での確認、提出、加工、手渡しに必要な経路を整える。撮影単位は`unit_id`で識別し、内容の完全性は全rawファイルの`source_manifest_sha256`で確認する。実装と`app/README.md`をデータ仕様の正とし、各タスクの判断と検証記録は個別READMEに残す。
+v0.1.4は、撮影データの収集、現場での確認、提出、加工、手渡しに必要な経路を整える。撮影単位は`unit_id`で識別し、内容の完全性は全rawファイルの`source_manifest_sha256`で確認する。実装と`mobile/README.md`をデータ仕様の正とし、各タスクの判断と検証記録は個別READMEに残す。
 
 ## 現在の構成
 
@@ -42,6 +42,7 @@ v0.1.4は、撮影データの収集、現場での確認、提出、加工、�
 | 23 | Public site consent flow | 完了 |
 | 24 | Consent evidence chain | 完了 |
 | 25 | Unit identity | 完了 |
-| 26 | Codebase hygiene | 進行中 |
+| 26 | Codebase hygiene | 完了 |
+| 27 | Runtime layout | 完了 |
 
 未完了項目の条件と、完了時に行った検証は各タスクのREADMEを参照する。過去の設計を記録した完了済み文書は当時の判断記録として保持し、現行仕様として参照しない。

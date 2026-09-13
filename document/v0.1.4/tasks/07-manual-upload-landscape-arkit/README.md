@@ -73,9 +73,9 @@ presign を返す機能は削除 (= presign は /api/v1/raw-uploads の役目)�
 
 ## 読むべきファイル
 
-- `app/src/screens/CaptureScreen.tsx` (ジェスチャー撮影、 旧 CalibrationCaptureScreen 復元 + 保存のみ)
-- `app/src/screens/CollectionScreen.tsx` + `app/src/components/ClipPreviewModal.tsx` + `ClipCard.tsx`
-- `app/src/dataflow/pipeline.ts` (enqueueRecording = recorded、 advanceClip = 手動起動)
+- `mobile/src/screens/CaptureScreen.tsx` (ジェスチャー撮影、 旧 CalibrationCaptureScreen 復元 + 保存のみ)
+- `mobile/src/screens/CollectionScreen.tsx` + `mobile/src/components/ClipPreviewModal.tsx` + `ClipCard.tsx`
+- `mobile/src/dataflow/pipeline.ts` (enqueueRecording = recorded、 advanceClip = 手動起動)
 - `web/lib/r2.ts` + `web/lib/r2-keys.ts` (RAW_SESSION_MANIFEST + rawBucketFor)
 - `web/app/api/v1/raw-uploads/route.ts` (recordingConfig 受け)
 
@@ -97,6 +97,6 @@ presign を返す機能は削除 (= presign は /api/v1/raw-uploads の役目)�
 - [x] CollectionScreen: 2 カラム待ち一覧 + ClipPreviewModal (プレビュー → 同意 → アップロード)
 - [x] RootNavigator: 全画面 landscape
 - [x] web/.env に R2_BUCKET_RAW_ARKIT (トークンスコープ実測 OK)
-- [x] tsc (app/web) + dataflow purity green
+- [x] tsc (mobile/web) + dataflow purity green
 - [ ] 実機 E2E (ultra_wide → rootlens-raw / arkit → rootlens-raw-arkit)
 - [ ] Vercel env に R2_BUCKET_RAW_ARKIT 追加 (= コード default と同値なので任意、 明示推奨)

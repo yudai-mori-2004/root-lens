@@ -57,8 +57,8 @@ progress/
 /output/pdf/applications/
 /output/xlsx/applications/
 
-# Superseded RootaCap design explorations (canonical R7 lives in tools/rootcap/)
-/tools/rootcap-candidates/
+# Superseded RootCap design explorations (canonical design lives in hardware/rootcap/)
+/hardware/rootcap/candidates/
 
 # Sensor session module build artifacts
 app/modules/sensor-session/android/build/

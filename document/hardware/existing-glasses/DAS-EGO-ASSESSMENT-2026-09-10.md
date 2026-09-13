@@ -91,7 +91,7 @@ DAS EgoはOSCARより画素数、基線、視野数が増える。深度の幾�
 1. SDのDAS原本MCAPを変更せずR2へ保存し、SHA-256を収録IDにする。
 2. 六眼・IMU・校正topicの件数、単調時刻、欠番、fps、5時間境界を検査してmanifestを作る。
 3. camera2/3をDouble Sphereモデルでrectifyし、元画像とは別にステレオ深度を生成する。
-4. 既存`tools/modal/fpvlabs/fpvlabs.py`のEgoBlurとROS2 MCAP writerを再利用するDAS readerを加える。camera2/3を同格の左右topicとして残し、主要RGB表示、残り四眼、個体校正、camera–IMU外参、派生深度、六眼原本への参照を出す。単眼schemaへ合わせるためcamera3を捨てない。
+4. EgoBlurとROS2 MCAP writerを含むDAS readerを実装する。camera2/3を同格の左右topicとして残し、主要RGB表示、残り四眼、個体校正、camera–IMU外参、派生深度、六眼原本への参照を出す。単眼schemaへ合わせるためcamera3を捨てない。
 5. 記録されたIMU値は保持し、単位・軸が確定した変換値だけを`/device/imu`へ出す。未処理生値ではない場合はその処理内容をmetadataに残す。GenRobotのVIOは派生値として保持し、IMUの代用にしない。
 6. 元MCAP、顔ぼかし済み派生MCAP、校正、検査manifest、機種差を記したdataset cardを顧客納品物にする。
 

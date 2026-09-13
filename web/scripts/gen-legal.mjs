@@ -4,7 +4,7 @@
 //   node scripts/gen-legal.mjs   (web/ から)
 //
 // 方針: 正本 md が唯一の source of truth。生成物を web に同梱することで、Vercel ビルドが
-// document/ を読む必要がなくなる(ビルドセーフ)。アプリ側 (app/scripts/gen-legal.mjs) と対。
+// document/ を読む必要がなくなる(ビルドセーフ)。アプリ側 (mobile/scripts/gen-legal.mjs) と対。
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';

@@ -8,12 +8,12 @@
 
 ## 読むべきファイル
 
-- `app/src/screens/captureFlow/` — フロー抽象 (types / gestureFlow / voiceFlow / registry)
-- `app/src/screens/CaptureScreen.tsx` — 状態機械。フロー差分は 2 接合点 (キャリブ確定後の行き先、
+- `mobile/src/screens/captureFlow/` — フロー抽象 (types / gestureFlow / voiceFlow / registry)
+- `mobile/src/screens/CaptureScreen.tsx` — 状態機械。フロー差分は 2 接合点 (キャリブ確定後の行き先、
   録画中の停止トリガー) + フロー固有 state の委譲
-- `app/modules/arkit-capture/ios/SpeechCommandController.swift` — オンデバイス ja-JP 音声認識
+- `mobile/modules/arkit-capture/ios/SpeechCommandController.swift` — オンデバイス ja-JP 音声認識
   (SFSpeechRecognizer)。~1 分制限はタスク再起動ループで回避。キーワード照合は Swift 側
-- `app/src/services/captureAudio.ts` — isAudioBusy() (= 自アプリ TTS の拾い込み防止ゲート)
+- `mobile/src/services/captureAudio.ts` — isAudioBusy() (= 自アプリ TTS の拾い込み防止ゲート)
 
 ## スコープ
 

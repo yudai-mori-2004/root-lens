@@ -277,8 +277,8 @@ Claruは8月10日時点で従来のパン屋サンプルを確認している。
 - Mentra実装記録：`document/v0.1.4/tasks/16-claru-mentra-capture/README.md`
 - iPhone実装記録：`document/v0.1.4/tasks/17-iphone-rgb-imu-capture/README.md`
 - 長時間データ処理記録：`document/v0.1.4/tasks/18-claru-session-cutter/README.md`
-- 5時間納品候補の進捗：`tools/claru-session-cutter/DELIVERY_QUEUE.md`
-- RootCap R7：`tools/rootcap/r6-forehead-magsafe/README.md`
+- 5時間納品候補の進捗：`tools/session_cutter/DELIVERY_QUEUE.md`
+- RootCap R7：`hardware/rootcap/r7-forehead-magsafe/README.md`
 - Muso Action応募の背景・方針：`document/applications/muso-action/APPLICATION_CONTEXT.md`
 
 ## 履歴確認範囲

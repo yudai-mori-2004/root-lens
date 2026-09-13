@@ -1,0 +1,104 @@
+name: RootLens Desktop for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/desktop-windows.yml'
+      - 'desktop/**'
+      - 'desktop/scripts/import-recordings.py'
+      - 'desktop/scripts/test_import_recordings.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      QT_MEDIA_BACKEND: ffmpeg
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13.15'
+          architecture: x64
+      - name: Install build dependencies
+        run: |
+          python -m pip install -r desktop/packaging/requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          New-Item -ItemType Directory -Force evidence | Out-Null
+      - name: Test Windows application and USB core
+        id: tests
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          $env:PYTHONPATH = "$PWD/desktop"
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          python -m unittest discover -s desktop/tests -v *> evidence/desktop-tests.log
+          $desktopCode = $LASTEXITCODE
+          python -m unittest discover -s desktop/scripts -p test_import_recordings.py -v *> evidence/usb-tests.log
+          $usbCode = $LASTEXITCODE
+          Get-Content evidence/desktop-tests.log -Tail 12
+          Get-Content evidence/usb-tests.log -Tail 12
+          if ($desktopCode -ne 0 -or $usbCode -ne 0) { throw 'Windows tests failed' }
+      - name: Record Windows multimedia environment
+        run: |
+          Get-Service Audiosrv, AudioEndpointBuilder -ErrorAction SilentlyContinue | Select-Object Name,Status,StartType | ConvertTo-Json | Out-File evidence/audio-services.json -Encoding utf8
+          Get-WindowsFeature Server-Media-Foundation | Select-Object Name,InstallState | ConvertTo-Json | Out-File evidence/media-foundation.json -Encoding utf8
+          Get-Item "$env:WINDIR/System32/mf*.dll" -ErrorAction SilentlyContinue | Select-Object Name,Length | ConvertTo-Json | Out-File evidence/media-libraries.json -Encoding utf8
+      - name: Prepare ADB and license notices
+        run: |
+          python desktop/packaging/prepare-windows-inputs.py --output "$env:RUNNER_TEMP/inputs"
+          if ($LASTEXITCODE -ne 0) { throw 'Build input preparation failed' }
+          Copy-Item "$env:RUNNER_TEMP/inputs/inputs.json" evidence/
+      - name: Install Inno Setup compiler
+        run: |
+          $installer = "$env:RUNNER_TEMP/innosetup.exe"
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f') { throw 'Inno Setup hash mismatch' }
+          $process = Start-Process $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$env:RUNNER_TEMP/inno") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Inno Setup installation failed' }
+      - name: Build Windows installer
+        run: |
+          ./desktop/packaging/build-windows.ps1 -Python python -PlatformTools "$env:RUNNER_TEMP/inputs/platform-tools" -Output "$env:RUNNER_TEMP/dist" -RuntimeNotices "$env:RUNNER_TEMP/inputs/runtime-notices" -InnoSetupCompiler "$env:RUNNER_TEMP/inno/ISCC.exe" *> evidence/build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
+      - name: Verify bundled app, installer and playback
+        run: |
+          $installer = Get-ChildItem "$env:RUNNER_TEMP/dist/RootLens-Import-Setup-*-windows-x64.exe"
+          if ($installer.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          ./desktop/packaging/verify-windows.ps1 -Python python -BundleDir "$env:RUNNER_TEMP/dist/RootLens Import" -Installer $installer.FullName -SampleVideo "$PWD/desktop/packaging/fixtures/kitchen-demo.mp4" -Output "$PWD/evidence/windows"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows acceptance failed' }
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item $installer.FullName release/
+          Get-FileHash "release/*.exe" -Algorithm SHA256 | Format-List | Out-File release/SHA256.txt -Encoding utf8
+      - name: Save verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-verification
+          path: evidence/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Require passing application tests
+        if: always() && steps.tests.outcome != 'success'
+        run: throw 'The installer is withheld because the application tests failed.'
+      - name: Save installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-installer
+          path: release/
+          retention-days: 14
+          if-no-files-found: error

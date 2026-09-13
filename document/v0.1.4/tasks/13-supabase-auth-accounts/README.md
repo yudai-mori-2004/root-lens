@@ -24,8 +24,8 @@
 
 ## 読むべきファイル
 
-- `app/src/services/auth/` (AuthProvider 抽象。 ここに SupabaseAuthProvider を差す)
-- `app/src/services/consent.ts` + `app/src/dataflow/steps/register.ts` (ヘッダ送信箇所)
+- `mobile/src/services/auth/` (AuthProvider 抽象。 ここに SupabaseAuthProvider を差す)
+- `mobile/src/services/consent.ts` + `mobile/src/dataflow/steps/register.ts` (ヘッダ送信箇所)
 - `web/app/api/clips/route.ts`, `web/app/api/v1/raw-uploads/route.ts`, `web/app/api/v1/consents/route.ts`
 - `web/db/schema.ts`, `web/drizzle/0003_content_hash_and_account.sql` (migration の流儀)
 - `web/lib/clipId.ts` (撤去対象。 コメントに C2PA 残骸あり)

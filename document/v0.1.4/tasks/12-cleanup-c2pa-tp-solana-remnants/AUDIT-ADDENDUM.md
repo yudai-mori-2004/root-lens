@@ -28,51 +28,51 @@ git action 不要、 `find . -name .DS_Store -delete` でローカル削除す�
   拾えていない → build 成果物がリポに漏れ込んだ。
 - **アクション**: `native/jarosz-wasm/` 全消し + `.gitignore` に `native/*/target/` (or `**/target/`) 追加。
 
-### F2. `app/src/sensors/` — 完全な孤児 TypeScript ディレクトリ
+### F2. `mobile/src/sensors/` — 完全な孤児 TypeScript ディレクトリ
 
 - 6 files: `captureFlow.ts` (5463 B、 1 行目 `C2paAssertion` import)、 `SensorSession.ts` (3978 B)、
   `registry.ts` (7934 B)、 `ISensor.ts` (1332 B)、 `DeviceInfoSensor.ts` (3223 B)、 `types.ts` (4015 B)。
 - v0.1.0/v0.1.1 の抽象化残骸 (= 現行の `arkit-capture` / `wide-capture` recording-config で置換済)。
 - **外部の import 元ゼロ**を実測確認。 ディレクトリごと削除。
 
-### F3. `app/src/native/sensorSession.ts` — F2 経由でのみ参照
+### F3. `mobile/src/native/sensorSession.ts` — F2 経由でのみ参照
 
-- 唯一の importer が F2 の `app/src/sensors/registry.ts:21`。 F2 と一緒に消える。
+- 唯一の importer が F2 の `mobile/src/sensors/registry.ts:21`。 F2 と一緒に消える。
 
-### F4. `app/modules/sensor-session/` — 遷移的に死んだネイティブモジュール
+### F4. `mobile/modules/sensor-session/` — 遷移的に死んだネイティブモジュール
 
 - iOS: `SensorSessionModule.swift`、 `PreviewView.swift`、 `sensor_session.podspec`、
   `sensors/` (5 Swift files)。
 - Android: `SensorSessionModule.kt`、 `PreviewView.kt`、 `sensors/` (6 Kotlin files)、
   `stream/StreamRecorder.kt:69` に C2PA コメントあり。
-- JS wrapper (F3) が死んだので遷移的に死。 `app/ios/Podfile.lock` に 4 hits あるので pod cleanup が要る。
+- JS wrapper (F3) が死んだので遷移的に死。 `mobile/ios/Podfile.lock` に 4 hits あるので pod cleanup が要る。
 - Android 側は `MainApplication.kt` に `packages.add(SensorSessionPackage())` が **無い** ので
   実質未リンク状態。
 - **判断**: 削除推奨。 v0.1.5 で IMU capture 用に復活の可能性があるなら残す (要 user 確認、 §I 参照)。
 
-### F5. `app/android/app/src/main/java/io/rootlens/app/AesGcm{Module,Package}.kt`
+### F5. `mobile/android/app/src/main/java/io/rootlens/app/AesGcm{Module,Package}.kt`
 
 - TP 暗号化アップロード用の AES-256-GCM ネイティブモジュール。
 - `MainApplication.kt:29` で `packages.add(AesGcmPackage())` として登録済。
-- **JS 側の consumer ゼロ** (`app/src/` からの `AesGcm*` 呼び出し実測 0 件)。 完全に死。
+- **JS 側の consumer ゼロ** (`mobile/src/` からの `AesGcm*` 呼び出し実測 0 件)。 完全に死。
 - 両ファイル削除 + `MainApplication.kt:29` から `packages.add(AesGcmPackage())` を撤去。
 
-### F6. `app/ios/RootLens/AesGcmModule.swift` + `AesGcmModule.m`
+### F6. `mobile/ios/RootLens/AesGcmModule.swift` + `AesGcmModule.m`
 
 - F5 の iOS 対応、 `@objc(AesGcmBridge)` 公開。 JS 側 consumer ゼロ。
 - `.xcodeproj/project.pbxproj` の参照要確認 (直接 grep 0 hit なので pod 経由の可能性)。
 
-### F7. `app/src/units/privacy-blur/index.ts` — 呼び出し元ゼロ
+### F7. `mobile/src/units/privacy-blur/index.ts` — 呼び出し元ゼロ
 
-- `processPrivacyBlur` を export しているが `app/src/` 内で誰も呼んでいない。
-- AUDIT §2 は `app/modules/privacy-blur/` (ネイティブ) は挙げていたが、 この JS ラッパは漏れ。
+- `processPrivacyBlur` を export しているが `mobile/src/` 内で誰も呼んでいない。
+- AUDIT §2 は `mobile/modules/privacy-blur/` (ネイティブ) は挙げていたが、 この JS ラッパは漏れ。
 - privacy-blur モジュール削除と同じ PR で消す。
 
-### F8. `app/dev-certs/` (disk 上、 gitignored)
+### F8. `mobile/dev-certs/` (disk 上、 gitignored)
 
 - 5 個の dev-only C2PA cert (`dev-chain.pem`、 `dev-device-key.pem`、 `dev-device.pem`、
   `dev-root-ca-key.pem`、 `dev-root-ca.pem`)。
-- `.gitignore:38` で除外済なので git action は不要、 `rm -rf app/dev-certs` でローカル削除。
+- `.gitignore:38` で除外済なので git action は不要、 `rm -rf mobile/dev-certs` でローカル削除。
 
 ### F9. `web/vercel.json` の cron が死んでる
 
@@ -81,12 +81,12 @@ git action 不要、 `find . -name .DS_Store -delete` でローカル削除す�
 - Vercel は毎日 404 を叩き続けている。
 - crons ブロック削除、 crons ブロックが唯一の内容なので **`web/vercel.json` ごと削除**でも良い。
 
-### F10. `app/scripts/gen-legal.mjs` と `web/scripts/gen-legal.mjs` の内容不整合
+### F10. `mobile/scripts/gen-legal.mjs` と `web/scripts/gen-legal.mjs` の内容不整合
 
 - 両方 `document/v0.1.3/legal/*.md` から `legalDocs.generated.ts` を生成する仕組み。
 - **app 側は古い**: 「映像と音声」 (現仕様は video-only) の記述が残る、 かつ両方に NFT/blockchain 言及。
 - ソース (`document/v0.1.3/legal/*.md`) を更新した上で両方再生成、 が正解。
-- ただし user 判断 「文章書き換えが大変」 で放置優先。 少なくとも app/web で snapshot 整合させる。
+- ただし user 判断 「文章書き換えが大変」 で放置優先。 少なくとも mobile/web で snapshot 整合させる。
 
 ### F11. `web/messages/{ja,en}.json` に `whyBlockchain` / `legalBasis` 残存
 
@@ -114,12 +114,12 @@ git action 不要、 `find . -name .DS_Store -delete` でローカル削除す�
 
 - ディレクトリ削除と同時に消える。 単に挙げ漏れの補足。
 
-### F15. `app/src/dataflow/steps/sign.ts` の transitive break points
+### F15. `mobile/src/dataflow/steps/sign.ts` の transitive break points
 
 - AUDIT §3 「App-side edits」 は `sign.ts` 削除に触れているが、 削除しただけで壊れる import 元を
   明示していない:
-  - `app/src/dataflow/pipeline.ts:19` — `signRecording` を import
-  - `app/src/dataflow/steps/index.ts:11` — `sign*` を re-export
+  - `mobile/src/dataflow/pipeline.ts:19` — `signRecording` を import
+  - `mobile/src/dataflow/steps/index.ts:11` — `sign*` を re-export
 - PR 9 でこれらを同時に scrub する必要あり。
 
 ## 4. コンポーネント別追加調査
@@ -178,7 +178,7 @@ staking + issue-license E2E。 `03-api-license-issue.spec.ts` は task 02 で消
 | **6.5** | **native/jarosz-wasm/ 削除** | **F1**: 孤児クレート + `.gitignore` に `**/target/` 追加 | **新規** |
 | 7 | app 依存整理 | `@title-protocol/sdk`、 `viem` 撤去 + `react-native-passkeys`/`react-native-qrcode-*` grep 検証 | AUDIT §7 の拡張 |
 | 8 | DB migration + 全 rename (breaking) | signature_hash→content_hash 系 | AUDIT §7 と同じ |
-| **8.5** | **孤児 sensors/units 削除** | **F2/F3/F4/F7**: `app/src/sensors/` + `app/src/native/sensorSession.ts` + `app/modules/sensor-session/` + `app/src/units/privacy-blur/index.ts` | **新規** |
+| **8.5** | **孤児 sensors/units 削除** | **F2/F3/F4/F7**: `mobile/src/sensors/` + `mobile/src/native/sensorSession.ts` + `mobile/modules/sensor-session/` + `mobile/src/units/privacy-blur/index.ts` | **新規** |
 | 9 | C2PA D1 + privacy-blur + AesGcm 削除 | AUDIT §7 PR 9 の拡張。 追加削除: `AesGcm{Module,Package}.kt`、 iOS `AesGcmModule.swift/.m`、 `MainApplication.kt:29` の該当 add() 撤去、 `native/c2pa-bridge/Cargo.lock` (**F5/F6/F12**) | 拡張 |
 | 10 | Modal pipeline 再編 | `tools/modal/` を score-wilor/ + fpvlabs/ に分離 + gtsam_eval.py 削除 | AUDIT §7 と同じ |
 
@@ -217,17 +217,17 @@ grep -rnE 'signature_hash|signatureHash|wallet_pubkey|walletPubkey|X-Wallet-Pubk
 
 **PR 8.5 後 (orphan sensors)**:
 ```
-find app/src/sensors app/src/units -type d
-grep -rn "from '.*sensors\|from '.*units/privacy-blur" app/src $EXCL
+find mobile/src/sensors mobile/src/units -type d
+grep -rn "from '.*sensors\|from '.*units/privacy-blur" mobile/src $EXCL
 ```
 
 **PR 9 後 (C2PA + AesGcm)**:
 ```
 grep -rniE 'c2pa|jumbf|AesGcm|CallbackSigner|active_manifest' . $EXCL
-find app/modules -type d -name 'c2pa-bridge' -o -name 'privacy-blur'
+find mobile/modules -type d -name 'c2pa-bridge' -o -name 'privacy-blur'
 find native -type d -name 'c2pa-bridge'
-find app/android -name 'libc2pa*' -o -name 'c2pa_jni*' -o -name 'C2paBridge*' -o -name 'AesGcm*'
-find app/ios -name 'AesGcmModule*'
+find mobile/android -name 'libc2pa*' -o -name 'c2pa_jni*' -o -name 'C2paBridge*' -o -name 'AesGcm*'
+find mobile/ios -name 'AesGcmModule*'
 ```
 
 **PR 10 後 (Modal 再編)**:
@@ -243,7 +243,7 @@ find . -name '.DS_Store' -not -path './.git/*' -not -path '*/node_modules/*' -no
 
 ## 7. まだ曖昧な項目 (実装前に user 判断)
 
-1. **F4 `app/modules/sensor-session/` を今削除するか、 v0.1.5 の IMU capture 用に残すか**。
+1. **F4 `mobile/modules/sensor-session/` を今削除するか、 v0.1.5 の IMU capture 用に残すか**。
    Android 側は既に `MainApplication.kt` に非登録 (inert)、 iOS 側は Podfile.lock で
    pod link 残存。 消せば軽くなるが、 IMU 系を後で復活させる想定がある場合は要保持。 推奨は削除
    (git 履歴からの復活は容易)。
@@ -251,7 +251,7 @@ find . -name '.DS_Store' -not -path './.git/*' -not -path '*/node_modules/*' -no
    実際に使ってなければ削除でよい。
 3. **`react-native-passkeys` / `react-native-qrcode-*` / `@likashefqet/react-native-image-zoom`**
    — 実 grep で使用箇所要確認。 Privy 経路 (passkeys) と QR / zoom はそれぞれ独立。
-4. **`app/src/content/legalDocs.generated.ts` と `web/content/legalDocs.generated.ts` の再生成**
+4. **`mobile/src/content/legalDocs.generated.ts` と `web/content/legalDocs.generated.ts` の再生成**
    — 内容不整合 (**F10**)。 少なくとも両者 sync すべきだが、 元 md (`document/v0.1.3/legal/*.md`)
    に NFT 記述が残っているので、 md 側の書き換え → 再生成、 が本来。 user 判断
    「文章書き換えが大変」 なら snapshot だけ sync で妥協。
@@ -261,8 +261,8 @@ find . -name '.DS_Store' -not -path './.git/*' -not -path '*/node_modules/*' -no
 - PR 6.5 と 8.5 は「後付けで思い出した孤児削除」 なので、 それぞれ単独で 5-10 file 級の小さい PR。
   順序を守る必要はほぼないが、 番号は既存に沿って 6.5 / 8.5 に置く。
 - PR 9 は複数プラットフォーム (Rust + iOS Swift/ObjC + Android Kotlin/JNI + web + JS wrapper) の
-  同時削除で最も広い。 分割の目安: (a) `native/` + `web/` server-side、 (b) `app/modules/*` +
-  `app/ios/*` + `app/android/*`、 (c) `app/src/` の import 切断。 3 段で分けても正。
+  同時削除で最も広い。 分割の目安: (a) `native/` + `web/` server-side、 (b) `mobile/modules/*` +
+  `mobile/ios/*` + `mobile/android/*`、 (c) `mobile/src/` の import 切断。 3 段で分けても正。
 - PR 8 (identity migration) は breaking なので単独 PR で必ずリリース。
 - Modal 再編 (PR 10) は Modal 側の deploy path が変わるので、 `RUNBOOK.md` と
   `list_pending.py` の path 参照を同一 PR 内で更新すること。

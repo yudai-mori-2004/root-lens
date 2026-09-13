@@ -76,7 +76,7 @@ signer に (予定)」 のまま未実装。 つまり CertGate (TEE 鍵 → App
 - 削除 (web): device-certificate / crl route、 lib/server の ca / attestation-ios /
   attestation-android / cert-store / crl / crypto / crypto-kms / vlm-gate / rate-limit
   (= 全部この経路の専用品) + tests
-- 削除: certs/ (dev PKI 生成一式。 Rust テスト用の app/dev-certs/ PEM は残置)
+- 削除: certs/ (dev PKI 生成一式。 Rust テスト用の mobile/dev-certs/ PEM は残置)
 - **native (Swift/Rust) は触らない**: 未使用関数が残るだけで無害。 次に native を触る時に掃除
 - 将来ハードウェア実証つき来歴が要る時は、 Secure Enclave callback signer 設計で正しく再導入
   (= 証明書を配って UserDefaults に置くのではなく、 TEE 鍵で直接 COSE 署名する)
@@ -90,9 +90,9 @@ signer に (予定)」 のまま未実装。 つまり CertGate (TEE 鍵 → App
 
 ## 成功基準
 
-- app/src に blockchain 語彙 (solana / wallet / mint / stake / devnet / ...) が legal 生成物以外
+- mobile/src に blockchain 語彙 (solana / wallet / mint / stake / devnet / ...) が legal 生成物以外
   ゼロ (実測済)。
-- tsc (app/web) + dataflow purity green (実測済)。
+- tsc (mobile/web) + dataflow purity green (実測済)。
 - 既存端末の鍵・AsyncStorage クリップがそのまま引き継がれる (= SecureStore キー名と 64 byte
   形式を維持)。
 

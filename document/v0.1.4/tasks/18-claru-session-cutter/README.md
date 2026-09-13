@@ -9,10 +9,10 @@ R2と同じ `raw/<content_hash>/` 配置で置く。
 
 ## 読むべきファイル
 
-- `tools/claru-session-cutter/README.md`
-- `tools/claru-session-cutter/lib/{session,exporter}.mjs`
-- `app/modules/arkit-capture/ios/IphoneCaptureRecorder.swift`
-- `app/README.md` の `iPhone RGB + IMU contract`
+- `tools/session_cutter/README.md`
+- `tools/session_cutter/lib/{session,exporter}.mjs`
+- `mobile/modules/arkit-capture/ios/IphoneCaptureRecorder.swift`
+- `mobile/README.md` の `iPhone RGB + IMU contract`
 - Claru RFP `Main footage requirements / Clips`
 
 ## スコープ

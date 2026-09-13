@@ -1,115 +1,43 @@
-# AGENTS.md
+# RootLens で作業するエージェントへ
 
-## Project overview
+成果物を早く出すことより、問題と既存の設計を正しく理解することに時間を使う。整った
+差分、抽象化、コメント、テストは、それが利用者の問題を解決し、既存の仕組みと噛み合う
+ときにだけ価値を持つ。見栄えを完成の代わりにしない。
 
-RootLens: iPhone アプリで家事の一人称視点映像 + LiDAR 深度 + IMU + 手ポーズを収集し、
-Embodied AI / VLA モデル向けの学習データとして FPV Labs (Stera) に渡すプラットフォーム。
+着手したら、所有者が変えたい状態、これまでに決めたこと、その理由、今回守る性質を
+つかむ。変更箇所の前後を読み、同じ責務を担う実装や文書を探す。検索結果や要約から
+仮説を立てた後は、現在のソースで確かめる。分からない部分を、一般論や自分の好みで
+埋めない。
 
-- 現行フェーズ: **v0.1.4** (= C2PA / Title Protocol / Solana を撤去し、 データ収集 + 手渡し
-  だけに絞った実装。 task 12 で残骸掃除まで実行済み)。
-- データ仕様の正: 実装 + `app/README.md` (= 契約は型 + fail-loud チェックで強制)。 UI 参考: `document/v0.1.3/UI_SPECS_JA.md`
-- タスク進捗: `document/v0.1.4/tasks/README.md`
-- 過去仕様: `document/v0.1.0..v0.1.3/` (= 参照用に保持、 触らない)
+このリポジトリにある語彙、部品、境界、失敗の扱い方を使って考える。既存の仕組みで
+目的を満たせるなら、そこへ接続する。既存の設計そのものが問題なら、別の流派を横に
+作らず、問題の根にある判断を必要な範囲で直す。新しい抽象化には、いま存在する複数の
+要求をまとめる役割が必要である。
 
-## リポジトリ構造
+変更範囲は、問題の原因から導く。短い差分だけを目指して症状を残すことも、ついでの
+整理で周囲を巻き込むことも避ける。将来のための拡張点、根拠のない例外処理、責務の
+曖昧な共通化を加える前に、現在の要求を明確な名前と素直な流れで表せるかを考える。
+防御的な処理は、実在する境界と失敗に対応させる。
 
-```
-root-lens/
-├── web/                Next.js 16 App Router (= rootlens.io、 Vercel link 済)。 LP + REST API
-├── app/                React Native (= Expo)。 撮影端末アプリ
-│
-├── tools/              web / app 以外の周辺 dev / ops ツール
-│   ├── modal/          納品パイプライン (1 ディレクトリ = 1 パイプライン。 各 README に入出力と実行)
-│   │   ├── fpvlabs/        raw arkit → 顔ぼかし + MCAP (FPV Labs 手渡し。 現運用の中心)
-│   │   └── sample-drive/   raw + MCAP → 共有ドライブの公開サンプル一式 (ぼかし済み rgb + mcap + manifest)
-│   ├── lp-sample/       ドライブ公開サンプルの 1 本 → LP /sample ビューア用 6 素材 (rootlens-public に配信キャッシュ)
-│   ├── sample-select/   サンプル選定用の統計 + サムネ (納品物なし。 Modal 実行)
-│   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
-│   └── asset-gen/       LP イラスト / SFX / 撮影トグルマーカー生成
-│
-└── document/
-    ├── legal/          法務正本 (ja 正 + en ミラー。 gen-legal.mjs のビルド入力)
-    └── v0.1.4/         tasks/ (タスクログ)
-        └── fpvlabs-handoff/ 運用手順 (RUNBOOK) + 未処理クリップ一覧 + FPV 向け README
-```
+会話の途中でも、目的、採用した方針、その理由、未解決点を保持する。新しい指摘は、
+どの判断を変えるのかを見極めて反映する。指摘された一文や一行だけを取り繕わず、同じ
+判断から生まれた問題が影響範囲に残っていないかを見る。その確認を、無関係な作り直し
+へ広げない。
 
-参考リポ: `../rootlens-mobile/` (= v0.0.x Android + Solana Seeker hackathon 系、
-別系統で並行開発、 意図的に分離維持)
+検証では、自分が書いた構造ではなく、利用者や接続先に対する約束を見る。モックの
+応答や内部の呼び出しだけを確かめても、実際の判断経路を通っていなければ根拠には
+ならない。変更が壊し得る挙動を特定し、その挙動を観測できる方法で確かめる。外部の
+コードや知識を使う場合は、現在の前提、既知の問題、出所、ライセンスまで確認する。
 
-## データフロー (v0.1.4 現行)
+文章にも同じ規律を適用する。読者の理解や判断を変えない文は足さない。本文より先に
+置く自己説明、先回りの免責、処理を言い換えただけのコメント、整って見せるための
+見出しは、書き手がまだ本筋を絞れていない兆候として疑う。添削では、原文の順序と声を
+保ち、読み手が実際につまずく箇所だけを直す。
 
-```
-[撮影端末: app/]
-  録画完了 → Webが unit_id を発行 → 全rawファイルのSHA-256と
-  source_manifest_sha256を確定 → R2 rootlens-raw-arkitへ検証付きPUT
-  → POST /api/clips で登録 (= state='uploaded')
+レビューする人に、変更の意図を最初から推測させない。なぜこの変更が必要で、なぜこの
+形で、どの挙動を確かめたかを差分と報告から追えるようにする。説明を増やして補う前に、
+実装や文章そのものを明確にする。次の判断に影響する未解決点は隠さず、それ以外の予防線
+は残さない。
 
-[サーバ: web/]
-  REST API のみ (自動後段処理なし)。 /api/v1/unitsでunit_idを予約し、
-  /api/v1/raw-uploadsで完全性情報を含むpresigned URLを発行、/api/clipsでR2実体を照合して登録。
-
-[運用: tools/modal/fpvlabs/]
-  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id>` 実行。
-  source manifestを検証してEgoBlurで顔ぼかし → Stera互換MCAPとdelivery manifestをput。
-
-[FPV Labs]
-  rclone で rootlens-fpvlabs から MCAP を pull。 詳細は document/v0.1.4/fpvlabs-handoff/。
-```
-
-## 動作確認 (production)
-
-- web: `https://rootlens.io` (= Vercel auto deploy on main push)
-- API: `https://rootlens.io/api/clips` 系
-- Modal: workspace `yudai-mori-2004`、 fpvlabs 用 image + volume `rootlens-egoblur` (= EgoBlur jit)
-- DB: Supabase (= web/drizzle/ + web/scripts/apply_one_migration.mjs)。 SQL 直流し方式で、
-  drizzle-kit の snapshot は使わない。
-- R2 buckets:
-  - `rootlens-raw-arkit` (arkit 端末の raw)
-  - `rootlens-raw` (旧 ultra_wide 用、 参考残置)
-  - `rootlens-fpvlabs` (FPV Labs 受け渡し用 MCAP)
-  - `rootlens-public` (LP 用 / 検証テスト用のスクラッチ)
-
-## Development methodology
-
-### 原則: 実装が正 + タスク駆動
-
-データ仕様の正は実装と `app/README.md`。 コンポーネント間の契約 (ファイルマニフェスト /
-API 型 / スキーマ) は型と fail-loud チェックで強制し、 別文書に二重管理しない。
-タスクは `document/v0.1.4/tasks/NN-name/` に分割、 各 README に「目的 / 読むべきファイル / スコープ
-(= やること / やらないこと) / 成功基準 / 進捗」 を持つ。
-
-### 1 タスク = 1 セッションを基本
-
-コンテキストオーバーフローを防ぐ。 大きい task は worktree なしで進める (= user 方針)。
-
-### Commit 規約
-
-- メッセージは英語
-- 1 つの設計判断 = 1 commit (= bisect 可能性を保つ)
-- 大規模 mv は `git mv` で history を保つ
-
-## Coding conventions
-
-- コメントは今のコードの説明だけを書く (= バージョン・task 番号・日付・変更履歴を書かない)
-- 公開向け文章 (= LP / dataset card) には内部設計プロセスを混ぜない
-- 完了バージョンの仕様書 (= `document/v0.1.0..v0.1.3/`) は誤り修正以外で変更しない
-
-## Key design decisions
-
-### 識別子と完全性を分離する
-
-撮影単位は`unit_<匿名site_id>_<録画開始UTC>_<乱数>`形式の`unit_id`で識別し、R2 rawキーと
-DB主キーに使う。ファイルの内容は各rawファイルのSHA-256と`source_manifest_sha256`で検証する。
-加工後の配布物は別の`delivery_manifest_sha256`で検証し、撮影単位の名前にファイルハッシュを使わない。
-
-### 顔ぼかしは EgoBlur (GPU L4、 Stera-10M と同じ)
-
-`tools/modal/fpvlabs/fpvlabs.py`。 mediapipe は緊急時 fallback。 閾値は 0.8 (stera-sdk 既定)、
-resize は 480 でコスト目標 1 時間あたり ~¥120。 実測で本物の顔は 0.97+、 誤爆は 0.3 以下で
-ケタで分離する。 詳細は `document/v0.1.4/fpvlabs-handoff/RUNBOOK.md`。
-
-### 検証用の --target-bucket
-
-fpvlabs.py に `--target-bucket <name>` オプションを持たせて、 本番 `rootlens-fpvlabs` を書き換えずに
-挙動確認できる。 検証は必ずこの経路を使う (= 過去に production を触って FPV へ渡した内容を壊した
-事故がある)。
+完了は、生成した量や検査の通過で決めない。目的としていた状態が実現し、既存の約束が
+保たれ、人が内容を理解して次の変更を続けられることを確かめて決める。

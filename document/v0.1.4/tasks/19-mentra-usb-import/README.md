@@ -10,14 +10,14 @@ Mentra Liveの撮影データをUSB-CでPCへ取り込み、クリップフォ�
 
 ## 読むべきファイル
 
-- `mentra-os/README.md`（撮影とPC取り込みの現行手順）
-- `mentra-os/scripts/import-recordings.py`（USB経由のコピーと整合性検証）
-- `mentra-os/Import Recordings.command`（Macのダブルクリック入口）
-- `mentra-os/app/src/main/java/io/rootlens/mentra/SessionArtifacts.java`（撮影データの確定と4ファイル契約）
-- `mentra-os/app/src/main/java/io/rootlens/mentra/CaptureService.java`（撮影操作とサービスの終了）
-- `mentra-os/app/src/main/java/io/rootlens/mentra/CaptureStorageBudget.java`（開始時と確定時の容量予約）
-- `mentra-os/app/src/main/java/io/rootlens/mentra/FixedRecordStore.java`、`TimestampIndex.java`（端末内ファイルによる索引）
-- `mentra-os/asg-fork/README.md`（アクションボタンと案内音声）
+- `glasses/README.md`（撮影とPC取り込みの現行手順）
+- `desktop/scripts/import-recordings.py`（USB経由のコピーと整合性検証）
+- `glasses/Import Recordings.command`（Macのダブルクリック入口）
+- `glasses/app/src/main/java/io/rootlens/mentra/SessionArtifacts.java`（撮影データの確定と4ファイル契約）
+- `glasses/app/src/main/java/io/rootlens/mentra/CaptureService.java`（撮影操作とサービスの終了）
+- `glasses/app/src/main/java/io/rootlens/mentra/CaptureStorageBudget.java`（開始時と確定時の容量予約）
+- `glasses/app/src/main/java/io/rootlens/mentra/FixedRecordStore.java`、`TimestampIndex.java`（端末内ファイルによる索引）
+- `glasses/asg-fork/README.md`（アクションボタンと案内音声）
 
 ## スコープ
 
@@ -60,7 +60,7 @@ Mentra Liveの撮影データをUSB-CでPCへ取り込み、クリップフォ�
 ## 進捗
 
 - RootLens APK、ASG fork、PC取り込みツール、現行手順書を実装した。
-- `python3 mentra-os/scripts/test_import_recordings.py`の24件が成功。不完全データ・切断・照合失敗を
+- `python3 desktop/scripts/test_import_recordings.py`の24件が成功。不完全データ・切断・照合失敗を
   公開先へ出さないこと、既存データを上書きしないこと、USB接続の固定、パッケージ選択、
   シンボリックリンクの拒否、重複取り込み、同時実行防止を確認した。
 - 実機のUSB接続を確認し、新版RootLens APKの導入後に開始・停止競合、重複command、camera解放を確認した。

@@ -14,7 +14,7 @@ export function rawSessionPrefix(unitId: string): string {
   return `raw/${unitId}/`;
 }
 
-/// 撮影構成 ID (= app/src/dataflow/recording-configs/ と 1:1)。
+/// 撮影方式 ID (= mobile/src/capture/ と 1:1)。
 export type RecordingConfigId = "ultra_wide" | "arkit" | "iphone";
 
 /// 撮影構成が出力するファイル名。 構成が増えたら固有ファイルを足す。

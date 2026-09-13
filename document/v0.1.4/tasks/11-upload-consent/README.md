@@ -38,7 +38,7 @@
 
 ## 実装メモ
 
-- app/src/services/consent.ts が記録の一元実装 (= @noble/hashes で summary hash)。
+- mobile/src/services/consent.ts が記録の一元実装 (= @noble/hashes で summary hash)。
 - LegalDocModal に supportedOrientations 追加 (= 横持ちアプリでの全文表示)。
 - 旧 tos_consents テーブルは旧仕様の残骸 (= 未使用)。 仕様書練り直し時に整理。
 - 撤回 (event_type='withdrawal') は endpoint / スキーマは対応済み、 UI は未実装 (= 将来)。

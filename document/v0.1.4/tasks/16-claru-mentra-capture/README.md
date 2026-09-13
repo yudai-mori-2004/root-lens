@@ -2,7 +2,7 @@
 
 現行のデータ受け渡しは[Task 19](../19-mentra-usb-import/README.md)のUSB-C経由のPC取り込みと
 Google Driveへの手動アップロードを使う。撮影・取り込み手順の正は
-[mentra-os/README.md](../../../../mentra-os/README.md)。以下はTask 16実施時の記録として保持する。
+[glasses/README.md](../../../../glasses/README.md)。以下はTask 16実施時の記録として保持する。
 
 ## 目的
 
@@ -14,17 +14,17 @@ timestamp対応を監査可能な形で保存・アップロードする。Claru
 
 - `devices/mentra-live.txt`（Claru向けデバイス別要件回答）
 - `CLOCK_AUDIT.md`（構成識別子と検証手法を含む内部技術監査）
-- `mentra-os/README.md`
-- `mentra-os/app/src/main/java/io/rootlens/mentra/SessionArtifacts.java`
-- `mentra-os/app/src/main/java/io/rootlens/mentra/DeviceProbe.java`
+- `glasses/README.md`
+- `glasses/app/src/main/java/io/rootlens/mentra/SessionArtifacts.java`
+- `glasses/app/src/main/java/io/rootlens/mentra/DeviceProbe.java`
 - `web/lib/r2-keys.ts`
-- `app/README.md`
+- `mobile/README.md`
 
 ## スコープ
 
 ### やること
 
-- iOS `app/`と並列なnative Android capture appを`mentra-os/`に作る
+- iOS `mobile/`と並列なnative Android capture appを`glasses/`に作る
 - 1920x1080、30fps、H.264 8-bit SDRを固定して録画する
 - accelerometer/gyroscopeをraw timestamp付きで保存する
 - MP4の全video sampleにper-frameのcamera↔IMU対応を出す

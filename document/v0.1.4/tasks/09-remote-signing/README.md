@@ -47,7 +47,7 @@ RootLens サーバの組織鍵で署名する。 Photoshop の Content Credentia
   staticlib 単体指定で 18MB)。
 - Swift: `signD1(inputMp4, outputMp4, signServiceUrl, accountPubkey)` (4 引数に変更)。
 - JS: dataflow/steps/sign.ts が `${SERVER_URL}/api/v1/c2pa-sign` + アカウント公開鍵を渡す。
-- web: `app/api/v1/c2pa-sign/route.ts` (GET=証明書 / POST=署名)。 サイズ上限 256KB
+- web: `mobile/api/v1/c2pa-sign/route.ts` (GET=証明書 / POST=署名)。 サイズ上限 256KB
   (= 動画を送りつけても署名しない)。 認可は X-Account-Pubkey (= 他 API と同じ MVP 水準)。
 
 ### セキュリティの現在地と宿題

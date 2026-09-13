@@ -1,0 +1,146 @@
+# FPV 受け渡し 運用手順（廃止済み）
+
+この手順が参照するModal納品処理は削除済みであり、現在の運用には使用しない。以下は当時の記録として保持する。
+
+撮影端末が raw を `rootlens-raw-arkit` に上げる → この手順で Modal で Stera 互換 MCAP に変換
+→ `rootlens-fpvlabs/<unit_id>/{session.mcap,delivery-manifest.json}` に出力 → FPV が rclone で取得。
+
+当面は自動化せず手動でよい。新しいセッションが上がったら、その都度これを回すだけ。
+コマンドは全部リポジトリ直下 (`root-lens/`) で実行する。
+
+## 事前に一度だけ
+
+- `modal` CLI にログイン済みであること (R2 認証は Modal の secret `r2-creds` 側にあるので、ローカルには不要)。
+- **EgoBlur モデル (jit) を Modal Volume に置く** (=顔検出器 EgoBlur が動く前提):
+  ```
+  modal volume create rootlens-egoblur
+  modal volume put rootlens-egoblur references/egoblur/ego_blur_face_gen2.jit /
+  ```
+  `references/egoblur/ego_blur_face_gen2.jit` は Meta EgoBlur gen2 の顔検出モデル (400MB)。
+  gen2 のソースコードは Modal image ビルド時に GitHub から clone するので不要。
+- **DB シークレットを Modal に置く** (= manifest のドメイン解決で `clips` テーブルを引く):
+  ```
+  set -a; source web/.env.local; set +a
+  modal secret create supabase-db DATABASE_URL="$DATABASE_URL"
+  ```
+- FPV への配布経路をひらく:
+  1. Cloudflare ダッシュボード → R2 → Manage R2 API Tokens → Create API Token。
+     Permissions = **Object Read only**、対象バケット = **rootlens-fpvlabs のみ**。
+  2. 発行された Access Key ID / Secret を FPV に DM。
+  3. `document/v0.1.4/fpvlabs-handoff/README-for-fpv.md` を渡す。
+  以後は新セッションを足すだけで、FPV 側は `rclone copy` の再実行で追従する。
+
+## 毎回 (新しいセッションが上がったら)
+
+1. 未処理を一覧する:
+   ```
+   python document/v0.1.4/fpvlabs-handoff/list_pending.py
+   ```
+   `rootlens-raw-arkit` にあって `rootlens-fpvlabs` に納品manifestがない unit_id が「未処理」。
+   raw サイズで **本命候補**（>= 0.3GB。そのまま貼れる処理コマンド付き）と
+   **小さい (中断/テスト録画の可能性、通常スキップ)** に分けて出る。本命候補だけ処理すればよい。
+   各候補には `[depth あり/なし]` が付く。FPV は深度が要るので、`⚠ depth なし`
+   (= 非LiDAR端末で撮影) のクリップは通常渡さない。
+
+2. 各 unit_id を処理する (顔ぼかしオン、EgoBlur GPU がデフォルト):
+   ```
+   modal run tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id>
+   ```
+   出力 JSON を確認:
+   - `blur: true` / `faceDetector: "egoblur"` / `detectionsTotal: N` (検出した顔 bbox の合計数)
+   - `stats.rgb == stats.depth == stats.pose` なら切り詰めなし
+   - `outputKey: rootlens-fpvlabs/<unit_id>/session.mcap`
+
+   これで出力完了。FPV 側は次の `rclone copy` で自動的に拾う。
+
+   コスト目安 (L4 実測): 30 分 @30fps ≈ $1.2-1.5/本、 30 分 @15fps ≈ $0.6-0.8/本。
+   ⚠ まとめて処理するときは 3〜4 本ずつ投入し、 完了を確認してから次を出す。
+   Modal は利用上限に達すると走行中のタスクを即殺する (= 消費した GPU 時間は課金されて
+   成果物はゼロになる) ので、 一斉投入はゲート到達時の全損額を最大化する。
+   バッチ前に modal.com の Usage 残量と概算コストを見比べること。
+
+   ⚠ ローカル発の `modal run` は Mac のスリープでも死ぬ (CLI 切断 → Modal 側が function を
+   停止して `ConflictError: function ... is stopped`)。 夜間・長時間バッチは
+   `caffeinate -i modal run ...` で包むか `modal run --detach` を使う。 この失敗は
+   アップロード前に起きるので、 R2 の既存オブジェクトは壊れない (再実行すればよい)。
+
+## manifest.jsonl (自動)
+
+処理のたびに、バケット直下の `manifest.jsonl` (全セッションの属性表: domain / site /
+尺 / fps / 解像度 / 端末…) が **DB + R2 の実状態からまるごと再生成**される。属性を
+どこにもメモしない派生物なので、並列実行でも収束し、セッションフォルダは
+`<unit_id>/` にMCAPとdelivery manifestのまま汚れない。FPV 側は普段の `rclone copy` で一緒に受け取る。
+フィールドの意味は `README-for-fpv.md` の表が正。
+
+- domain / site の正は DB の `accounts` テーブル (匿名の現場コードのみ。店名は置かない)。
+  新しい現場のアカウントを `scripts/create_account.mjs` で発行したら 1 行入れる:
+  ```sql
+  INSERT INTO accounts (id, domain, site) VALUES ('<auth uuid>', '<domain>', '<domain>-01');
+  ```
+  `accounts` に行が無いアカウント (テスト端末など) のクリップは GPU が回る前に
+  fail-loud で止まる。
+- 本番バケットへの `--no-blur` は実行拒否される (= manifest の `blurred: true` を保証)。
+- パイプラインを回さずに再生成したいとき (セッションを消した直後など):
+  ```
+  python document/v0.1.4/fpvlabs-handoff/gen_manifest.py
+  ```
+
+## ぼかしマーカー (店側の撮影禁止ゾーン)
+
+店側が「映したくない場所」 に貼る ArUco ステッカー。 fpvlabs.py が全フレームを走査して検出し、
+マーカー周囲の実寸ゾーン (id → 寸法の対応は `NG_MARKER_ZONES`) を納品前に自動でぼかす。
+ゾーンを塗るのは実際に目撃したフレームだけ (= カメラが動くため、 目撃時点のジオメトリを
+時間方向に延長しても正しい画面位置にならない)。 同一 id の目撃が 3 秒以内にもう 1 回も
+無い単発の目撃はノイズとして捨てる (= 環境中の模様が偶発的にカタログ id へ復号されるのは
+孤立フレームだけで、 貼られたステッカーは連続フレームで目撃されるため)。 マーカーが
+1 つも映っていないセッションでは挙動は従来と同一。
+
+- シート: `document/business/templates/data-cooperation/ng-markers.pdf`
+  (紙面は同名 .html、 マーカー画像は `tools/asset-gen/gen-ng-markers.py`、 PDF 化は
+  `document/business/build.sh data-cooperation`)。 **必ず原寸 (等倍) で印刷する**。 黒枠 70mm が
+  ゾーンの cm → px 換算の基準なので、 拡大縮小するとぼかし範囲がずれる。 厨房ではラミネート推奨。
+- 限界: ステンレス等の鏡面反射に映り込んだ内容までは守れない。 万一の露出は提供前の
+  確認・削除 (合意書 第 10 条) が受け皿。 店主に「絶対」 とは言わない。
+
+## オプション
+
+- 顔ぼかしを外す: `--no-blur` を付ける (raw の生映像そのまま)。
+- 検出器切替: `--face-detector mediapipe` (EgoBlur が使えないときの CPU fallback)。
+- EgoBlur 検出閾値: `tools/modal/fpvlabs/fpvlabs.py` の `EGOBLUR_SCORE_THRESHOLD` (既定 0.5)。
+  実測で本物の顔は 0.95+、誤爆は 0.3 以下なので、0.5 で綺麗に分離できる。
+- コスト削減: `EGOBLUR_RESIZE` を下げる (480 → 320 で更に高速化、 ただし小さい遠景の顔は取りこぼす)。
+- 超長尺 (60 分超) で timeout する場合: `@app.function(timeout=7200)` を上げる。
+- 冪等: 同じ unit_id を再実行すると同じキーに上書き。設定を変えて何度でもやり直せる。
+
+## 検証・チューニング (本番バケットに触らない)
+
+閾値やリサイズを調整して挙動を見るときは、 `--target-bucket <自分のテスト用バケット>` を付けて
+本番 `rootlens-fpvlabs` 以外に書き出す。 出力キー形式 (`<unit_id>/{session.mcap,delivery-manifest.json}`) と処理内容は
+本番と完全に同一。 テスト用バケットは自分で R2 に作成しておく (例: `rootlens-fpvlabs-scratch`)。
+
+```
+modal run tools/modal/fpvlabs/fpvlabs.py --unit-id <unit_id> --target-bucket rootlens-public
+```
+
+結果を rclone や boto3 で落として目視 → 良ければ `--target-bucket` を外して本番に反映。
+
+ローカルからの R2 アクセスは 2 系統あるので注意:
+
+- rclone remote `rootlens:` は **rootlens-fpvlabs 専用トークン** (FPV に渡しているものと同じ
+  スコープ)。 rootlens-public / rootlens-raw-arkit は 403 になる。
+- raw や public を読み書きするときは `web/.env.local` の `R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` / `R2_ACCOUNT_ID` を使う (設定ファイルを汚さない ephemeral 方式):
+  ```
+  set -a; source web/.env.local; set +a
+  export RCLONE_S3_PROVIDER=Cloudflare RCLONE_S3_REGION=auto \
+         RCLONE_S3_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+         RCLONE_S3_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" RCLONE_S3_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+  rclone lsf ":s3:rootlens-raw-arkit/raw/<unit_id>/"
+  ```
+- rootlens-public は公開バケットなので、 読むだけなら
+  `https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/<key>` で無認証ダウンロードできる。
+
+## 確認・トラブル時
+
+- 処理来歴は MCAP の `/rootlens/processing_info` に入る (ぼかし有無・閾値・pipeline 版)。
+- 中身の検証は stera-sdk: `MCAPReader(path, check_format=True)`。

@@ -13,7 +13,7 @@ Root cause of the audit: v0.1.3 was built around C2PA + Title Protocol + Solana 
 
 1. **The Solana/NFT/staking crates (`programs/`, `crates/`, `tests/license-nft/`, `tests/staking/`, `Anchor.toml`, `Cargo.toml`, `network.json`)** are still committed and intentionally kept "for v0.1.5 mint re-wiring" per task 07 §6, but the user's 2026-07-09 instruction ("TP and NFT are not used anymore") kills that plan. All of it can go.
 2. **The public-website verify pipeline (`web/lib/verify/`, `web/lib/data.ts`, `web/lib/types.ts`, `web/lib/supabase.ts`, `web/lib/server/page-store.ts`, `web/lib/server/r2.ts`, `web/app/[addressOrUsername]/page.tsx`, `web/app/p/[shortId]/page.tsx`, `web/app/why-blockchain/page.tsx`, `web/app/legal-basis/page.tsx`, `web/app/delete-account/page.tsx`, `web/app/api/v1/delete-account/route.ts`, `web/components/ContentPage.tsx`, `web/components/CreatorPage.tsx`, `web/components/lp/*`)** were built for content-authenticity-page TP verification and reference the DAS API + Supabase `users/pages/contents/cnft_assets` tables. This is a large chunk that also drags in `@title-protocol/sdk`, `@solana/web3.js`, `@aws-sdk/client-kms`, `bs58`, `canonicalize`, `cbor-x`, `mp4box`, `@peculiar/x509`, `sharp` from the deps.
-3. **Since the user also declared "C2PA is no longer a selling point", the C2PA D1 remote-signing subsystem (added in v0.1.4 task 09) is also dead:** `web/app/api/v1/c2pa-sign/`, `web/lib/c2pa-certs.ts`, `native/c2pa-bridge/`, `app/src/dataflow/steps/sign.ts`, `app/src/native/c2paBridge.ts`, `app/modules/c2pa-bridge/`, `app/dev-certs/`, plus the `signature_hash` primary key everywhere.
+3. **Since the user also declared "C2PA is no longer a selling point", the C2PA D1 remote-signing subsystem (added in v0.1.4 task 09) is also dead:** `web/app/api/v1/c2pa-sign/`, `web/lib/c2pa-certs.ts`, `native/c2pa-bridge/`, `mobile/src/dataflow/steps/sign.ts`, `mobile/src/native/c2paBridge.ts`, `mobile/modules/c2pa-bridge/`, `mobile/dev-certs/`, plus the `signature_hash` primary key everywhere.
 4. **`tools/mock-device/` (Rust) is written for the v0.1.3 flow with TP `/process` + `/extension/solana` + `POST /api/clips` (with `rootAssetId`, `signedJsonUri`). It's incompatible with the current server contract and unusable now.**
 
 Rough delete numbers: **~130 files delete outright**, **~40 files edited in place**, **1 forward-only DB migration** (drop `wallet_pubkey`→`account_pubkey` rename + `network` column + `tos_consents` table, replace `signature_hash` with `sha256_content_hash`). Risk is **medium**: the deletes are cleanly scoped by subsystem, but the identity migration (`signature_hash` → sha256-of-file) touches every R2 key path and requires coordinated app + web + Modal rollout.
@@ -29,10 +29,10 @@ Rationale: user declared C2PA is not a selling point. Server-side remote signing
 - `native/c2pa-bridge/` — entire crate. `pipeline1.rs` builds JUMBF + D1 manifest, `lib.rs` has the CallbackSigner FFI, examples/`remote_sign_smoke.rs` calls `pipeline1_sign_d1_remote`. All dead once D1 is dropped.
 - `native/c2pa-bridge/fixtures/chain.pem`, `native/c2pa-bridge/fixtures/ee.key` — Title Protocol test Ed25519 chain.
 - `native/c2pa-bridge/c2pa_bridge.h` — C header.
-- `app/modules/c2pa-bridge/` — Expo Module wrapper (iOS Swift + Rust `.a` libs). `libc2pa_rs.a`, `libc2pa_rs_device.a`, `libc2pa_rs_sim.a` are ~18MB each.
-- `app/android/app/src/main/java/io/rootlens/app/C2paBridgeModule.kt`, `app/android/app/src/main/jni/c2pa_jni.c`, `app/android/app/src/main/jniLibs/*/libc2pa_bridge.so`, `app/android/app/src/main/jniLibs/*/libc2pa_jni.so` — Android JNI wrappers.
-- `app/src/native/c2paBridge.ts` — JS FFI wrapper (`signContent`, `signD1`, `signD2`, `computeSignatureHash`).
-- `app/src/dataflow/steps/sign.ts` — D1 remote-signing step; drop the whole step, upload the raw MP4 as-is.
+- `mobile/modules/c2pa-bridge/` — Expo Module wrapper (iOS Swift + Rust `.a` libs). `libc2pa_rs.a`, `libc2pa_rs_device.a`, `libc2pa_rs_sim.a` are ~18MB each.
+- `mobile/android/app/src/main/java/io/rootlens/app/C2paBridgeModule.kt`, `mobile/android/app/src/main/jni/c2pa_jni.c`, `mobile/android/app/src/main/jniLibs/*/libc2pa_bridge.so`, `mobile/android/app/src/main/jniLibs/*/libc2pa_jni.so` — Android JNI wrappers.
+- `mobile/src/native/c2paBridge.ts` — JS FFI wrapper (`signContent`, `signD1`, `signD2`, `computeSignatureHash`).
+- `mobile/src/dataflow/steps/sign.ts` — D1 remote-signing step; drop the whole step, upload the raw MP4 as-is.
 - `web/app/api/v1/c2pa-sign/route.ts` — remote signing oracle.
 - `web/lib/c2pa-certs.ts` — public cert chain PEM.
 - `native/c2pa-bridge/target/` — build artifact, already gitignored but check.
@@ -86,7 +86,7 @@ The public site was built for TP-verified content pages. Kill anything that pres
 ### Root-level cruft
 
 - `rootlens-sample-5h-2026-06-20.zip` — **28 GB**, not a text file; gitignored (`rootlens-sample-*.zip`), so already off git. The file on disk is a local scratch item — user should manually delete.
-- All `.DS_Store` files — 12 tracked, should be gitignored-and-purged: `./`, `tools/`, `progress/`, `web/`, `document/`, `sample/`, `progress/app/`, `progress/promo-video/`, `progress/public/`, `app/ios/`, `web/public/lp/sample/`.
+- All `.DS_Store` files — 12 tracked, should be gitignored-and-purged: `./`, `tools/`, `progress/`, `web/`, `document/`, `sample/`, `progress/app/`, `progress/promo-video/`, `progress/public/`, `mobile/ios/`, `web/public/lp/sample/`.
 - `tools/macos-blur/.build/` — Swift build artifacts (not gitignored, but likely local dirt). Verify against `.gitignore`: `.gitignore` has `tools/macos-blur/.build/` so this is a working-tree residual.
 
 ### Modal Pipeline 2/3 (task 12 § 4 で再編する)
@@ -223,7 +223,7 @@ Total 215+ dead keys per language. Sections to delete outright:
 
 - `.gitignore:41` — `native/c2pa-bridge/target/` can go with the crate.
 - `.gitignore:60-79` — the whole `# Solana / Anchor` block including `network.json`, `target/`, `test-ledger/`, program keypair paths, License Collection keypair paths, `tests/license-nft/fixtures*.json`, `references/` (partially).
-- `.gitignore:83` — `app/modules/hand-pose/android/build/` fine to keep.
+- `.gitignore:83` — `mobile/modules/hand-pose/android/build/` fine to keep.
 
 ### `web/.env.example`
 
@@ -238,24 +238,24 @@ Total 215+ dead keys per language. Sections to delete outright:
 
 Because the app has already been through v0.1.4 (task 03), the dataflow is 3-step (unsigned → signed → registered). We now compress to 2 stages: `recorded → uploaded`. Skipping D1 means:
 
-- `app/src/dataflow/pipeline.ts:16-56` — `advanceClip` currently branches on `stage in ('unsigned','signed','registered')`. Simplify: `unsigned → upload+register → registered`. Drop `signRecording`, `signedUriIn`, `effectiveStage` inspection for the `signed` intermediate.
-- `app/src/dataflow/pipeline.ts:189-286` — `advanceClip` body.
-- `app/src/dataflow/types.ts:16-25` — `Pipeline1Stage = 'unsigned' | 'registered'` (no 'signed' middle).
-- `app/src/dataflow/types.ts:69-80` — `SignInput`/`SignResult` types delete outright.
-- `app/src/dataflow/steps/index.ts` — drop the sign re-exports.
-- `app/src/dataflow/steps/upload.ts` — the primary video file is now the raw mp4 (no D1), not `signedUriIn(workDir)`. Adjust caller.
-- `app/src/dataflow/steps/register.ts` — rename body field `signatureHash` → `contentHash`.
-- `app/src/dataflow/steps/list.ts:26-35` — rename `ServerClipStatus.signatureHash` → `contentHash`.
-- `app/src/dataflow/store.ts:111-121` — `renameClipId(localId, signatureHash)` becomes `renameClipId(localId, contentHash)`.
-- `app/src/dataflow/index.ts` — drop `signClip`, `signRecording`, `makeSignTmpDir`, `signedUriIn` from exports.
-- `app/src/env.ts:33-37` — `SIGN_SERVICE_URL` env drops.
-- `app/App.tsx:23` — no code change here, but `RootNavigator` shouldn't need updates.
-- `app/package.json:28-70` — drop `@title-protocol/sdk` (unused in app source), `viem` (unused in app source per grep), `bs58` (only used by DebugAuthProvider — see next), `expo-speech`, `expo-camera` review, `expo-av` review. Keep: `@noble/curves`, `@noble/hashes`, `expo-secure-store`, others active.
-  - **Load-bearing**: `bs58` is still used by `app/src/services/auth/DebugAuthProvider.ts:15`. Keep unless auth is also rewritten. Rename doesn't reduce dependency; just check it's used exactly there.
+- `mobile/src/dataflow/pipeline.ts:16-56` — `advanceClip` currently branches on `stage in ('unsigned','signed','registered')`. Simplify: `unsigned → upload+register → registered`. Drop `signRecording`, `signedUriIn`, `effectiveStage` inspection for the `signed` intermediate.
+- `mobile/src/dataflow/pipeline.ts:189-286` — `advanceClip` body.
+- `mobile/src/dataflow/types.ts:16-25` — `Pipeline1Stage = 'unsigned' | 'registered'` (no 'signed' middle).
+- `mobile/src/dataflow/types.ts:69-80` — `SignInput`/`SignResult` types delete outright.
+- `mobile/src/dataflow/steps/index.ts` — drop the sign re-exports.
+- `mobile/src/dataflow/steps/upload.ts` — the primary video file is now the raw mp4 (no D1), not `signedUriIn(workDir)`. Adjust caller.
+- `mobile/src/dataflow/steps/register.ts` — rename body field `signatureHash` → `contentHash`.
+- `mobile/src/dataflow/steps/list.ts:26-35` — rename `ServerClipStatus.signatureHash` → `contentHash`.
+- `mobile/src/dataflow/store.ts:111-121` — `renameClipId(localId, signatureHash)` becomes `renameClipId(localId, contentHash)`.
+- `mobile/src/dataflow/index.ts` — drop `signClip`, `signRecording`, `makeSignTmpDir`, `signedUriIn` from exports.
+- `mobile/src/env.ts:33-37` — `SIGN_SERVICE_URL` env drops.
+- `mobile/App.tsx:23` — no code change here, but `RootNavigator` shouldn't need updates.
+- `mobile/package.json:28-70` — drop `@title-protocol/sdk` (unused in app source), `viem` (unused in app source per grep), `bs58` (only used by DebugAuthProvider — see next), `expo-speech`, `expo-camera` review, `expo-av` review. Keep: `@noble/curves`, `@noble/hashes`, `expo-secure-store`, others active.
+  - **Load-bearing**: `bs58` is still used by `mobile/src/services/auth/DebugAuthProvider.ts:15`. Keep unless auth is also rewritten. Rename doesn't reduce dependency; just check it's used exactly there.
 
 ### App files that go with the D1 delete
 
-- Rename `app/modules/c2pa-bridge/expo-module.config.json` — delete along with the module.
+- Rename `mobile/modules/c2pa-bridge/expo-module.config.json` — delete along with the module.
 
 ### Tools
 
@@ -341,9 +341,9 @@ App-side headers: The app currently sends `X-Account-Pubkey`; the server reads e
 ### C2PA D1 subsystem removal
 
 Callers (Layer 2 → Layer 1):
-- `app/src/dataflow/pipeline.ts:189-234` — `advanceClip` calls `signRecording` before upload. Replacement: compute `sha256(rawMp4)` on-device (already trivially available via `expo-crypto` or the existing `computeSignatureHash` renamed to `computeContentHash`).
-- `app/src/dataflow/steps/sign.ts:59-108` — the step itself.
-- `app/src/native/c2paBridge.ts` — `signD1`, `computeSignatureHash`. The `computeSignatureHash` JS wrapper (line 189-192) actually calls `C2paBridge.computeContentId(inputMp4)` — this native method reads JUMBF signature bytes and hashes them; it can't be reused for raw-mp4 hashing.
+- `mobile/src/dataflow/pipeline.ts:189-234` — `advanceClip` calls `signRecording` before upload. Replacement: compute `sha256(rawMp4)` on-device (already trivially available via `expo-crypto` or the existing `computeSignatureHash` renamed to `computeContentHash`).
+- `mobile/src/dataflow/steps/sign.ts:59-108` — the step itself.
+- `mobile/src/native/c2paBridge.ts` — `signD1`, `computeSignatureHash`. The `computeSignatureHash` JS wrapper (line 189-192) actually calls `C2paBridge.computeContentId(inputMp4)` — this native method reads JUMBF signature bytes and hashes them; it can't be reused for raw-mp4 hashing.
 
 **Replacement**: `sha256(file_bytes)` via `expo-crypto.digestStringAsync(SHA256, file_bytes)` — needs streaming for GB-scale mp4. Since `expo-file-system` doesn't stream well, may need to add a small native module. Or accept the cost by loading the whole file to memory (blocked at ~4GB uploads).
 
@@ -415,20 +415,20 @@ Since v0.1.4 doesn't process the old data (no scoring, no dataset), the orphans 
 8. **PR 8 — DB migration + code rename (breaking)**. This is the coordinated one:
    1. Write `0003_deblockchain_and_content_hash.sql`.
    2. In `web/db/schema.ts`, `web/lib/mapper.ts`, `web/lib/r2.ts`, `web/lib/r2-keys.ts`, `web/shared/api-types.ts`, `web/app/api/**/route.ts`: rename `signatureHash` → `contentHash`, `walletPubkey` → `accountPubkey`. Remove `network`.
-   3. In `app/src/**`: same renames.
+   3. In `mobile/src/**`: same renames.
    4. Apply migration to Supabase manually via `node web/scripts/apply_one_migration.mjs 0003_deblockchain_and_content_hash.sql`.
    5. Deploy web + roll app build. Coordinated deploy — 5-minute service window.
    6. Existing R2 raw uploads with the old `signature_hash` key stay orphaned (documented).
 
 9. **PR 9 — Delete C2PA D1 signing subsystem + privacy-blur**. Delete:
    - `native/c2pa-bridge/`
-   - `app/modules/c2pa-bridge/` (Expo module + its `.a` libs)
-   - `app/modules/privacy-blur/` + `app/src/units/privacy-blur/`
-   - `app/src/native/c2paBridge.ts`
-   - `app/src/dataflow/steps/sign.ts`
+   - `mobile/modules/c2pa-bridge/` (Expo module + its `.a` libs)
+   - `mobile/modules/privacy-blur/` + `mobile/src/units/privacy-blur/`
+   - `mobile/src/native/c2paBridge.ts`
+   - `mobile/src/dataflow/steps/sign.ts`
    - `web/app/api/v1/c2pa-sign/`, `web/lib/c2pa-certs.ts`
-   - Update `app/src/dataflow/pipeline.ts` to skip the sign step (upload raw mp4 directly).
-   - Update `app/src/dataflow/types.ts`, `store.ts`, `index.ts` accordingly.
+   - Update `mobile/src/dataflow/pipeline.ts` to skip the sign step (upload raw mp4 directly).
+   - Update `mobile/src/dataflow/types.ts`, `store.ts`, `index.ts` accordingly.
    - Add a new content-hash step (`sha256_of_file`).
    - Rebuild iOS + Android; ship new app build.
 
@@ -442,8 +442,8 @@ Each PR passes tsc, tests (what remains), and Vercel build.
 
 - **`signature_hash` field** is present in ~50 files across web + app + tools + document. It's the primary R2 key, DB PK component, ClipDto identity, and API contract. Any rename requires the coordinated migration in PR 8.
 - **`account_pubkey` header** is read by `web/lib/auth.ts` with dual fallback (`X-Wallet-Pubkey` legacy). Multiple API routes call `requireAccountPubkey`: `web/app/api/clips/route.ts`, `web/app/api/clips/[id]/route.ts`, `web/app/api/clips/[id]/media/route.ts`, `web/app/api/v1/consents/route.ts`, `web/app/api/v1/c2pa-sign/route.ts`. All chain to the same helper.
-- **`AuthSession.pubkey`** — `app/src/services/auth/AuthContext.tsx`, `app/src/dataflow/pipeline.ts`, `app/src/dataflow/steps/list.ts`, `app/src/dataflow/steps/sign.ts`, `app/src/dataflow/steps/register.ts` all read `session.pubkey`. Naming stays `pubkey` since it's still the Ed25519 pubkey; only the header name and DB column change.
-- **`bs58` in app/**: only used by `DebugAuthProvider.ts`. Removing bs58 requires switching debug key encoding — bigger refactor. Recommend keeping bs58.
+- **`AuthSession.pubkey`** — `mobile/src/services/auth/AuthContext.tsx`, `mobile/src/dataflow/pipeline.ts`, `mobile/src/dataflow/steps/list.ts`, `mobile/src/dataflow/steps/sign.ts`, `mobile/src/dataflow/steps/register.ts` all read `session.pubkey`. Naming stays `pubkey` since it's still the Ed25519 pubkey; only the header name and DB column change.
+- **`bs58` in mobile/**: only used by `DebugAuthProvider.ts`. Removing bs58 requires switching debug key encoding — bigger refactor. Recommend keeping bs58.
 - **v0.1.4 documented "future v0.1.5 mint" everywhere**: comments in `web/db/schema.ts:6-13`, `web/drizzle/0001_v0_1_4_simplify.sql:6-7`, `document/v0.1.4/tasks/*/README.md`. Rewrite these comments to say "removed in cleanup, not reintroducing".
 - **Content-hash key in R2**: `web/lib/r2.ts`, `web/lib/r2-keys.ts`, `tools/modal/fpvlabs.py:812-826`, `tools/fpvlabs-handoff/list_pending.py`, and the entire fpvlabs handoff spec key on this. Renaming `signature_hash` → `content_hash` affects fpvlabs too.
 
@@ -459,14 +459,14 @@ Each PR passes tsc, tests (what remains), and Vercel build.
 - **`tools/gen-dummy-sensors.py`**: **削除** (mock-device 一緒に消えるので単体では無意味)。
 - **`tools/asset-gen/generate-task-illustrations.mjs`**: 参照される asset パス (`assets/sandbox-04/tasks/*/`) が既に無い。 削除。
 - **`keys/`**: **物理削除しない** (user 判断)。 .gitignore 済で git には元々無い。 ローカルに残置。
-- **`app/src/units/privacy-blur/`**: **削除** (「オンデバイス blur はもうやらない」)。 `app/modules/privacy-blur/` も。
-- **`app/src/services/auth/DebugAuthProvider.ts` の `STORAGE_KEY = 'rootlens.debug_wallet.v1'`**: そのまま残す (既存端末の鍵を保持)。 内部の "wallet" 語彙は debug 用なので許容。
+- **`mobile/src/units/privacy-blur/`**: **削除** (「オンデバイス blur はもうやらない」)。 `mobile/modules/privacy-blur/` も。
+- **`mobile/src/services/auth/DebugAuthProvider.ts` の `STORAGE_KEY = 'rootlens.debug_wallet.v1'`**: そのまま残す (既存端末の鍵を保持)。 内部の "wallet" 語彙は debug 用なので許容。
 - **App-side `expo-speech`, `expo-camera`, `expo-av`, `expo-media-library`**: 全て active (task 07 で復活のため)。 keep。
 - **`tests/staking/03-api-license-issue.spec.ts`**: 参照先の `/api/v1/license/issue` が task 02 で削除済み。 tests/ ディレクトリごと削除で解消。
 - **`web/lib/server/__tests__/r2.live.test.ts` + `r2.test.ts`**: 削除 (r2.ts と一緒に)。
 - **`web/scripts/r2_inspect.mjs`**: keep (R2_BUCKET_RAW 向けの汎用 utility として)。
 - **`web/scripts/apply_one_migration.mjs` + `apply_migrations.mjs`**: keep (現役)。
-- **`app/scripts/gen-legal.mjs` vs `web/scripts/gen-legal.mjs`**: 両方 keep (別々の legalDocs.generated.ts を生成する現役)。
+- **`mobile/scripts/gen-legal.mjs` vs `web/scripts/gen-legal.mjs`**: 両方 keep (別々の legalDocs.generated.ts を生成する現役)。
 
 ---
 
@@ -511,11 +511,11 @@ Places in current code that cite frozen specs from v0.1.0-v0.1.2:
 - `@supabase/supabase-js` — used by `web/lib/supabase.ts` (deleted), `web/lib/server/page-store.ts` (deleted), and `web/app/api/v1/delete-account/route.ts` (rewritten off drizzle). Can drop.
 - `yaml` — grep to confirm if used.
 
-### `app/package.json` deps to remove:
-- `@title-protocol/sdk` — grep app/src for uses. Confirmed unused per §3 grep.
-- `viem` — grep app/src for uses. Confirmed unused per §3 grep.
+### `mobile/package.json` deps to remove:
+- `@title-protocol/sdk` — grep mobile/src for uses. Confirmed unused per §3 grep.
+- `viem` — grep mobile/src for uses. Confirmed unused per §3 grep.
 
-### `app/package.json` deps to review:
+### `mobile/package.json` deps to review:
 - `expo-speech`, `expo-av` — currently active (§7 task 07).
 - `@shopify/react-native-skia` — check.
 

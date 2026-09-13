@@ -1,97 +1,45 @@
 # RootLens
 
-Open-source capture infrastructure for turning real human work into multimodal
-training data for embodied AI and robotics.
-
-[RootLens](https://rootlens.io) records first-person work with head-mounted
-iPhones or smart glasses, preserves video and motion sensors on a shared
-timeline, and delivers consented sessions in buyer-ready formats. The current
-pilot focuses on commercial environments such as food preparation, packing,
-cleaning, assembly, and other hands-on work.
-
-## Capture methods
-
-RootLens currently supports three independent capture profiles:
-
-- **iPhone ARKit** — 1920x1440 RGB, ARKit camera pose, LiDAR depth and
-  confidence, Core Motion IMU, feature points, scene mesh, and optional hand
-  landmarks.
-- **iPhone RGB + IMU** — 1920x1080 ultra-wide RGB with mono audio and raw
-  accelerometer/gyroscope samples, without starting ARKit.
-- **Mentra Live** — a standalone Android capture stack for 1920x1080 RGB,
-  audio, and raw IMU on the glasses, including per-frame synchronization
-  evidence and device-side upload.
-
-Recordings are controlled hands-free using gestures, voice commands, physical
-iPhone buttons, or the glasses action button, depending on the device.
-
-## Data flow
-
-```text
-Capture device
-  -> SHA-256 identity over the raw MP4
-  -> consent and review
-  -> raw session upload to Cloudflare R2
-  -> REST registration through rootlens.io
-  -> face blur and delivery conversion on Modal
-  -> buyer handoff as Stera-compatible MCAP
-```
-
-The raw MP4 SHA-256 is the clip identity across device storage, the API,
-database rows, R2 keys, and delivery artifacts. Face blur is applied before
-external handoff. Production recordings and credentials are not stored in this
-repository.
+Capture infrastructure for turning real work into multimodal training data for embodied AI and robotics.
 
 ## Repository layout
 
-- [`app/`](app/) — React Native + Expo iPhone app and native Swift capture
-  modules. See [`app/README.md`](app/README.md) for the delivered file
-  contracts and synchronization details.
-- [`mentra-os/`](mentra-os/) — native Android capture and upload stack for
-  Mentra Live smart glasses.
-- [`web/`](web/) — Next.js 16 website and REST API, deployed at
-  [rootlens.io](https://rootlens.io).
-- [`tools/modal/fpvlabs/`](tools/modal/fpvlabs/) — GPU face blur and conversion
-  from raw sessions to Stera-compatible MCAP for FPV Labs.
-- [`tools/modal/sample-drive/`](tools/modal/sample-drive/) — generation of
-  privacy-processed public sample packages.
-- [`tools/hand-visibility-qc/`](tools/hand-visibility-qc/) — hand-visibility
-  quality checks for first-person footage.
-- [`document/legal/`](document/legal/) — Japanese legal source documents and
-  their English mirrors.
-- [`document/v0.1.4/`](document/v0.1.4/) — active implementation tasks and
-  operational runbooks. Earlier version directories are retained as history.
+```text
+root-lens/
+├── mobile/            iPhone capture app (React Native, Expo, Swift)
+├── glasses/           Mentra Live capture app (Android)
+├── desktop/           On-site review and upload app (Python, Qt)
+├── web/               rootlens.io and its REST API (Next.js)
+├── hardware/
+│   └── rootcap/       Head-mounted capture hardware designs
+├── tools/
+│   ├── session_cutter/       Long-session clip extraction
+│   ├── hand-visibility-qc/   Hand-visibility quality checks
+│   └── sample-select/        Sample statistics and selection
+├── fixtures/          Contracts shared across runtimes
+└── document/          Legal sources, task records, and historical specifications
+```
 
-## Stack
+Each top-level application is an independently executed product. `tools/` contains operator-run utilities; physical designs live under `hardware/`.
 
-- **Mobile:** React Native, Expo, Swift, ARKit, AVFoundation, Core Motion
-- **Smart glasses:** Android, Camera2, MediaCodec, Android sensor APIs
-- **Web/API:** Next.js 16, TypeScript, Supabase Postgres, Drizzle ORM
-- **Storage:** Cloudflare R2
-- **Processing:** Python, Modal, EgoBlur, Stera SDK / MCAP
-- **Deployment:** Vercel, EAS, Modal
+## Capture paths
+
+The iPhone path records locally, creates a server-issued `unit_id`, verifies every source file, uploads the raw session to Cloudflare R2, and registers it through the web API.
+
+The smart-glasses path records locally without network access. A site supervisor connects the glasses to the desktop app, reviews the recordings, and uploads approved sessions to the site's Google Drive folder.
 
 ## Development
 
-The iPhone capture modules require a physical device:
+The iPhone native modules require a physical device:
 
 ```bash
-cd app
+cd mobile
 npm install
 cd ios && LANG=en_US.UTF-8 pod install && cd ..
 npx expo run:ios --device
 ```
 
-For the Mentra build and field-device setup, follow
-[`mentra-os/README.md`](mentra-os/README.md). Environment variable names are
-documented in the checked-in `.env.example` files; local values remain ignored.
-
-## Project status
-
-RootLens is in active pilot development. Interfaces, capture contracts, and
-operational tooling may change while field data and buyer requirements are
-validated. The implementation and the capture-contract README files are the
-source of truth.
+See [mobile/README.md](mobile/README.md), [glasses/README.md](glasses/README.md), and [desktop/README.md](desktop/README.md) for each runtime's data contract and validation commands.
 
 ## License
 

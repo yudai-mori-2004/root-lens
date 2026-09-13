@@ -116,8 +116,8 @@ tools/modal/
 
 - 端末: 録画 → (D1 署名を挟まず) content_hash 計算 → R2 raw アップロード → `POST /api/clips`。
 - サーバ: `/api/v1/c2pa-sign` エンドポイント削除、 組織鍵 (`C2PA_SIGN_KEY_B64`) も env から削除。
-- native/c2pa-bridge crate、 app/modules/c2pa-bridge (iOS+Android module + 400MB jar/`.a`)、
-  app/src/native/c2paBridge.ts、 app/src/dataflow/steps/sign.ts、 web/lib/c2pa-certs.ts 全消し。
+- native/c2pa-bridge crate、 mobile/modules/c2pa-bridge (iOS+Android module + 400MB jar/`.a`)、
+  mobile/src/native/c2paBridge.ts、 mobile/src/dataflow/steps/sign.ts、 web/lib/c2pa-certs.ts 全消し。
 - タスク 09 で入れた PublicKey PEM チェーン 3 種の env (`ROOT_CA_CERT_PEM` 等) も削除。
 
 ### 6. Web verify pipeline + 検証ページを完全に廃止
@@ -147,7 +147,7 @@ tools/modal/
 - `tools/smoke-test.sh` (mock-device に依存する e2e スクリプト)
 - `tools/gen-dummy-sensors.py` (mock-device に食わせる偽 IMU + 手ポーズ JSONL 生成器、 単体では無意味)
 - `tools/macos-blur/` (mock-device から呼ばれる Apple Vision blur、 mock-device と一緒に caller 消失)
-- `app/modules/privacy-blur/` (iOS ネイティブ Swift オンデバイスぼかし) + `app/src/units/privacy-blur/`
+- `mobile/modules/privacy-blur/` (iOS ネイティブ Swift オンデバイスぼかし) + `mobile/src/units/privacy-blur/`
   (JS ラッパ)。 現行フローで呼ばれておらず、 「オンデバイス blur はもうやらない」 の user 判断で確定廃止。
 
 ### 9. `keys/` は物理削除しない
@@ -186,7 +186,7 @@ tools/modal/
 5. **mock-device + smoke-test + gen-dummy-sensors + macos-blur 削除**: §8 に列挙。
 6. **CLAUDE.md 最終形**: Pipeline 1/2/3 のテーブル、 TP register + cNFT の設計判断セクション、
    「オフチェーンストレージ」 節を全て削除・置換して現状 (fpvlabs pipeline + score-wilor legacy) を反映。
-7. **app 依存整理**: `@title-protocol/sdk`、 `viem` を `app/package.json` から削除。 `bs58` は
+7. **app 依存整理**: `@title-protocol/sdk`、 `viem` を `mobile/package.json` から削除。 `bs58` は
    DebugAuthProvider が使っているので残す。
 8. **DB migration + `signature_hash → content_hash` 系 rename (breaking)**: AUDIT.md §4 の
    `0003_deblockchain_and_content_hash.sql` を作成 + web/app 側で全ての identifier rename。 順序は
@@ -229,7 +229,7 @@ PR 間の依存は最小化されているが、 以下だけ厳守:
   で残るのは `document/v0.1.0-v0.1.3/`、 過去タスク README、 `references/`、 履歴用途の一部だけ。
 - `git ls-files | wc -l` が 667 → 500 前後に減る (= AUDIT-ADDENDUM.md 想定)。
 - `web/` `pnpm typecheck` + `next build` green。 依存 11 個削除後も build 通る。
-- `app/` `pnpm typecheck` + iOS/Android build 通る。 sign step が消えても capture → upload flow が動く。
+- `mobile/` `pnpm typecheck` + iOS/Android build 通る。 sign step が消えても capture → upload flow が動く。
 - `POST /api/clips` の contract が `contentHash` (SHA-256 of raw mp4) を受け取る形。
 - `tools/modal/` 直下に `score-wilor/` と `fpvlabs/` の 2 サブディレクトリのみ (他は削除 or 移動済)。
 - `README.md`、 `CLAUDE.md`、 `web/public/{llms,robots}.txt` が現状 (FPV データ収集) を反映。

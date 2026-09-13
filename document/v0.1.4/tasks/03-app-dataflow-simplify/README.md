@@ -2,24 +2,24 @@
 
 ## 目的
 
-`app/src/dataflow/` を v0.1.4 の最小フローに整える: `recording-configs` + `signClip`（D1 のみ）+
+`mobile/src/dataflow/` を v0.1.4 の最小フローに整える: `recording-configs` + `signClip`（D1 のみ）+
 `uploadToR2` + `registerClip`（POST /api/clips）だけにする。 Pipeline 2/3 / TP / mint 関連は削除。
 state machine を `uploading → uploaded / error` の 3 値に縮小。
 
 ## 読むべきファイル
 
 - `document/v0.1.4/DATA_SPECS_JA.md` §2, §4, §6
-- `app/src/dataflow/orchestrator.ts`（または `pipeline.ts`、 advanceClip / enqueueRecording 等）
-- `app/src/dataflow/store.ts`（state machine / Clip 型を簡素化）
-- `app/src/dataflow/steps/sign.ts`（**D1 のみに**、 blur 呼び出しと D2 を撤去）
-- `app/src/dataflow/steps/upload.ts`（**維持**、 files map から signed-json 撤去）
-- `app/src/dataflow/steps/register.ts`（必須 body を `signatureHash` / `contentSize` / `network` に）
-- `app/src/dataflow/steps/titleProtocol.ts` → **削除**
-- `app/src/dataflow/steps/pipeline2.ts` → **削除**
-- `app/src/dataflow/steps/pipeline3.ts` → **削除**（存在すれば）
-- `app/src/dataflow/steps/lifecycle.ts`（stake / resolveServerClipId / retry など全部撤去）
-- `app/src/units/privacy-blur/` → **dataflow からの参照を全部切る**（モジュール自体は残してよい、 native は弄らない）
-- `app/src/native/c2paBridge.ts`（signD2 / 関連 wrapper を未使用に）
+- `mobile/src/dataflow/orchestrator.ts`（または `pipeline.ts`、 advanceClip / enqueueRecording 等）
+- `mobile/src/dataflow/store.ts`（state machine / Clip 型を簡素化）
+- `mobile/src/dataflow/steps/sign.ts`（**D1 のみに**、 blur 呼び出しと D2 を撤去）
+- `mobile/src/dataflow/steps/upload.ts`（**維持**、 files map から signed-json 撤去）
+- `mobile/src/dataflow/steps/register.ts`（必須 body を `signatureHash` / `contentSize` / `network` に）
+- `mobile/src/dataflow/steps/titleProtocol.ts` → **削除**
+- `mobile/src/dataflow/steps/pipeline2.ts` → **削除**
+- `mobile/src/dataflow/steps/pipeline3.ts` → **削除**（存在すれば）
+- `mobile/src/dataflow/steps/lifecycle.ts`（stake / resolveServerClipId / retry など全部撤去）
+- `mobile/src/units/privacy-blur/` → **dataflow からの参照を全部切る**（モジュール自体は残してよい、 native は弄らない）
+- `mobile/src/native/c2paBridge.ts`（signD2 / 関連 wrapper を未使用に）
 
 ## スコープ
 

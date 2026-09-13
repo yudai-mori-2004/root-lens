@@ -1,6 +1,6 @@
 // /sample のショーケースビューアが読む JSON の型。
 //
-// スキーマは tools/lp-sample/lp_sample.py が吐く物と 1:1 に一致する。
+// 公開サンプルの静的メタデータ契約。
 // 変えるときは両方 (Python 出力 + この型) を同時に触ること。
 
 export interface AssetStats {

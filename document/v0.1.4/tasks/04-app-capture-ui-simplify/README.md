@@ -9,11 +9,11 @@
 ## 読むべきファイル
 
 - `document/v0.1.4/DATA_SPECS_JA.md` §2, §4
-- `app/src/screens/CalibrationCaptureScreen.tsx`（902 行、 ほぼ全面書き直しに近い）
-- `app/src/screens/CollectionScreen.tsx`（quality / mint / staking 表示を撤去）
-- `app/src/devsandbox/DevSandboxScreen.tsx`（Pipeline 2/3 ボタン群を撤去、 「送信」 だけに）
-- `app/src/components/ClipCard.tsx` 等の表示部品（あれば quality / autoCategory / delegate 表示撤去）
-- `app/src/services/i18n/` または `assets/locales/`（`capture.tts.*`、 `capture.state.*`、 `capture.guide.*`
+- `mobile/src/screens/CalibrationCaptureScreen.tsx`（902 行、 ほぼ全面書き直しに近い）
+- `mobile/src/screens/CollectionScreen.tsx`（quality / mint / staking 表示を撤去）
+- `mobile/src/devsandbox/DevSandboxScreen.tsx`（Pipeline 2/3 ボタン群を撤去、 「送信」 だけに）
+- `mobile/src/components/ClipCard.tsx` 等の表示部品（あれば quality / autoCategory / delegate 表示撤去）
+- `mobile/src/services/i18n/` または `assets/locales/`（`capture.tts.*`、 `capture.state.*`、 `capture.guide.*`
   などのキー削除）
 
 ## スコープ

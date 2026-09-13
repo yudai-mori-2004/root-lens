@@ -40,7 +40,7 @@
 
 - v0.1.5 の後段ワーカー用エンドポイント（blur worker callback 等）の先取り実装。
 - raw-uploads の signed URL TTL や認証強化（= 別案件）。
-- `app/api/clips` 配下の他ルート（例: download / share）にあれば残し、 v0.1.5 でレビュー。
+- `mobile/api/clips` 配下の他ルート（例: download / share）にあれば残し、 v0.1.5 でレビュー。
 
 ## 成功基準
 
