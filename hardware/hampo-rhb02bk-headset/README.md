@@ -253,7 +253,7 @@ A1653の公式外形は約77 × 37 × 25 mmですが、端子中心、ボタン�
 OpenSCADを導入したmacOSでは次で全STLとプレビューを再生成します。
 
 ```bash
-document/hardware/hampo-rhb02bk-headset/cad/build.sh
+hardware/hampo-rhb02bk-headset/cad/build.sh
 ```
 
 ビルドは全STLをCGALで完全レンダーし、バイナリSTLの長さ、三角形、外形、体積を

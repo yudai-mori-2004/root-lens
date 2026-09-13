@@ -1,6 +1,6 @@
 # 初号機の端子別配線表
 
-> **旧配線:** この表はM5Stamp ESP32P4頭部完結型の配線である。現在のRaspberry Pi 5分離型には使わない。現行配線は[2026-09-11の配線](../existing-glasses/LOW-COST-DECISION-2026-09-11.md#配線)を正とする。
+> **旧配線:** この表はM5Stamp ESP32P4頭部完結型の配線である。現在のRaspberry Pi 5分離型には使わない。現行配線は[2026-09-11の配線](../research/existing-glasses/LOW-COST-DECISION-2026-09-11.md#配線)を正とする。
 
 更新日：2026-09-07。この表は初号機をユニバーサル基板で組むときの結線正本である。M5Stamp ESP32P4映像処理基板の`pad`番号はモジュール外周端子番号、XIAO ESP32S3センサー制御基板の`D0`〜`D7`は基板印字を表す。
 

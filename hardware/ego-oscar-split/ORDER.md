@@ -1,6 +1,6 @@
 # 初号機の注文画面
 
-> **発注停止:** この一括カートは2026-09-07のM5Stamp ESP32P4案である。現在の初号機では使わない。Raspberry Pi 5版の一括カートとDECXINの発注順は[2026-09-11の低価格経路](../existing-glasses/LOW-COST-DECISION-2026-09-11.md#raspberry-pi-5分離型の購入表)を使う。
+> **発注停止:** この一括カートは2026-09-07のM5Stamp ESP32P4案である。現在の初号機では使わない。Raspberry Pi 5版の一括カートとDECXINの発注順は[2026-09-11の低価格経路](../research/existing-glasses/LOW-COST-DECISION-2026-09-11.md#raspberry-pi-5分離型の購入表)を使う。
 
 確認日：2026-09-07。数量はすべて一個。次の二つのリンクは、この設計で固定した国内品を一括でカートへ入れる。
 

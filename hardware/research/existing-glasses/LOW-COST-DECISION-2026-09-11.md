@@ -86,7 +86,7 @@ Pi Zero 2 Wは3,190〜3,520円の掲載があるが、2026-09-11時点で国内�
 - 個体別の左右内部パラメータ、歪み、左右外部パラメータを納品できるか回答する。
 - 数量一個を日本へ送付する。商品代、加工代、送料、Incotermを分けて示す。
 
-送付文は[`../ego-oscar-split/SUPPLIER-QUESTIONS.md`](../ego-oscar-split/SUPPLIER-QUESTIONS.md)を使う。販売者回答を注文書へ転記できない場合、その商品ページからは買わない。
+送付文は[`../../ego-oscar-split/SUPPLIER-QUESTIONS.md`](../../ego-oscar-split/SUPPLIER-QUESTIONS.md)を使う。販売者回答を注文書へ転記できない場合、その商品ページからは買わない。
 
 ## 配線
 

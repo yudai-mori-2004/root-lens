@@ -21,7 +21,7 @@
 ## 生成とビルド
 
 ```bash
-cd document/hardware/ego-oscar-split/pi5
+cd hardware/ego-oscar-split/pi5
 bash prepare_upstream.sh
 python3 -m py_compile build/ego-oscar-pi5/radxa/fpv_recorder.py
 bash build_xiao.sh

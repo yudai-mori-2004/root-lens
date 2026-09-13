@@ -1,6 +1,6 @@
 # 映像処理基板ファームウェア
 
-> **第二段階の実装:** このM5Stamp ESP32P4映像ファームウェアは初号機へ書き込まない。初号機はRaspberry Pi 5版のOSCARホスト処理を使う。判断は[2026-09-11の低価格経路](../../existing-glasses/LOW-COST-DECISION-2026-09-11.md#収録処理)、生成可能な実装は[`../pi5`](../pi5/README.md)を参照する。
+> **第二段階の実装:** このM5Stamp ESP32P4映像ファームウェアは初号機へ書き込まない。初号機はRaspberry Pi 5版のOSCARホスト処理を使う。判断は[2026-09-11の低価格経路](../../research/existing-glasses/LOW-COST-DECISION-2026-09-11.md#収録処理)、生成可能な実装は[`../pi5`](../pi5/README.md)を参照する。
 
 このディレクトリは、M5Stamp ESP32P4映像処理基板で次を実行するESP-IDFプロジェクトである。
 

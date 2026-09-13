@@ -11,7 +11,10 @@ root-lens/
 ├── desktop/           On-site review and upload app (Python, Qt)
 ├── web/               rootlens.io and its REST API (Next.js)
 ├── hardware/
-│   └── rootcap/       Head-mounted capture hardware designs
+│   ├── rootcap/       iPhone head mounts
+│   ├── ego-oscar-split/       Custom stereo capture hardware
+│   ├── hampo-rhb02bk-headset/ Hampo camera headset enclosure
+│   └── research/      Existing-device assessments and procurement records
 ├── tools/
 │   ├── session_cutter/       Long-session clip extraction
 │   ├── hand-visibility-qc/   Hand-visibility quality checks
@@ -20,7 +23,7 @@ root-lens/
 └── document/          Legal sources, task records, and historical specifications
 ```
 
-Each top-level application is an independently executed product. `tools/` contains operator-run utilities; physical designs live under `hardware/`.
+Each top-level application is an independently executed product. `tools/` contains operator-run utilities; hardware implementation, fabrication files, and device research live under `hardware/`.
 
 ## Capture paths
 
