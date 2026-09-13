@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import { getLocale } from "next-intl/server";
 import { publicLocale, publicPages } from "../../content/publicPages";
 import s from "./home.module.css";
@@ -6,6 +6,25 @@ import s from "./home.module.css";
 export default async function HomePage() {
   const locale = publicLocale(await getLocale());
   const pageCopy = publicPages[locale].home;
+  const illustrationAlt = locale === "ja"
+    ? "パンを並べながら撮影機材を装着して働くスタッフのイラスト"
+    : "Illustration of a worker arranging bread while wearing capture equipment";
+  const { props: { srcSet: desktopSrcSet } } = getImageProps({
+    src: "/illustrations/bakery-work-desktop.jpg",
+    alt: illustrationAlt,
+    width: 1536,
+    height: 1024,
+    sizes: "(min-width: 1024px) 1024px, 100vw",
+    priority: true,
+  });
+  const { props: mobileImageProps } = getImageProps({
+    src: "/illustrations/bakery-work-mobile.jpg",
+    alt: illustrationAlt,
+    width: 1536,
+    height: 1024,
+    sizes: "100vw",
+    priority: true,
+  });
 
   return (
     <main className={s.page}>
@@ -21,15 +40,14 @@ export default async function HomePage() {
       </header>
 
       <figure className={s.workplaceFigure}>
-        <Image
-          className={s.workplacePhoto}
-          src="/photos/workplace-capture-satokaede.jpg"
-          alt={locale === "ja" ? "ベーカリーの厨房で撮影機材を装着して作業する様子" : "A worker wearing capture equipment in a bakery kitchen"}
-          width={1536}
-          height={2048}
-          sizes="(max-width: 64rem) 100vw, 64rem"
-          priority
-        />
+        <picture>
+          <source
+            media="(min-width: 641px)"
+            sizes="(min-width: 1024px) 1024px, 100vw"
+            srcSet={desktopSrcSet}
+          />
+          <img {...mobileImageProps} alt={illustrationAlt} className={s.workplaceIllustration} />
+        </picture>
       </figure>
 
       <section className={s.overview} aria-label={locale === "ja" ? "RootLensについて" : "About RootLens"}>

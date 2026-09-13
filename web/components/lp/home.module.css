@@ -49,11 +49,11 @@
   padding: 0 var(--content-gutter) var(--space-lg);
 }
 
-.workplacePhoto {
+.workplaceIllustration {
   width: 100%;
-  aspect-ratio: 16 / 7;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
-  object-position: center 48%;
+  object-position: center;
   border: var(--rule-thin) solid var(--color-rule-strong);
 }
 
@@ -141,7 +141,7 @@
     margin-top: var(--space-sm);
   }
 
-  .workplacePhoto {
+  .workplaceIllustration {
     aspect-ratio: 4 / 3;
   }
 
