@@ -109,8 +109,8 @@ export const publicPages = {
       title: "実際の現場で収集した、一人称視点データ。",
       overviewTitle: "概要",
       overview: [
-        "当社は日本を拠点に、飲食、小売、製造、リフォーム等、幅広い業種の現場における一人称視点データの収集を計画しています。現在は飲食業を中心に協力先のネットワークを拡大しています。",
-        "撮影デバイスについても、複数の機材で試験運用を進めています。現場の業務への影響、装着者の身体的負担、取得されるエゴセントリックデータの品質を検証しながら、収集体制の改善を続けています。",
+        "当社は日本を拠点に、飲食、小売、製造、リフォーム等、幅広い業種の現場における一人称視点データの収集を行っております。現在は飲食業を中心に協力先のネットワークを拡大しています。",
+        "撮影デバイスについても、複数の機材を実際の収集に用いながら、選定と改善を進めています。現場の業務への影響、装着者の身体的負担、取得されるエゴセントリックデータの品質を検証しながら、収集体制の改善を続けています。",
       ],
       designTitle: "収集条件の設計",
       designBody: "対象業務、収集時間、センサー構成、納品形式は、研究目的やモデル要件に応じて設計できます。必要に応じて、対象範囲の切り出しやアノテーションを施した上での提供にも対応します。",
@@ -274,8 +274,8 @@ export const publicPages = {
       title: "First-person data from real workplaces.",
       overviewTitle: "Overview",
       overview: [
-        "Based in Japan, we plan to collect first-person data across food service, retail, manufacturing, renovation, and other workplaces. We are currently expanding our network of participating sites, with an initial focus on food service.",
-        "We are also piloting several capture devices. We continue to improve the collection setup by testing its effect on ordinary work, the physical burden on the wearer, and the quality of the resulting egocentric data.",
+        "Based in Japan, we collect first-person data across food service, retail, manufacturing, renovation, and other workplaces. We are currently expanding our network of participating sites, with an initial focus on food service.",
+        "We use multiple capture devices in live data collection while continuing to select and improve them. We evaluate their effect on ordinary work, the physical burden on the wearer, and the quality of the resulting egocentric data as we improve the collection setup.",
       ],
       designTitle: "Collection design",
       designBody: "Target work, collection time, sensor configuration, and delivery format can be designed around research goals and model requirements. We can also provide selected ranges or annotated data when required.",
