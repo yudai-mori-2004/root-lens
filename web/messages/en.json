@@ -37,9 +37,13 @@
         "mentra": {
           "label": "Smart glasses",
           "description": "Captured on site with Mentra Live smart glasses, recording video, acceleration, and angular velocity. There is no LiDAR depth or mesh. A 65-second work segment has been selected for this public preview."
+        },
+        "tobiE2": {
+          "label": "TOBI E2",
+          "description": "A sample of binocular RGB video and IMU data collected with TOBI E2 is being prepared."
         }
       },
-      "preparingBadge": "In preparation",
+      "preparingBadge": "Coming soon",
       "placeholder": " — sample not yet available.",
       "loading": "Loading…",
       "loadError": "Could not load the data. Please wait a moment and try again.",

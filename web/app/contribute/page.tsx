@@ -40,9 +40,6 @@ export default async function ContributePage() {
                   <section key={item.title}>
                     <h2>{item.title}</h2>
                     <p>{item.body}</p>
-                    <a href={item.href} target="_blank" rel="noreferrer">
-                      {item.linkLabel}<span aria-hidden="true"> ↗</span>
-                    </a>
                   </section>
                 ))}
               </div>
@@ -65,7 +62,8 @@ export default async function ContributePage() {
                         height={device.height}
                         sizes="(max-width: 640px) 76vw, 24rem"
                       />
-                      <p>{device.name}</p>
+                      <p className={s.deviceName}>{device.name}</p>
+                      {"specs" in device ? <p className={s.deviceSpecs}>{device.specs}</p> : null}
                     </li>
                   ))}
                 </ul>

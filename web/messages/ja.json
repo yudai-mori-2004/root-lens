@@ -37,9 +37,13 @@
         "mentra": {
           "label": "スマートグラス",
           "description": "スマートグラス（Mentra Live）で、現場の映像、加速度、角速度を記録しました。公開用に作業部分の65秒間を切り出しています。"
+        },
+        "tobiE2": {
+          "label": "TOBI E2",
+          "description": "TOBI E2で収集する双眼RGB映像とIMUデータのサンプルを準備しています。"
         }
       },
-      "preparingBadge": "準備中",
+      "preparingBadge": "近日公開",
       "placeholder": "のサンプルはまだありません。",
       "loading": "読み込み中…",
       "loadError": "データを読み込めませんでした。時間を置いて再読み込みしてみてください。",

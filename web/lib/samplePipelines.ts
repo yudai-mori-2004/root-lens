@@ -83,5 +83,12 @@ export async function buildSamplePipelines(): Promise<PipelineOption[]> {
         range: { startSec: 0, endSec: 65.03662 },
       }],
     },
+    {
+      id: "tobi-e2",
+      label: t("tobiE2.label"),
+      description: t("tobiE2.description"),
+      available: false,
+      sessions: [],
+    },
   ];
 }

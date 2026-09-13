@@ -256,11 +256,19 @@
   background: var(--color-paper);
 }
 
-.deviceScroller p {
+.deviceName {
   margin-top: var(--space-xs);
   font-size: var(--public-body-size);
   font-weight: 600;
   line-height: 1.5;
+}
+
+.deviceSpecs {
+  margin-top: 0.2rem;
+  color: var(--color-ink-muted);
+  font-size: var(--public-body-size);
+  font-weight: 400;
+  line-height: 1.55;
 }
 
 .noticeSection {
