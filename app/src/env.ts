@@ -40,7 +40,7 @@ export const SERVER_URL =
 
 // ─── Supabase Auth ──────────────────────────────────────────────────────
 // 運営発行アカウント (uuid + パスワード) のログイン先。 anon key は公開前提の値。
-// 未設定のビルドは DebugAuthProvider に落ちる (= ローカル検証用)。
+// 開発ビルドだけ未設定時にDebugAuthProviderを使う。リリースビルドは起動時に失敗させる。
 
 export const SUPABASE_URL = readOptional('EXPO_PUBLIC_SUPABASE_URL');
 export const SUPABASE_ANON_KEY = readOptional('EXPO_PUBLIC_SUPABASE_ANON_KEY');

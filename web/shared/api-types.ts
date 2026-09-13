@@ -35,9 +35,9 @@ export interface ClipDto {
 
 /// POST /api/clips
 /// unit_id発行、source manifest確定、R2アップロードを終えてから呼ぶ。
-/// 重複排除キーは (account, unitId)、 既存行があれば idempotent に返す。
+/// unitIdは全撮影単位で一意。既存行があればidempotentに返す。
 export interface CreateClipRequest {
-  /// Webが発行した撮影単位の識別子。
+  /// Webで予約済みの撮影単位の識別子。
   unitId: string;
   /// rgb.mp4 (= raw、 blur 無し) のサイズ (bytes)
   videoBytes: number;
