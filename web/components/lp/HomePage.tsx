@@ -11,24 +11,24 @@ export default async function HomePage() {
       className: s.illustrationLeft,
       frames: [
         "/illustrations/work-bakery.jpg",
-        "/illustrations/extraction-pictogram-1.jpg",
-        "/illustrations/revenue-pictogram-1.jpg",
+        "/illustrations/extraction-cut-1.jpg",
+        "/illustrations/revenue-cut-1.jpg",
       ],
     },
     {
       className: s.illustrationCenter,
       frames: [
         "/illustrations/work-grocery.jpg",
-        "/illustrations/extraction-pictogram-2.jpg",
-        "/illustrations/revenue-pictogram-2.jpg",
+        "/illustrations/extraction-cut-2.jpg",
+        "/illustrations/revenue-cut-2.jpg",
       ],
     },
     {
       className: s.illustrationRight,
       frames: [
         "/illustrations/work-restaurant.jpg",
-        "/illustrations/extraction-pictogram-3.jpg",
-        "/illustrations/revenue-pictogram-3.jpg",
+        "/illustrations/extraction-cut-3.jpg",
+        "/illustrations/revenue-cut-3.jpg",
       ],
     },
   ];
@@ -63,7 +63,7 @@ export default async function HomePage() {
                   alt=""
                   fill
                   sizes="(max-width: 640px) 33vw, 21rem"
-                  loading="eager"
+                  preload
                   key={src}
                 />
               ))}
