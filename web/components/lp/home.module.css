@@ -66,60 +66,18 @@
 }
 
 .processCaption {
-  position: relative;
   width: 100%;
   max-width: var(--content-max);
   min-height: 1.7em;
   margin: 0 auto;
-  overflow: hidden;
+  font-family: var(--font-lp-mono, monospace);
   font-size: var(--public-body-size);
+  font-weight: 500;
   line-height: 1.7;
 }
 
-.captionLine {
-  position: absolute;
-  inset: 0 auto auto 0;
-  max-width: 100%;
-  white-space: nowrap;
-}
-
-.captionWork {
-  --caption-delay: 1.55s;
-}
-
-.captionExtraction {
-  --caption-delay: 7.55s;
-}
-
-.captionRevenue {
-  --caption-delay: 13.55s;
-}
-
-.captionText {
-  display: inline-block;
-  max-width: 100%;
-  clip-path: inset(0 100% 0 0);
-  opacity: 0;
-  animation: typeCaptionText 18s linear var(--caption-delay) infinite;
-}
-
-.captionCursor {
-  position: absolute;
-  top: 0.15em;
-  left: 0;
-  height: 1.35em;
-  border-left: var(--rule-thin) solid var(--color-ink);
-  opacity: 0;
-  animation: typeCaptionCursor 18s linear var(--caption-delay) infinite;
-}
-
-.workplaceFigure:hover .illustrationFrame,
-.workplaceFigure:hover .captionText,
-.workplaceFigure:hover .captionCursor,
-.workplaceFigure:focus-within .illustrationFrame,
-.workplaceFigure:focus-within .captionText,
-.workplaceFigure:focus-within .captionCursor {
-  animation-play-state: paused;
+.processCaption :global(.Typewriter__cursor) {
+  font-weight: 400;
 }
 
 .illustrationCircle {
@@ -136,98 +94,28 @@
 
 .illustrationFrame {
   object-fit: cover;
-  opacity: 0;
-  transform: scale(0.985);
-  will-change: opacity, transform;
-  animation: revealPanel 18s cubic-bezier(0.45, 0, 0.2, 1) infinite;
-}
-
-.frameWork {
-  animation-delay: var(--step-delay);
-}
-
-.frameExtraction {
-  animation-delay: calc(6s + var(--step-delay));
-}
-
-.frameRevenue {
-  animation-delay: calc(12s + var(--step-delay));
+  animation: revealPanel 420ms var(--ease-out) var(--panel-delay) both;
 }
 
 .illustrationLeft {
-  --step-delay: 0s;
+  --panel-delay: 0ms;
 }
 
 .illustrationCenter {
-  --step-delay: 0.65s;
+  --panel-delay: 110ms;
 }
 
 .illustrationRight {
-  --step-delay: 1.3s;
+  --panel-delay: 220ms;
 }
 
 @keyframes revealPanel {
-  0%, 100% {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-
-  4.5%, 30% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  36.7% {
-    opacity: 0;
-    transform: scale(1.01);
-  }
-}
-
-@keyframes typeCaptionText {
-  0% {
-    clip-path: inset(0 100% 0 0);
-    opacity: 1;
-    animation-timing-function: steps(var(--caption-steps), end);
-  }
-
-  11% {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-    animation-timing-function: linear;
-  }
-
-  21% {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
-
-  24%, 100% {
-    clip-path: inset(0 0 0 0);
+  from {
     opacity: 0;
   }
-}
 
-@keyframes typeCaptionCursor {
-  0% {
+  to {
     opacity: 1;
-    transform: translateX(0);
-    animation-timing-function: steps(var(--caption-steps), end);
-  }
-
-  11% {
-    opacity: 1;
-    transform: translateX(var(--caption-width));
-    animation-timing-function: linear;
-  }
-
-  21% {
-    opacity: 1;
-    transform: translateX(var(--caption-width));
-  }
-
-  24%, 100% {
-    opacity: 0;
-    transform: translateX(var(--caption-width));
   }
 }
 
@@ -238,23 +126,6 @@
 @media (prefers-reduced-motion: reduce) {
   .illustrationFrame {
     animation: none;
-  }
-
-  .frameWork {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  .captionText,
-  .captionCursor {
-    display: none;
-    animation: none;
-  }
-
-  .captionWork .captionText {
-    display: block;
-    clip-path: none;
-    opacity: 1;
   }
 }
 
