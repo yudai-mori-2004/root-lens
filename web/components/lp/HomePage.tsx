@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { getLocale } from "next-intl/server";
+import type { CSSProperties } from "react";
 import { publicLocale, publicPages } from "../../content/publicPages";
 import s from "./home.module.css";
 
@@ -33,6 +34,18 @@ export default async function HomePage() {
     },
   ];
   const frameClasses = [s.frameWork, s.frameExtraction, s.frameRevenue];
+  const captionClasses = [s.captionWork, s.captionExtraction, s.captionRevenue];
+  const captions = locale === "ja"
+    ? [
+        "現場の手作業を、一人称視点で撮影。",
+        "データを、ロボット開発に活用。",
+        "得られた利益を、現場へ還元。",
+      ]
+    : [
+        "Capture work in first person.",
+        "Use the data to develop robots.",
+        "Return revenue to workplaces.",
+      ];
 
   return (
     <main className={s.page}>
@@ -49,6 +62,7 @@ export default async function HomePage() {
 
       <figure
         className={s.workplaceFigure}
+        tabIndex={0}
         aria-label={locale === "ja"
           ? "現場作業の撮影、データの取得、ロボット開発、収益還元の流れ"
           : "The flow from workplace capture and data collection to robot development and revenue return"}
@@ -70,6 +84,21 @@ export default async function HomePage() {
             </div>
           ))}
         </div>
+        <figcaption className={s.processCaption}>
+          {captions.map((caption, captionIndex) => (
+            <span
+              className={`${s.captionLine} ${captionClasses[captionIndex]}`}
+              style={{
+                "--caption-steps": caption.length,
+                "--caption-width": `${caption.length}${locale === "ja" ? "em" : "ch"}`,
+              } as CSSProperties}
+              key={caption}
+            >
+              <span className={s.captionText}>{caption}</span>
+              <span className={s.captionCursor} aria-hidden="true" />
+            </span>
+          ))}
+        </figcaption>
       </figure>
 
       <section className={s.overview} aria-label={locale === "ja" ? "RootLensについて" : "About RootLens"}>

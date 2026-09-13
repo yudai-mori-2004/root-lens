@@ -1,6 +1,8 @@
 /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · genre: plain institutional editorial · macrostructure: single-column editorial measure + terminal route row · theme: studied-DNA (source: materialcultures.org) · contrast: pass (40–41) · nav: studied disclosure · footer: Ft4 · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
 
 .page {
+  display: flex;
+  flex-direction: column;
   min-height: 100dvh;
   background: var(--color-paper);
 }
@@ -49,13 +51,75 @@
   padding: 0 var(--content-gutter) var(--space-lg);
 }
 
+.workplaceFigure:focus-visible {
+  outline: var(--rule-heavy) solid var(--color-focus);
+  outline-offset: calc(var(--rule-heavy) * -1);
+}
+
 .illustrationCluster {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: var(--space-md) 0;
+  padding: var(--space-md) 0 var(--space-sm);
+}
+
+.processCaption {
+  position: relative;
+  width: 100%;
+  max-width: var(--content-max);
+  min-height: 1.7em;
+  margin: 0 auto;
+  overflow: hidden;
+  font-size: var(--public-body-size);
+  line-height: 1.7;
+}
+
+.captionLine {
+  position: absolute;
+  inset: 0 auto auto 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.captionWork {
+  --caption-delay: 1.55s;
+}
+
+.captionExtraction {
+  --caption-delay: 7.55s;
+}
+
+.captionRevenue {
+  --caption-delay: 13.55s;
+}
+
+.captionText {
+  display: inline-block;
+  max-width: 100%;
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  animation: typeCaptionText 18s linear var(--caption-delay) infinite;
+}
+
+.captionCursor {
+  position: absolute;
+  top: 0.15em;
+  left: 0;
+  height: 1.35em;
+  border-left: var(--rule-thin) solid var(--color-ink);
+  opacity: 0;
+  animation: typeCaptionCursor 18s linear var(--caption-delay) infinite;
+}
+
+.workplaceFigure:hover .illustrationFrame,
+.workplaceFigure:hover .captionText,
+.workplaceFigure:hover .captionCursor,
+.workplaceFigure:focus-within .illustrationFrame,
+.workplaceFigure:focus-within .captionText,
+.workplaceFigure:focus-within .captionCursor {
+  animation-play-state: paused;
 }
 
 .illustrationCircle {
@@ -119,6 +183,54 @@
   }
 }
 
+@keyframes typeCaptionText {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 1;
+    animation-timing-function: steps(var(--caption-steps), end);
+  }
+
+  11% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    animation-timing-function: linear;
+  }
+
+  21% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+
+  24%, 100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+
+@keyframes typeCaptionCursor {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    animation-timing-function: steps(var(--caption-steps), end);
+  }
+
+  11% {
+    opacity: 1;
+    transform: translateX(var(--caption-width));
+    animation-timing-function: linear;
+  }
+
+  21% {
+    opacity: 1;
+    transform: translateX(var(--caption-width));
+  }
+
+  24%, 100% {
+    opacity: 0;
+    transform: translateX(var(--caption-width));
+  }
+}
+
 .introTitleLine {
   display: block;
 }
@@ -131,6 +243,18 @@
   .frameWork {
     opacity: 1;
     transform: scale(1);
+  }
+
+  .captionText,
+  .captionCursor {
+    display: none;
+    animation: none;
+  }
+
+  .captionWork .captionText {
+    display: block;
+    clip-path: none;
+    opacity: 1;
   }
 }
 
@@ -184,6 +308,21 @@
 
 .entry:last-child {
   border-bottom: 0;
+}
+
+@media (min-width: 641px) {
+  .overview {
+    order: 2;
+    padding-bottom: var(--space-md);
+  }
+
+  .workplaceFigure {
+    order: 3;
+  }
+
+  .entryGrid {
+    order: 4;
+  }
 }
 
 .entry:hover {
