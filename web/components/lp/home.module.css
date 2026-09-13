@@ -6,34 +6,36 @@
 }
 
 .intro {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.65fr);
+  display: block;
   background: var(--color-paper);
 }
 
 .introTitle,
 .introBody {
   min-width: 0;
-  padding: var(--space-lg) var(--page-gutter) var(--space-xl);
+  padding: var(--space-lg) var(--page-gutter);
 }
 
 .introBody {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   gap: var(--space-md);
-  border-left: var(--rule-thin) solid var(--color-rule-strong);
+  border-top: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--text-md);
   line-height: 1.9;
+}
+
+.introBody p {
+  max-width: 56rem;
 }
 
 .introTitle h1 {
   min-width: 0;
   max-width: 22ch;
-  font-size: clamp(1.8rem, 2.8vw, 2.75rem);
+  font-size: clamp(1.8rem, 2.6vw, 2.5rem);
   font-weight: 600;
-  line-height: 1.14;
-  letter-spacing: -0.045em;
+  line-height: 1.18;
+  letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 
@@ -74,7 +76,8 @@
 
 .entryGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  border-top: var(--rule-thin) solid var(--color-rule-strong);
 }
 
 .entry {
@@ -83,7 +86,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-lg) var(--page-gutter);
-  border-right: var(--rule-thin) solid var(--color-rule-strong);
+  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
   font-size: clamp(1.15rem, 2vw, 1.55rem);
   font-weight: 600;
   line-height: 1.4;
@@ -91,7 +94,7 @@
 }
 
 .entry:last-child {
-  border-right: 0;
+  border-bottom: 0;
 }
 
 .entry:hover {
@@ -102,44 +105,24 @@
   background: var(--color-surface-pressed);
 }
 
-@media (max-width: 900px) {
-  .intro {
-    grid-template-columns: 1fr;
-  }
-
-  .introBody {
-    border-top: var(--rule-thin) solid var(--color-rule-strong);
-    border-left: 0;
-  }
-
-}
-
 @media (max-width: 640px) {
-  .introTitle,
+  .introTitle {
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-md);
+  }
+
   .introBody {
-    padding-top: var(--space-lg);
+    padding-top: var(--space-md);
     padding-bottom: var(--space-sm);
   }
 
   .introTitle h1 {
     font-size: clamp(1.6rem, 6.5vw, 1.95rem);
+    line-height: 1.22;
   }
 
   .overviewText {
     margin-top: var(--space-sm);
-  }
-
-  .entryGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .entry {
-    border-right: 0;
-    border-bottom: var(--rule-thin) solid var(--color-rule-strong);
-  }
-
-  .entry:last-child {
-    border-bottom: 0;
   }
 
 }
