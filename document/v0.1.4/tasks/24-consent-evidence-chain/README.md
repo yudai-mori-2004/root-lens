@@ -74,13 +74,26 @@ webhookは完了を知る契機としてのみ使う。受信したリクエス�
 
 ### 2. スタッフ同意
 
-1. 協力先が撮影機材を装着する人と、撮影中に映り込む可能性のあるスタッフを特定する。
-2. RootLensが個人ごとの署名依頼を作成する。同じ人の署名を複数人分として共有しない。
-3. 本人が撮影参加に関する同意書を確認し、署名する。
-4. 現場合意と同じ方法で、完了記録、文書版、完成PDFと監査証明書のSHA-256を保存する。
-5. 撤回時は原記録を上書きせず、撤回イベントを追記する。以降の撮影ロットには有効な同意だけを関連付ける。
+1. 協力先が撮影機材を装着する人と、撮影中に映り込む可能性のあるスタッフをRootLensへ伝える。
+2. RootLensがスタッフごとに `person_id` を発行し、所属する `organization_id` と `site_id` に結び付ける。
+3. RootLensが個人ごとにDocuSealの署名依頼を作成する。同じ署名URLや署名記録を複数人分として共有しない。
+4. 本人が個別に送られた署名URLを開き、撮影参加に関する同意書を確認して署名する。
+5. RootLensは署名完了webhookを受け、DocuSeal APIで完了状態を再確認する。`agreement_record_id` を発行し、`person_id`、`site_id`、文書版、署名時刻、完成PDFと監査証明書のSHA-256を保存する。
+6. 撤回時は原記録を上書きせず、撤回イベントを追記する。以降の撮影ロットには有効な同意だけを関連付ける。
 
 撮影ロットごとに全員が同じ文書へ署名し直す必要はない。承認時点で、そのロットを撮影した本人と、映り込む可能性があったスタッフに有効な同意記録があることを、同意スナップショットとして確定する。
+
+### 事前同意と撮影ロットの対応
+
+現場合意は `site_id`、スタッフ同意は `person_id` と `site_id` に結び付ける。現在のMentra収録ファイルには撮影者の識別子が入っていないため、PCアプリでの確認時に現場監督者が次を指定する。
+
+- 撮影機材を装着したスタッフ。一人を必須とする。
+- 映像又は音声に含まれる、同意取得済みの他のスタッフ。
+- 同意を取得していない人の偶発的な映り込みの有無。該当する場合は匿名化対象として記録する。
+
+Webは、指定された人の同意が撮影開始時点より前に完了し、撤回又は失効していないことを確認する。撮影者本人の有効な同意がない場合、又は同意を取得していないスタッフが意図的な撮影対象になっている場合は承認できない。
+
+確認を通過したら、適用する現場合意の `agreement_record_id`、撮影者と他のスタッフの `person_id` と `agreement_record_id`、各記録の状態を並べた `consent_snapshot` を作る。項目を安定した順序で正規化し、SHA-256を `consent_snapshot_hash` として保存する。後から同意者を追加・削除する場合は別のスナップショットとなり、撮影ロットへの電子署名をやり直す。
 
 ### 3. PCアプリでの撮影ロット確認と電子署名
 
@@ -88,17 +101,18 @@ webhookは完了を知る契機としてのみ使う。受信したリクエス�
 
 1. PCアプリが `rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json` を再読込し、各ファイルのサイズとSHA-256を算出する。
 2. ファイル名、サイズ、SHA-256、`content_hash` を正規化した `capture_manifest` を作り、そのSHA-256を `capture_manifest_hash` とする。
-3. PCアプリがWeb APIへ署名セッションを作成する。Webは `capture_manifest_hash`、承認文の版、事業所、有効な合意記録を一回限りのchallengeに結び付け、PCアプリへ署名URLを返す。
-4. PCアプリが既定ブラウザで署名URLを開く。画面には撮影日時、尺、対象ファイル、映像・音声の確認結果、適用される現場合意とスタッフ同意の状態を表示する。
-5. 現場監督者は個人アカウントでログインし、次の承認文を確認して「署名して承認」を押す。
+3. PCアプリで撮影者と映像又は音声に含まれる他のスタッフを指定する。PCアプリはWebから取得した、その事業所で有効な同意を持つスタッフだけを候補として表示する。
+4. PCアプリがWeb APIへ署名セッションを作成する。Webは撮影時点の合意状態を検証して `consent_snapshot` を確定し、`capture_manifest_hash`、`consent_snapshot_hash`、承認文のハッシュ、事業所、ランダムなnonceを一回限りのchallengeに結び付ける。PCアプリへは署名URLを返す。
+5. PCアプリが既定ブラウザで署名URLを開く。画面には撮影日時、尺、対象ファイル、撮影者、他のスタッフ、偶発的な映り込みの有無、適用される現場合意とスタッフ同意の状態を表示する。
+6. 現場監督者は個人アカウントでログインし、次の承認文を確認して「署名して承認」を押す。
 
    `この撮影データの内容を確認し、現場合意書に基づき、販売先への提供を承認します。`
 
-6. ブラウザはパスキーを呼び出し、challengeへWebAuthn署名を行う。challengeはサーバ側で `capture_manifest_hash` と一対一に対応するため、署名者、承認文、対象データが一つの電子署名記録として結び付く。
-7. WebはWebAuthn署名を検証し、`person_id`、`site_id`、`capture_manifest_hash`、承認文の版、承認時刻、credential ID、認証器のsign count、challengeのハッシュ、現場合意記録、スタッフ同意スナップショットをappend-onlyの承認イベントとして保存する。
-8. Webは承認内容とWebAuthn署名のハッシュを含むreceiptを生成し、RootLensの証跡署名鍵で署名する。
-9. PCアプリは署名済みreceiptをAPIから取得し、receipt内の `capture_manifest_hash` が現在のローカルファイルと一致する場合だけアップロードを開始する。
-10. 一つでもファイルが変わった場合は電子署名を無効とし、新しい撮影ロットとして再署名を求める。
+7. ブラウザはパスキーを呼び出し、challengeへWebAuthn署名を行う。challengeはサーバ側で `capture_manifest_hash` と `consent_snapshot_hash` に対応するため、署名者、承認文、対象データ、適用した事前同意が一つの電子署名記録として結び付く。
+8. WebはWebAuthn署名を検証し、`person_id`、`site_id`、`capture_manifest_hash`、`consent_snapshot_hash`、承認文の版、承認時刻、credential ID、認証器のsign count、challengeのハッシュをappend-onlyの承認イベントとして保存する。
+9. Webは承認内容とWebAuthn署名のハッシュを含むreceiptを生成し、RootLensの証跡署名鍵で署名する。
+10. PCアプリは署名済みreceiptをAPIから取得し、receipt内の `capture_manifest_hash` が現在のローカルファイルと一致する場合だけアップロードを開始する。
+11. 一つでもファイル又は同意スナップショットが変わった場合は電子署名を無効とし、新しい撮影ロットとして再署名を求める。
 
 利用者から見ると、電子署名はPCアプリの「署名して承認」操作から始まり、完了後は同じPCアプリへ戻る。システムブラウザを使うのは、Qt製PCアプリへWebAuthnと秘密鍵管理を独自実装しないためである。パスキーの秘密鍵は認証器から取り出さない。承認者の権限は、RootLensが協力先との合意時に登録する。一般の自己登録や、事業所で共有するアカウントは使わない。
 
@@ -131,30 +145,52 @@ webhookは完了を知る契機としてのみ使う。受信したリクエス�
     "capture_manifest_hash": "<sha256 of canonical capture manifest>",
     "recorded_at": "2026-09-13T07:30:00Z",
     "recording_config": "mentra",
-    "site_id": "site_..."
+    "site_id": "site_...",
+    "files": [
+      {"path": "rgb.mp4", "size": 123, "sha256": "..."},
+      {"path": "frames.jsonl", "size": 123, "sha256": "..."},
+      {"path": "imu.jsonl", "size": 123, "sha256": "..."},
+      {"path": "metadata.json", "size": 123, "sha256": "..."}
+    ]
   },
   "agreements": {
     "site": {
       "record_id": "agr_...",
       "document_version": "site-agreement-...",
-      "document_sha256": "...",
-      "completed_at": "...",
+      "template_sha256": "...",
+      "signed_pdf_sha256": "...",
+      "audit_log_sha256": "...",
+      "signed_at": "...",
       "status_at_approval": "active"
     },
     "staff_consent_snapshot": {
       "snapshot_id": "csp_...",
       "snapshot_sha256": "...",
-      "record_ids": ["agr_..."],
+      "members": [
+        {
+          "role": "wearer",
+          "person_ref": "person_...",
+          "record_id": "agr_...",
+          "document_version": "staff-consent-...",
+          "signed_pdf_sha256": "...",
+          "signed_at": "...",
+          "status_at_approval": "active"
+        }
+      ],
       "status_at_approval": "active"
     }
   },
   "approval": {
     "event_id": "apv_...",
     "approver_id": "person_...",
+    "approver_authority_record_id": "auth_...",
     "approved_at": "...",
+    "statement": "この撮影データの内容を確認し、現場合意書に基づき、販売先への提供を承認します。",
     "statement_version": "lot-approval-ja-1",
     "signature_method": "webauthn",
     "approved_capture_manifest_hash": "...",
+    "approved_consent_snapshot_hash": "...",
+    "signed_payload_sha256": "...",
     "webauthn_assertion_sha256": "...",
     "receipt_sha256": "..."
   },
@@ -279,8 +315,9 @@ webhookは完了を知る契機としてのみ使う。受信したリクエス�
 ## 成功条件
 
 - 二種類の署名文書について、署名者、文書版、完了時刻、完成PDFのハッシュを取得できる。
+- 撮影者と撮影中に含まれる同意取得済みスタッフを撮影ロットごとに指定し、撮影時点で有効な同意だけから同意スナップショットを作成できる。
 - 現場監督者がPCアプリから撮影ロットへ電子署名し、全ファイルが署名対象のハッシュで固定される。
-- 電子署名されていない撮影ロット、又は署名後に変更された撮影ロットはアップロードできない。
+- 電子署名されていない撮影ロット、又は署名後にファイル若しくは同意スナップショットが変更された撮影ロットはアップロードできない。
 - 納品される撮影データごとに `rootlens-evidence.json` が一つ存在する。
 - 証跡ファイルから、現場合意、スタッフ同意の集合、現場監督者の承認、raw、加工後の納品ファイルを追跡できる。
 - 販売先へ個人情報や署名済みPDFを直接渡さず、記録の存在と完全性を検証できる。
