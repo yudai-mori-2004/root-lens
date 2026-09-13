@@ -18,7 +18,7 @@ Specific procedures for recording are set out in the Workplace Agreement and the
 
 We collect the following information:
 
-- Video, audio, and sensor data captured by recording equipment, including IMU, LiDAR, and hand-tracking data
+- Video, audio, and sensor data captured by recording equipment, including IMU data
 - Information about devices used for recording, including the model, operating system, application version, and recording settings
 - Account information, including IDs and login information issued by us
 - Information required to pay recording cooperation fees, including bank account details and payment records

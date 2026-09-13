@@ -6,24 +6,10 @@ import Typewriter, { type TypewriterClass } from "typewriter-effect";
 import s from "./home.module.css";
 
 const imageStages = [
-  [
-    "/illustrations/work-bakery.jpg",
-    "/illustrations/work-grocery.jpg",
-    "/illustrations/work-restaurant.jpg",
-  ],
-  [
-    "/illustrations/extraction-cut-1.jpg",
-    "/illustrations/robot-research-use.jpg",
-    "/illustrations/robot-development.jpg",
-  ],
-  [
-    "/illustrations/payment-into-rootlens.jpg",
-    "/illustrations/rootlens-distribution-hub.jpg",
-    "/illustrations/revenue-cut-3.jpg",
-  ],
+  "/illustrations/lifecycle-work.webp",
+  "/illustrations/lifecycle-development.webp",
+  "/illustrations/lifecycle-return.webp",
 ] as const;
-
-const columnClasses = [s.illustrationLeft, s.illustrationCenter, s.illustrationRight];
 
 export default function LifecycleAnimation({ locale }: { locale: "ja" | "en" }) {
   const captions = locale === "ja"
@@ -66,19 +52,20 @@ export default function LifecycleAnimation({ locale }: { locale: "ja" | "en" }) 
       onFocus={pause}
       onBlur={resume}
     >
-      <div className={s.illustrationCluster} key={stage}>
-        {imageStages[stage].map((src, index) => (
-          <div className={`${s.illustrationCircle} ${columnClasses[index]}`} key={src}>
-            <Image
-              className={s.illustrationFrame}
-              src={src}
-              alt=""
-              fill
-              sizes="(max-width: 640px) 33vw, 21rem"
-              preload={stage === 0}
-            />
-          </div>
+      <div className={s.illustrationCluster}>
+        {imageStages.map((src, index) => (
+          <Image
+            className={`${s.illustrationStrip} ${index === stage ? s.illustrationStripActive : ""}`}
+            src={src}
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 64rem"
+            loading="eager"
+            key={src}
+          />
         ))}
+        <span className={s.illustrationDividerLeft} aria-hidden="true" />
+        <span className={s.illustrationDividerRight} aria-hidden="true" />
       </div>
       <figcaption className={s.processCaption} aria-hidden="true">
         {reduceMotion ? captions[0] : (

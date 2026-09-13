@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Noto_Sans_JP } from "next/font/google";
+import { BIZ_UDMincho, Courier_Prime, Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
@@ -22,6 +21,22 @@ const notoSansJp = Noto_Sans_JP({
   display: "swap",
 });
 
+const bizUdMincho = BIZ_UDMincho({
+  variable: "--font-typewriter-ja",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  preload: false,
+});
+
+const courierPrime = Courier_Prime({
+  variable: "--font-typewriter-en",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
   title: {
     default: "RootLens",
@@ -39,7 +54,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable} ${bizUdMincho.variable} ${courierPrime.variable}`}>
         {/* messages を渡さないと useTranslations() をクライアントで使う画面が全部
             キーを素で出す (=/sample の 4 パネルビューアで起きた実障害)。
             getMessages() は現在 locale の messages/*.json 全体を返す。 全部渡しても

@@ -57,12 +57,14 @@
 }
 
 .illustrationCluster {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  position: relative;
   width: 100%;
   max-width: var(--content-max);
+  aspect-ratio: 3 / 1;
   margin: 0 auto;
-  padding: var(--space-md) 0 var(--space-sm);
+  overflow: hidden;
+  border: var(--rule-thin) solid var(--color-rule-strong);
+  background: var(--color-paper);
 }
 
 .processCaption {
@@ -70,53 +72,49 @@
   max-width: var(--content-max);
   min-height: 1.7em;
   margin: 0 auto;
-  font-family: var(--font-lp-mono, monospace);
+  font-family: var(--font-typewriter-ja), "Courier New", monospace;
   font-size: var(--public-body-size);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.7;
+  letter-spacing: 0.035em;
+  padding-top: var(--space-sm);
+}
+
+:global(html[lang="en"]) .processCaption {
+  font-family: var(--font-typewriter-en), "Courier New", monospace;
 }
 
 .processCaption :global(.Typewriter__cursor) {
   font-weight: 400;
 }
 
-.illustrationCircle {
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: var(--rule-thin) solid var(--color-rule-strong);
-  background: var(--color-paper);
-}
-
-.illustrationCircle + .illustrationCircle {
-  border-left: 0;
-}
-
-.illustrationFrame {
+.illustrationStrip {
   object-fit: cover;
-  animation: revealPanel 420ms var(--ease-out) var(--panel-delay) both;
+  opacity: 0;
+  transition: opacity 180ms linear;
 }
 
-.illustrationLeft {
-  --panel-delay: 0ms;
+.illustrationStripActive {
+  opacity: 1;
 }
 
-.illustrationCenter {
-  --panel-delay: 110ms;
+.illustrationDividerLeft,
+.illustrationDividerRight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: var(--rule-thin);
+  background: var(--color-rule-strong);
+  pointer-events: none;
 }
 
-.illustrationRight {
-  --panel-delay: 220ms;
+.illustrationDividerLeft {
+  left: 33.333%;
 }
 
-@keyframes revealPanel {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+.illustrationDividerRight {
+  left: 66.666%;
 }
 
 .introTitleLine {
@@ -124,8 +122,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .illustrationFrame {
-    animation: none;
+  .illustrationStrip {
+    transition: none;
   }
 }
 
