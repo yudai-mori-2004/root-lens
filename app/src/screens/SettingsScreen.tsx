@@ -434,15 +434,10 @@ export const SettingsScreen: React.FC = () => {
               value: method.id,
               label: method.id === 'arkit'
                 ? t('settings.capture.method.arkit')
-                : method.id === 'mentra'
-                  ? t('settings.capture.method.mentra')
-                  : t('settings.capture.method.iphone'),
+                : t('settings.capture.method.iphone'),
             }))}
             onChange={(value) => updateCs({ captureMethodId: value as CaptureMethodId })}
           />
-          {cs.captureMethodId === 'mentra' ? (
-            <Row label={t('settings.capture.device')} value={t('settings.capture.mentraExternal')} />
-          ) : null}
           {cs.captureMethodId === 'arkit' ? (
             <>
           <SegmentRow
@@ -547,8 +542,6 @@ export const SettingsScreen: React.FC = () => {
               />
             </>
           ) : null}
-          {cs.captureMethodId !== 'mentra' ? (
-            <>
           <SegmentRow
             label={t('settings.capture.orientation')}
             value={cs.displayOrientation}
@@ -593,16 +586,9 @@ export const SettingsScreen: React.FC = () => {
               onChange={(v) => updateCs({ cyclePauseMinutes: v })}
             />
           ) : null}
-            </>
-          ) : null}
         </Section>
 
         <Section title={t('settings.section.sensorSync')}>
-          {cs.captureMethodId === 'mentra' ? (
-            <Row label={t('settings.sensorSync.status')} value={t('settings.sensorSync.mentraManaged')} />
-          ) : null}
-          {cs.captureMethodId !== 'mentra' ? (
-            <>
           {timeValidationResult ? (
             <>
               <Row
@@ -640,8 +626,6 @@ export const SettingsScreen: React.FC = () => {
               : t('settings.sensorSync.measure')}
             onPress={() => { void openTimeValidation(); }}
           />
-            </>
-          ) : null}
         </Section>
 
         {/* ── 開発者向け (= debug provider 時のみ表示) ── */}

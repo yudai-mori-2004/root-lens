@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accounts, uploadUnits } from "@/db/schema";
-import { requireAccountId } from "@/lib/auth";
+import { authenticateAccount } from "@/lib/auth";
 import { createUnitId } from "@/lib/unit-id";
+import { reservationCutoff, reservationExpiry } from "@/lib/upload-reservation";
 
 const requestSchema = z.object({
   recordedAt: z.string().datetime({ offset: true }),
-  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]),
+  recordingConfig: z.enum(["ultra_wide", "arkit", "iphone"]),
 });
 
 export async function POST(req: Request) {
-  let accountId: string;
-  try {
-    accountId = await requireAccountId(req);
-  } catch (response) {
-    return response as Response;
-  }
+  const authentication = await authenticateAccount(req);
+  if (!authentication.ok) return authentication.response;
+  const { accountId } = authentication;
 
   let body: unknown;
   try {
@@ -37,11 +35,17 @@ export async function POST(req: Request) {
   }
 
   const unitId = createUnitId(rows[0].site, new Date(parsed.data.recordedAt));
+  const now = new Date();
+  await db.delete(uploadUnits).where(lt(uploadUnits.createdAt, reservationCutoff(now)));
   await db.insert(uploadUnits).values({
     unitId,
     accountId,
     recordingConfig: parsed.data.recordingConfig,
     recordedAt: new Date(parsed.data.recordedAt),
   });
-  return NextResponse.json({ unitId, siteId: rows[0].site }, { status: 201 });
+  return NextResponse.json({
+    unitId,
+    siteId: rows[0].site,
+    expiresAt: reservationExpiry(now).toISOString(),
+  }, { status: 201 });
 }

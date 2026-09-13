@@ -1,7 +1,7 @@
 // iPhone RGB + IMU capture without ARKit.
 //
 // The native backend uses AVCaptureSession with the rear ultra-wide camera and
-// Core Motion. Its delivered manifest deliberately matches Mentra: rgb.mp4,
+// Core Motion. Its delivered manifest contains rgb.mp4,
 // frames.jsonl, imu.jsonl, and metadata.json. The JSON schemas preserve raw
 // timestamps and carry the measured video-to-IMU residual separately.
 

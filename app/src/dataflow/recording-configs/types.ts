@@ -117,21 +117,11 @@ export interface RecordingConfig {
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
 }
 
-/** User-facing capture methods are broader than local recording configs:
- * Mentra is selected and managed from this iPhone, but recording itself runs
- * on the glasses. Keeping that distinction explicit prevents the UI from
- * pretending an external device implements the iPhone session lifecycle. */
-export type CaptureMethodId = 'arkit' | 'mentra' | 'iphone';
+export type CaptureMethodId = 'arkit' | 'iphone';
 
-export type CaptureMethod =
-  | {
-      readonly id: 'arkit' | 'iphone';
-      readonly label: string;
-      readonly location: 'this_device';
-      readonly recordingConfigId: 'arkit' | 'iphone';
-    }
-  | {
-      readonly id: 'mentra';
-      readonly label: string;
-      readonly location: 'external_device';
-    };
+export interface CaptureMethod {
+  readonly id: CaptureMethodId;
+  readonly label: string;
+  readonly location: 'this_device';
+  readonly recordingConfigId: CaptureMethodId;
+}

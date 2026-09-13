@@ -16,13 +16,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { presignRawSessionUploads } from "@/lib/r2";
-import { requireAccountId } from "@/lib/auth";
+import { authenticateAccount } from "@/lib/auth";
 import { UNIT_ID_RE } from "@/lib/unit-id";
 import { db } from "@/db/client";
 import { uploadUnits } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { SHA256_RE } from "@/lib/source-manifest";
 import { validateRawSourceManifest } from "@/lib/raw-source";
+import { reservationCutoff } from "@/lib/upload-reservation";
 
 const SourceFileSchema = z.object({
   name: z.string().min(1).max(128),
@@ -33,18 +34,15 @@ const SourceFileSchema = z.object({
 const RequestSchema = z.object({
   unitId: z.string().regex(UNIT_ID_RE, "invalid unit id"),
   // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる。
-  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]),
+  recordingConfig: z.enum(["ultra_wide", "arkit", "iphone"]),
   sourceManifestSha256: z.string().regex(SHA256_RE),
   sourceFiles: z.array(SourceFileSchema).min(2).max(32),
 });
 
 export async function POST(req: NextRequest) {
-  let accountId: string;
-  try {
-    accountId = await requireAccountId(req);
-  } catch (r) {
-    return r as Response;
-  }
+  const authentication = await authenticateAccount(req);
+  if (!authentication.ok) return authentication.response;
+  const { accountId } = authentication;
 
   let body: unknown;
   try {
@@ -65,6 +63,7 @@ export async function POST(req: NextRequest) {
     eq(uploadUnits.unitId, parsed.data.unitId),
     eq(uploadUnits.accountId, accountId),
     eq(uploadUnits.recordingConfig, parsed.data.recordingConfig),
+    gt(uploadUnits.createdAt, reservationCutoff()),
   )).limit(1);
   if (reservations.length === 0) {
     return NextResponse.json({ error: "unit id is not reserved for this account and recording config" }, { status: 403 });

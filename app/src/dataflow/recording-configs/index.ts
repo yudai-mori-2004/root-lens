@@ -36,11 +36,9 @@ export const RECORDING_CONFIGS_BY_PLATFORM: Record<DevicePlatform, readonly Reco
   android: [],
 };
 
-/** Settings-level capture choices. Mentra is intentionally not a
- * RecordingConfig because its camera session does not run on this phone. */
+/** Settings-level capture choices available on this phone. */
 export const CAPTURE_METHODS: readonly CaptureMethod[] = [
   { id: 'arkit', label: 'iPhone ARKit', location: 'this_device', recordingConfigId: 'arkit' },
-  { id: 'mentra', label: 'Mentra', location: 'external_device' },
   { id: 'iphone', label: 'iPhone', location: 'this_device', recordingConfigId: 'iphone' },
 ];
 
@@ -50,9 +48,7 @@ export function getCaptureMethod(id: CaptureMethodId | string): CaptureMethod | 
 
 export function recordingConfigForMethod(id: CaptureMethodId | string): RecordingConfig | undefined {
   const method = getCaptureMethod(id);
-  return method?.location === 'this_device'
-    ? getRecordingConfig(method.recordingConfigId)
-    : undefined;
+  return method ? getRecordingConfig(method.recordingConfigId) : undefined;
 }
 
 /** All configs across platforms, deduplicated. */

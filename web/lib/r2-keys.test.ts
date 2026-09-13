@@ -2,16 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { RAW_SESSION_MANIFEST, rawSessionFileKey } from "./r2-keys";
 
-describe("Mentra raw upload contract", () => {
-  it("presigns every file required by the device uploader", () => {
-    expect(RAW_SESSION_MANIFEST.mentra).toEqual([
-      { filename: "rgb.mp4", contentType: "video/mp4", required: true },
-      { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },
-      { filename: "imu.jsonl", contentType: "application/x-ndjson", required: true },
-      { filename: "metadata.json", contentType: "application/json", required: true },
-    ]);
-  });
-
+describe("raw upload keys", () => {
   it("uses the recording-unit raw prefix", () => {
     const unitId = "unit_bakery-01_20260930T044055123Z_7K2M9Q4R";
     expect(rawSessionFileKey(unitId, "frames.jsonl")).toBe(
@@ -21,8 +12,13 @@ describe("Mentra raw upload contract", () => {
 });
 
 describe("iPhone RGB+IMU raw upload contract", () => {
-  it("matches the Mentra delivered manifest exactly", () => {
-    expect(RAW_SESSION_MANIFEST.iphone).toEqual(RAW_SESSION_MANIFEST.mentra);
+  it("presigns its complete four-file source manifest", () => {
+    expect(RAW_SESSION_MANIFEST.iphone).toEqual([
+      { filename: "rgb.mp4", contentType: "video/mp4", required: true },
+      { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "imu.jsonl", contentType: "application/x-ndjson", required: true },
+      { filename: "metadata.json", contentType: "application/json", required: true },
+    ]);
   });
 });
 

@@ -2,7 +2,7 @@ import 'react-native-get-random-values';
 import 'fast-text-encoding';
 
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -26,7 +26,11 @@ import { DevSandboxScreen } from './src/devsandbox/DevSandboxScreen';
 import { AuthGate } from './src/services/auth';
 import { colors } from './src/theme';
 import { USE_DEV_SANDBOX } from './src/env';
-import { initClipPersistence } from './src/clips/persistence';
+import {
+  initClipPersistence,
+  retryClipPersistence,
+  subscribeClipPersistenceErrors,
+} from './src/clips/persistence';
 import { recoverOrphanRecordings } from './src/dataflow';
 import { initLocale } from './src/i18n';
 
@@ -57,16 +61,27 @@ export default function App() {
   // (= タブ portrait、 撮影だけ landscape)。 expo-screen-orientation の lockAsync は
   // react-native-screens に上書きされ効かないので、 ここでは扱わない。
   const [localeReady, setLocaleReady] = React.useState(false);
+  const [clipStorageError, setClipStorageError] = React.useState<string | null>(null);
+  const initializeClips = React.useCallback(async () => {
+    try {
+      await initClipPersistence();
+      const recovered = await recoverOrphanRecordings();
+      if (recovered > 0) console.log(`[clips] 未登録の録画を ${recovered} 本回収しました`);
+      setClipStorageError(null);
+    } catch (error) {
+      console.error('[clips] initialization failed:', error);
+      setClipStorageError(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
   useEffect(() => {
     // クリップ永続化 (= Layer 2 アダプタ) を起動: 保存済みクリップを hydrate + 以降の変更を persist。
     // hydrate 後に孤児録画 (= 電池切れ / クラッシュ / kill で台帳登録前に死んだ録画) を回収する。
-    initClipPersistence()
-      .then(() => recoverOrphanRecordings())
-      .then((n) => { if (n > 0) console.log(`[clips] 未登録の録画を ${n} 本回収しました`); })
-      .catch(() => {});
+    const unsubscribe = subscribeClipPersistenceErrors((error) => setClipStorageError(error.message));
+    void initializeClips();
     // 保存済み locale を hydrate してから描画 (= 既定 locale のちらつきを防ぐ)。
     initLocale().finally(() => setLocaleReady(true));
-  }, []);
+    return unsubscribe;
+  }, [initializeClips]);
 
   const [fontsLoaded] = useFonts({
     NotoSansJP_300Light,
@@ -84,6 +99,25 @@ export default function App() {
     return (
       <View style={[styles.center, { backgroundColor: colors.paper }]}>
         <ActivityIndicator color={colors.ink} />
+      </View>
+    );
+  }
+
+  if (clipStorageError) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.storageTitle}>録画一覧を保存できません</Text>
+        <Text style={styles.storageBody}>撮影を始める前に、もう一度お試しください。</Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={() => {
+            void retryClipPersistence()
+              .then(initializeClips)
+              .catch((error) => setClipStorageError(error instanceof Error ? error.message : String(error)));
+          }}
+        >
+          <Text style={styles.retryLabel}>再試行</Text>
+        </Pressable>
       </View>
     );
   }
@@ -114,4 +148,8 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: 24, gap: 12, backgroundColor: colors.paper,
   },
+  storageTitle: { color: colors.ink, fontSize: 20, fontWeight: '700' },
+  storageBody: { color: colors.ink, fontSize: 15 },
+  retryButton: { backgroundColor: colors.ink, paddingHorizontal: 20, paddingVertical: 12 },
+  retryLabel: { color: colors.paper, fontWeight: '700' },
 });

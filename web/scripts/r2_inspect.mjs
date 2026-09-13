@@ -1,6 +1,6 @@
 // R2 の prefix を一覧する / オブジェクトをローカルに落とす検証ユーティリティ。
-//   list:  node scripts/r2_inspect.mjs list <raw|arkit|mentra|processed> <prefix>
-//   get:   node scripts/r2_inspect.mjs get  <raw|arkit|mentra|processed> <key> <localPath>
+//   list:  node scripts/r2_inspect.mjs list <raw|arkit|processed> <prefix>
+//   get:   node scripts/r2_inspect.mjs get  <raw|arkit|processed> <key> <localPath>
 import { config } from "dotenv";
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { writeFileSync } from "fs";
@@ -23,7 +23,6 @@ const r2 = new S3Client({
 const bucketOf = (name) => {
   if (name === "raw") return process.env.R2_BUCKET_RAW;
   if (name === "arkit") return process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
-  if (name === "mentra") return process.env.R2_BUCKET_RAW_MENTRA ?? "rootlens-raw-mentra";
   if (name === "iphone") return process.env.R2_BUCKET_RAW;
   if (name === "processed") return process.env.R2_BUCKET_PROCESSED;
   throw new Error(`unknown bucket alias: ${name}`);
@@ -43,6 +42,6 @@ if (cmd === "list") {
   writeFileSync(b, buf);
   console.log(`wrote ${buf.length} bytes → ${b}`);
 } else {
-  console.error("usage: list <raw|arkit|mentra|iphone|processed> <prefix>  |  get <raw|arkit|mentra|iphone|processed> <key> <localPath>");
+  console.error("usage: list <raw|arkit|iphone|processed> <prefix>  |  get <raw|arkit|iphone|processed> <key> <localPath>");
   process.exit(1);
 }

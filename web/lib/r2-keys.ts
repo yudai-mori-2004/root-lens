@@ -4,7 +4,6 @@
 // バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw、 超広角 RGB の raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= depth / IMU / 6DoF ポーズ等 ARKit 由来 raw)
-//   mentra     → R2_BUCKET_RAW_MENTRA (= Mentra RGB / per-frame timestamp / IMU)
 //   iphone     → R2_BUCKET_RAW        (= rootlens-raw。iPhone 超広角 RGB / raw IMU)
 // key prefix は各バケットとも raw/<unit_id>/ で対称。
 
@@ -16,7 +15,7 @@ export function rawSessionPrefix(unitId: string): string {
 }
 
 /// 撮影構成 ID (= app/src/dataflow/recording-configs/ と 1:1)。
-export type RecordingConfigId = "ultra_wide" | "arkit" | "mentra" | "iphone";
+export type RecordingConfigId = "ultra_wide" | "arkit" | "iphone";
 
 /// 撮影構成が出力するファイル名。 構成が増えたら固有ファイルを足す。
 export type RawSessionFilename =
@@ -24,7 +23,7 @@ export type RawSessionFilename =
   | "frames.jsonl"            // per-frame の pose / intrinsics / tracking / hands (旧名 realtime_handpose.jsonl)
   | "realtime_handpose.jsonl" // 旧ビルド (= build 30 以前) 互換。 新規アップロードが frames.jsonl に揃ったら削除
   | "metadata.json"
-  | "imu.jsonl"           // ARKit / Mentra / iPhone 構成
+  | "imu.jsonl"           // ARKit / iPhone 構成
   | "depth.tar"           // ARKit + LiDAR (Pro) のみ optional
   | "pointcloud.jsonl"    // ARKit 構成のみ optional (= VIO 特徴点群)
   | "mesh.jsonl"          // ARKit + LiDAR (Pro) のみ optional (= シーン再構成メッシュ)
@@ -54,14 +53,6 @@ export const RAW_SESSION_MANIFEST: Record<
     { filename: "arkit_imu.jsonl", contentType: "application/x-ndjson", required: false },
     { filename: "device_metrics.jsonl", contentType: "application/x-ndjson", required: false },
   ],
-  mentra: [
-    { filename: "rgb.mp4", contentType: "video/mp4", required: true },
-    { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },
-    { filename: "imu.jsonl", contentType: "application/x-ndjson", required: true },
-    { filename: "metadata.json", contentType: "application/json", required: true },
-  ],
-  // Same delivered file contract as Mentra; only the capture implementation
-  // and metadata schema differ.
   iphone: [
     { filename: "rgb.mp4", contentType: "video/mp4", required: true },
     { filename: "frames.jsonl", contentType: "application/x-ndjson", required: true },

@@ -2,7 +2,7 @@
 // 認証は Authorization: Bearer <supabase JWT>。
 
 // ─── 撮影構成 ───────────────────────────────────────────────────
-export type RecordingConfig = "ultra_wide" | "arkit" | "mentra" | "iphone";
+export type RecordingConfig = "ultra_wide" | "arkit" | "iphone";
 
 export interface SourceFileIntegrity {
   name: string;
@@ -43,11 +43,11 @@ export interface CreateClipRequest {
   videoBytes: number;
   sourceManifestSha256: string;
   sourceFiles: SourceFileIntegrity[];
-  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit' | 'mentra' | 'iphone')
+  /// 採用された撮影構成。
   recordingConfig: RecordingConfig;
   /// 録画尺 (ms)。 端末が record stop−start から算出。
   durationMs?: number;
-  /// 撮影端末の機種 (= "iPhone15,2"、 "Mentra Live" 等)。
+  /// 撮影端末の機種 (= "iPhone15,2" 等)。
   deviceModel?: string;
   /// アップロード同意イベント id (= POST /api/v1/consents の返り値)。
   consentEventId?: string;
@@ -57,7 +57,6 @@ export interface CreateClipRequest {
 /// 撮影構成が並走出力するファイル分の presigned PUT URL。 構成でバケット + ファイル集合が決まる:
 ///   ultra_wide → rootlens-raw        (rgb.mp4 / realtime_handpose.jsonl / metadata.json)
 ///   arkit      → rootlens-raw-arkit  (RGB / frames / IMU + optional depth / point cloud / mesh / metrics)
-///   mentra     → rootlens-raw-mentra (rgb / per-frame timestamps / imu)
 export type RawSessionFilename =
   | "rgb.mp4"
   | "frames.jsonl"
@@ -85,6 +84,7 @@ export interface IssueUnitRequest {
 export interface IssueUnitResponse {
   unitId: string;
   siteId: string;
+  expiresAt: string;
 }
 
 export interface RawSessionUploadResponse {
@@ -107,16 +107,6 @@ export interface CreateClipResponse {
 /// 撮影アカウントの全クリップを返す。 アカウントは Bearer token の sub で決まる。
 export interface ListClipsResponse {
   clips: ClipDto[];
-}
-
-/// PATCH /api/clips/:unitId
-/// Mentra が先にアップロードしたクリップへ、 iPhone で取得した同意イベントを結び付ける。
-export interface AttachClipConsentRequest {
-  consentEventId: string;
-}
-
-export interface AttachClipConsentResponse {
-  clip: ClipDto;
 }
 
 /// DELETE /api/clips/:unitId

@@ -29,16 +29,14 @@ import Svg, { Circle, Polygon } from 'react-native-svg';
 import { BrandMark } from '../components/BrandMark';
 import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
-import { GlassesClipReviewModal } from '../components/GlassesClipReviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
-  storeEventSink, enqueueAdvance, discardClip, fetchMyClips, attachClipConsent,
+  storeEventSink, enqueueAdvance, discardClip, fetchMyClips,
   deleteServerClip, ClipApiError,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
 import { useUploadedClipFrame } from '../services/clipFrames';
-import { recordUploadConsent, type UploadConsentChecks } from '../services/consent';
 import { useAuth } from '../services/auth';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
@@ -235,15 +233,12 @@ interface Row {
   thumb?: DesignMock['thumb'];
 }
 
-type DeviceView = 'phone' | 'glasses';
-
 export const CollectionScreen: React.FC = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   const allClips = useClips();
   const { state: authState } = useAuth();
   const accountId = authState.status === 'authenticated' ? authState.session.accountId : null;
-  const [deviceView, setDeviceView] = useState<DeviceView>('phone');
 
   // 扉カラムの時計 (= 30 秒ごとに更新)
   const [nowMs, setNowMs] = useState(Date.now());
@@ -269,52 +264,35 @@ export const CollectionScreen: React.FC = () => {
   const serverClips = server.clips;
   const historyScrollRef = React.useRef<ScrollView>(null);
 
-  const phoneServerClips = useMemo(
-    () => serverClips.filter((clip) => clip.recordingConfig !== 'mentra'),
-    [serverClips],
-  );
-  const glassesPending = useMemo(
-    () => serverClips.filter((clip) => clip.recordingConfig === 'mentra' && !clip.consentEventId),
-    [serverClips],
-  );
-  const glassesConsented = useMemo(
-    () => serverClips.filter((clip) => clip.recordingConfig === 'mentra' && Boolean(clip.consentEventId)),
-    [serverClips],
-  );
-  const visibleServerClips = deviceView === 'phone' ? phoneServerClips : glassesConsented;
-
   // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
   const history = useMemo(
     () => [
-      ...(deviceView === 'phone'
-        ? HISTORY_MOCKS.map((m) => ({ clip: m.clip, source: m.source as ImageSourcePropType | undefined }))
-        : []),
-      ...visibleServerClips.map((c) => ({ clip: c, source: undefined as ImageSourcePropType | undefined })),
+      ...HISTORY_MOCKS.map((m) => ({ clip: m.clip, source: m.source as ImageSourcePropType | undefined })),
+      ...serverClips.map((c) => ({ clip: c, source: undefined as ImageSourcePropType | undefined })),
     ],
-    [deviceView, visibleServerClips],
+    [serverClips],
   );
 
   // 合計撮影時間 = アカウントのサーバ uploaded 分だけ (= ローカル待ちは端末の層なので混ぜない)
   const uploadedTotalMs = useMemo(
-    () => visibleServerClips.reduce((sum, c) => sum + (c.durationMs ?? 0), 0),
-    [visibleServerClips],
+    () => serverClips.reduce((sum, c) => sum + (c.durationMs ?? 0), 0),
+    [serverClips],
   );
   const totalMs = MOCK_STATS ? 11_460_000 : uploadedTotalMs;
 
   // 日別グラフもアカウントのサーバデータだけで描く
   const mergedDaily = useMemo(() => {
     const d: Record<string, number> = {};
-    for (const c of visibleServerClips) {
+    for (const c of serverClips) {
       const ms = c.durationMs ?? 0;
       if (ms <= 0 || !c.createdAt) continue;
       const k = dayKey(c.createdAt);
       d[k] = (d[k] ?? 0) + ms;
     }
     return d;
-  }, [visibleServerClips]);
+  }, [serverClips]);
 
   const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
-  const [glassesReviewTarget, setGlassesReviewTarget] = useState<ServerClipStatus | null>(null);
   const [historyTarget, setHistoryTarget] = useState<{ clip: ServerClipStatus; source?: ImageSourcePropType } | null>(null);
   // グラフで選択中の日 (= バーtap)。 履歴の該当日タイルもハイライトされる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -338,32 +316,8 @@ export const CollectionScreen: React.FC = () => {
     setPreviewTarget(null);
     void discardClip(clip.id);
   }, []);
-  const onChangeDevice = useCallback((next: DeviceView) => {
-    setDeviceView(next);
-    setSelectedDay(null);
-    setPreviewTarget(null);
-    setGlassesReviewTarget(null);
-    setHistoryTarget(null);
-  }, []);
-  const onGlassesConsent = useCallback(async (
-    clip: ServerClipStatus,
-    checks: UploadConsentChecks,
-  ) => {
-    const parsedCreatedAt = clip.createdAt ? new Date(clip.createdAt).getTime() : Number.NaN;
-    const consentEventId = await recordUploadConsent({
-      checks,
-      clipLocalId: clip.unitId,
-      clipCreatedAt: Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now(),
-      recordingConfig: 'mentra',
-      flow: 'uploaded-review',
-    });
-    await attachClipConsent(clip.unitId, consentEventId);
-    setGlassesReviewTarget(null);
-    server.refresh();
-  }, [server.refresh]);
   const onDeleteServerClip = useCallback(async (clip: ServerClipStatus) => {
     await deleteServerClip(clip.unitId);
-    setGlassesReviewTarget(null);
     setHistoryTarget(null);
     server.refresh();
   }, [server.refresh]);
@@ -383,7 +337,7 @@ export const CollectionScreen: React.FC = () => {
             (= 読み込み前の 0分 と「本当に 0 分」 を混ぜない)。 */}
         <View style={styles.counter}>
           <Text style={styles.counterNumber}>
-            {MOCK_STATS || visibleServerClips.length > 0 || server.phase === 'ready'
+            {MOCK_STATS || serverClips.length > 0 || server.phase === 'ready'
               ? formatTotal(totalMs)
               : '--'}
           </Text>
@@ -393,7 +347,6 @@ export const CollectionScreen: React.FC = () => {
           </View>
         </View>
 
-        <DeviceSwitch value={deviceView} onChange={onChangeDevice} />
       </View>
 
       {/* ── 右: 履歴 (上) + 待ち or グラフ (下) ── */}
@@ -401,7 +354,7 @@ export const CollectionScreen: React.FC = () => {
         <View>
           <View style={styles.pill}>
             <Text style={styles.pillText}>
-              {t(deviceView === 'phone' ? 'portfolio.uploadedLabel' : 'portfolio.glassesHistoryLabel')}
+              {t('portfolio.uploadedLabel')}
             </Text>
           </View>
           {history.length > 0 ? (
@@ -452,7 +405,7 @@ export const CollectionScreen: React.FC = () => {
                 <Text style={styles.serverStatusText}>{t('portfolio.signedOutNote')}</Text>
               ) : (
                 <Text style={styles.serverStatusText}>
-                  {t(deviceView === 'phone' ? 'portfolio.serverEmpty' : 'portfolio.glassesServerEmpty')}
+                  {t('portfolio.serverEmpty')}
                 </Text>
               )}
             </View>
@@ -460,7 +413,7 @@ export const CollectionScreen: React.FC = () => {
         </View>
 
         <View style={styles.bottomBlock}>
-          {deviceView === 'phone' && rows.length > 0 ? (
+          {rows.length > 0 ? (
             <View style={styles.pendingBlock}>
               <Text style={styles.pendingNotice}>{t('portfolio.pendingNotice')}</Text>
               <ScrollView
@@ -477,24 +430,6 @@ export const CollectionScreen: React.FC = () => {
                       previewSource={item.thumb}
                       onOpen={onOpen}
                     />
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          ) : deviceView === 'glasses' && glassesPending.length > 0 ? (
-            <View style={styles.pendingBlock}>
-              <Text style={styles.pendingNotice}>{t('portfolio.glassesPendingNotice')}</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.rowList}
-              >
-                {glassesPending.map((clip, i) => (
-                  <View
-                    key={clip.unitId}
-                    style={{ transform: [{ rotate: i % 2 === 0 ? '-0.8deg' : '0.7deg' }] }}
-                  >
-                    <GlassesReviewCard clip={clip} onOpen={() => setGlassesReviewTarget(clip)} />
                   </View>
                 ))}
               </ScrollView>
@@ -521,87 +456,7 @@ export const CollectionScreen: React.FC = () => {
         onClose={() => setHistoryTarget(null)}
         onDelete={onDeleteServerClip}
       />
-      <GlassesClipReviewModal
-        visible={glassesReviewTarget !== null}
-        clip={glassesReviewTarget}
-        onClose={() => setGlassesReviewTarget(null)}
-        onConsent={onGlassesConsent}
-        onDelete={onDeleteServerClip}
-      />
     </View>
-  );
-};
-
-// ─── 端末切替 (= 左下。 履歴・合計・グラフを同じ端末に揃える) ─────────
-
-const DeviceSwitch: React.FC<{
-  value: DeviceView;
-  onChange: (value: DeviceView) => void;
-}> = ({ value, onChange }) => {
-  const t = useT();
-  return (
-    <View style={styles.deviceSwitchBlock}>
-      <Text style={styles.deviceSwitchLabel}>{t('portfolio.deviceLabel')}</Text>
-      <View style={styles.deviceSwitch}>
-        {(['phone', 'glasses'] as const).map((device) => {
-          const selected = value === device;
-          return (
-            <Pressable
-              key={device}
-              onPress={() => onChange(device)}
-              style={({ pressed }) => [
-                styles.deviceOption,
-                selected && styles.deviceOptionSelected,
-                pressed && styles.deviceOptionPressed,
-              ]}
-            >
-              <View style={[styles.deviceDot, selected && styles.deviceDotSelected]} />
-              <Text
-                style={[styles.deviceOptionText, selected && styles.deviceOptionTextSelected]}
-                numberOfLines={1}
-              >
-                {t(device === 'phone' ? 'portfolio.devicePhone' : 'portfolio.deviceGlasses')}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-};
-
-// ─── Mentra 確認待ちカード (= 動画はすでにサーバ上にある) ───────────────
-
-const GlassesReviewCard: React.FC<{
-  clip: ServerClipStatus;
-  onOpen: () => void;
-}> = ({ clip, onOpen }) => {
-  const t = useT();
-  const frame = useUploadedClipFrame(clip.unitId, clip.unitId);
-  return (
-    <Pressable onPress={onOpen} style={({ pressed }) => [styles.reviewCard, pressed && styles.tilePressed]}>
-      <View style={styles.reviewThumb}>
-        {frame ? (
-          <Image source={{ uri: frame }} style={styles.tileImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.tileFallback}>
-            <Svg width={22} height={22} viewBox="0 0 18 18" fill="none">
-              <Circle cx={9} cy={9} r={8.2} stroke={colors.textFaint} strokeWidth={1.1} />
-              <Polygon points="7,5.6 12.4,9 7,12.4" fill={colors.textFaint} />
-            </Svg>
-          </View>
-        )}
-        <View style={styles.reviewBadge}>
-          <Text style={styles.reviewBadgeText}>{t('glassesReview.consentTitle')}</Text>
-        </View>
-      </View>
-      <View style={styles.reviewMeta}>
-        <Text style={styles.reviewDate} numberOfLines={1}>{historyDateLabel(clip.createdAt)}</Text>
-        <Text style={styles.reviewDuration}>
-          {clip.durationMs != null ? formatTotal(clip.durationMs) : '—'}
-        </Text>
-      </View>
-    </Pressable>
   );
 };
 
@@ -779,45 +634,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.ink,
   },
-  deviceSwitchBlock: { gap: 7 },
-  deviceSwitchLabel: {
-    fontFamily: fonts.sansBold,
-    fontSize: 9,
-    letterSpacing: 1.35,
-    textTransform: 'uppercase',
-    color: colors.textMute,
-  },
-  deviceSwitch: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    backgroundColor: colors.card,
-  },
-  deviceOption: {
-    minHeight: 35,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  deviceOptionSelected: { backgroundColor: colors.lpYellow },
-  deviceOptionPressed: { opacity: 0.68 },
-  deviceDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.textFaint,
-  },
-  deviceDotSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
-  deviceOptionText: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 11.5,
-    color: colors.textMute,
-  },
-  deviceOptionTextSelected: { color: colors.textOnInk },
-
   // ── 右面 ──
   main: {
     flex: 1,
@@ -910,47 +726,6 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     alignItems: 'center',
   },
-  reviewCard: {
-    width: CARD_WIDTH,
-    padding: 7,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  reviewThumb: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    overflow: 'hidden',
-    borderRadius: radii.md,
-    backgroundColor: colors.paperDeep,
-  },
-  reviewBadge: {
-    position: 'absolute',
-    left: 8,
-    bottom: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    backgroundColor: colors.lpYellow,
-  },
-  reviewBadgeText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 9,
-    letterSpacing: 0.5,
-    color: colors.textOnInk,
-  },
-  reviewMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: 3,
-    paddingTop: 7,
-  },
-  reviewDate: { ...typography.labelSmall, color: colors.textMute, flex: 1 },
-  reviewDuration: { ...typography.labelSmall, color: colors.ink },
-
   graph: { flex: 1, justifyContent: 'flex-end', paddingBottom: spacing.sm },
   graphHeader: {
     flexDirection: 'row',

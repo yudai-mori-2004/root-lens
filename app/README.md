@@ -2,11 +2,9 @@
 
 An iPhone app (React Native + Expo, with native Swift modules) that records
 egocentric video of real work and uploads the raw recording sessions that
-become robot-learning training data. Settings expose three capture methods:
+become robot-learning training data. Settings expose two capture methods:
 
 - **iPhone ARKit** records RGB + ARKit/LiDAR/VIO sensor outputs on this phone.
-- **Mentra** is an external-device method. The phone shutter is intentionally
-  disabled because capture and upload are controlled on the glasses.
 - **iPhone** records ultra-wide RGB + microphone audio + raw accelerometer and
   gyroscope samples on this phone, without starting ARKit.
 
@@ -64,7 +62,7 @@ and mesh geometry, is written verbatim.
 
 ## iPhone RGB + IMU contract
 
-The non-ARKit **iPhone** method has the same delivered-file manifest as Mentra:
+The non-ARKit **iPhone** method uses a four-file delivered manifest:
 
 | File | Content |
 |---|---|
@@ -116,7 +114,7 @@ app/
     │                        pipeline (unit + manifest → verified R2 upload → registration).
     │                        Nothing here imports React
     ├── screens/             Capture, clip list, settings, login
-    ├── components/          Clip cards, local upload consent, and remote Mentra review
+    ├── components/          Clip cards and local upload consent
     ├── services/            Auth (Supabase), capture settings, sound cues
     └── domain/              Gesture debouncing
 ```
@@ -128,11 +126,8 @@ files receive a separate delivery manifest after processing.
 
 For iPhone captures, the wearer reviews each local clip and records consent
 before upload. The upload is stage-resumable (manifest, upload, register), so a
-failed or interrupted upload retries without redoing finished work. Mentra
-captures follow the field-device path: the glasses upload under the signed-in
-site account first, and the same account reviews the remote clip in this app.
-The resulting consent event is attached to that existing recording-unit row;
-unreviewed Mentra clips never appear in the consented history or its totals.
+failed or interrupted upload retries without redoing finished work. Mentra uses
+the independent field-device path described in `mentra-os/README.md`.
 
 ## Development
 

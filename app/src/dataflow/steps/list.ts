@@ -104,32 +104,3 @@ export async function deleteServerClip(unitId: string): Promise<void> {
   mediaUrlCache.delete(unitId);
   mediaUrlInflight.delete(unitId);
 }
-
-/** Mentra がアップロード済みのクリップへ、 iPhone で取得した同意を結び付ける。 */
-export async function attachClipConsent(
-  unitId: string,
-  consentEventId: string,
-): Promise<ServerClipStatus> {
-  let res: Response;
-  try {
-    res = await fetch(`${SERVER_URL}/api/clips/${unitId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(await getAuthHeader()),
-      },
-      body: JSON.stringify({ consentEventId }),
-    });
-  } catch (e) {
-    throw new ClipApiError('network', e instanceof Error ? e.message : String(e));
-  }
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    const detail = `PATCH /api/clips/:unitId ${res.status}: ${text.slice(0, 200)}`;
-    if (res.status === 404) throw new ClipApiError('not-found', detail);
-    if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
-    throw new ClipApiError('server', detail);
-  }
-  const { clip } = (await res.json()) as { clip: ServerClipStatus };
-  return clip;
-}

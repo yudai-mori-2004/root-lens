@@ -7,7 +7,7 @@
 // 自前の row レイアウト + useState が最小)。 撮影は RootStack の CaptureMode を
 // fullscreen modal で push する (= タブ画面ではなく action trigger)。
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,12 +21,6 @@ import { HomeIcon, SettingsIcon } from '../components/TabIcons';
 import { BackgroundGlow } from '../components/BackgroundGlow';
 import { useT } from '../i18n';
 import { colors, fonts, spacing } from '../theme';
-import {
-  DEFAULT_CAPTURE_SETTINGS,
-  loadCaptureSettings,
-  subscribeCaptureSettings,
-  type CaptureSettings,
-} from '../services/captureSettings';
 
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
 type TabKey = 'home' | 'settings';
@@ -38,15 +32,6 @@ export const MainTabs: React.FC = () => {
   const insets = useSafeAreaInsets();
   const rootNav = useNavigation<RootNav>();
   const [tab, setTab] = useState<TabKey>('home');
-  const [captureMethod, setCaptureMethod] = useState<CaptureSettings['captureMethodId']>(
-    DEFAULT_CAPTURE_SETTINGS.captureMethodId,
-  );
-  useEffect(() => {
-    loadCaptureSettings().then((settings) => setCaptureMethod(settings.captureMethodId)).catch(() => {});
-    return subscribeCaptureSettings((settings) => setCaptureMethod(settings.captureMethodId));
-  }, []);
-  const captureOnPhone = captureMethod !== 'mentra';
-
   return (
     <View style={styles.root}>
       {/* LP と同じ紫黒 + 色付きグラデ + grain の背景 (= 全画面の下地) */}
@@ -74,15 +59,11 @@ export const MainTabs: React.FC = () => {
         <View style={styles.shutterSlot}>
           <Pressable
             onPress={() => rootNav.navigate('CaptureMode')}
-            disabled={!captureOnPhone}
             accessibilityRole="button"
             accessibilityLabel={t('tab.captureA11y')}
-            accessibilityState={{ disabled: !captureOnPhone }}
-            accessibilityHint={!captureOnPhone ? t('tab.captureMentraHint') : undefined}
             style={({ pressed }) => [
               styles.shutter,
-              !captureOnPhone && styles.shutterDisabled,
-              pressed && captureOnPhone && styles.shutterPressed,
+              pressed && styles.shutterPressed,
             ]}
           >
             <Svg width={30} height={30} viewBox="0 0 30 30" fill="none">
@@ -91,7 +72,6 @@ export const MainTabs: React.FC = () => {
               <Circle cx={15} cy={15} r={5.5} fill={colors.lpPink} />
             </Svg>
           </Pressable>
-          {!captureOnPhone ? <Text style={styles.externalCaptureLabel}>MENTRA</Text> : null}
         </View>
 
         <RailItem
@@ -170,12 +150,5 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   shutterPressed: { backgroundColor: colors.inkSoft, transform: [{ scale: 0.96 }] },
-  shutterDisabled: { opacity: 0.32 },
   shutterSlot: { alignItems: 'center', gap: 5 },
-  externalCaptureLabel: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 8,
-    letterSpacing: 1.2,
-    color: colors.textMute,
-  },
 });

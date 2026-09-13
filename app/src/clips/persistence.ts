@@ -18,6 +18,24 @@ const STORAGE_KEY = '@rootlens/clips/v2';
 const PERSIST_DEBOUNCE_MS = 400;
 
 let initialized = false;
+let persistenceErrorListener: ((error: Error) => void) | null = null;
+
+function asError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+function reportPersistenceError(value: unknown): void {
+  const error = asError(value);
+  console.error('[clips/persistence] write failed:', error);
+  persistenceErrorListener?.(error);
+}
+
+export function subscribeClipPersistenceErrors(listener: (error: Error) => void): () => void {
+  persistenceErrorListener = listener;
+  return () => {
+    if (persistenceErrorListener === listener) persistenceErrorListener = null;
+  };
+}
 
 // iOS はアプリを再インストールするたびに Data コンテナの UUID が変わる。 絶対パスを
 // そのまま保存すると、 次のインストールで全クリップのファイル参照が無効になる
@@ -44,11 +62,10 @@ function toAbsoluteUri(path: string | undefined): string | undefined {
 
 /** 起動時に保存済みクリップを store へ流し込む (= 1 回だけ)。 */
 async function hydrate(): Promise<void> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const arr = JSON.parse(raw) as Clip[];
-    const sanitized = arr.map((c) => {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  const arr = JSON.parse(raw) as Clip[];
+  const sanitized = arr.map((c) => {
       const clip: Clip = {
         ...c,
         sessionDir: toAbsoluteUri(c.sessionDir),
@@ -64,15 +81,23 @@ async function hydrate(): Promise<void> {
         return { ...clip, state: 'recorded' as const };
       }
       return clip;
-    });
-    dataflowStore.getState().replaceClips(sanitized);
-  } catch (e) {
-    console.error('[clips/persistence] hydrate failed (persisted clips ignored):', e);
-  }
+  });
+  dataflowStore.getState().replaceClips(sanitized);
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let lastClips: Record<string, Clip> | null = null;
+
+function serializedClips(clips: Record<string, Clip>): string {
+  const persistent = clipList(clips)
+    .filter((clip) => clip.state !== 'uploaded')
+    .map((clip) => ({ ...clip, sessionDir: toRelativePath(clip.sessionDir) }));
+  return JSON.stringify(persistent);
+}
+
+async function persistClips(clips: Record<string, Clip>): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, serializedClips(clips));
+}
 
 /** clips の変化を AsyncStorage に書き出す (= uploaded は保存しない、 軽くデバウンス)。 */
 function schedulePersist(clips: Record<string, Clip>): void {
@@ -83,13 +108,7 @@ function schedulePersist(clips: Record<string, Clip>): void {
     persistTimer = null;
     // uploaded = サーバに引き渡し済み (= 一覧から消える + ローカルファイルも掃除済み)。
     // 永続化しないことで再起動後に蘇らない。
-    const arr = clipList(clips)
-      .filter((c) => c.state !== 'uploaded')
-      .map((c) => ({
-        ...c,
-        sessionDir: toRelativePath(c.sessionDir),
-      }));
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(arr)).catch(() => {});
+    void persistClips(clips).catch(reportPersistenceError);
   }, PERSIST_DEBOUNCE_MS);
 }
 
@@ -99,10 +118,14 @@ function schedulePersist(clips: Record<string, Clip>): void {
  */
 export async function initClipPersistence(): Promise<void> {
   if (initialized) return;
-  initialized = true;
   await hydrate();
   // clips が変わるたびに永続化 (= zustand vanilla の subscribe は (state, prev) を渡す)。
   dataflowStore.subscribe((state, prev) => {
     if (state.clips !== prev.clips) schedulePersist(state.clips);
   });
+  initialized = true;
+}
+
+export async function retryClipPersistence(): Promise<void> {
+  await persistClips(dataflowStore.getState().clips);
 }

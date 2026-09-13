@@ -23,7 +23,6 @@ import type { SourceFileIntegrity } from "./source-manifest";
 // バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
-//   mentra     → R2_BUCKET_RAW_MENTRA (= 既定 rootlens-raw-mentra、 env で上書き)
 //   iphone     → R2_BUCKET_RAW        (= rootlens-raw。ultra_wideと同じ既存iPhone raw bucket)
 
 if (!process.env.R2_ACCOUNT_ID) {
@@ -47,7 +46,6 @@ const r2 = new S3Client({
 
 const BUCKET_RAW = process.env.R2_BUCKET_RAW;
 const BUCKET_RAW_ARKIT = process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
-const BUCKET_RAW_MENTRA = process.env.R2_BUCKET_RAW_MENTRA ?? "rootlens-raw-mentra";
 // iPhone RGB+IMU is part of the existing iPhone raw dataset. This alias is
 // intentionally not configurable independently so app/server/ops cannot drift
 // onto a fourth bucket by environment accident.
@@ -57,8 +55,7 @@ const BUCKET_RAW_IPHONE = BUCKET_RAW;
 export function rawBucketFor(config: RecordingConfigId): string {
   if (config === "ultra_wide") return BUCKET_RAW;
   if (config === "arkit") return BUCKET_RAW_ARKIT;
-  if (config === "iphone") return BUCKET_RAW_IPHONE;
-  return BUCKET_RAW_MENTRA;
+  return BUCKET_RAW_IPHONE;
 }
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここから再エクスポート。
@@ -214,4 +211,4 @@ export async function deleteRawSession(unitId: string, bucket: string): Promise<
   return keys.length;
 }
 
-export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT, BUCKET_RAW_MENTRA, BUCKET_RAW_IPHONE };
+export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT, BUCKET_RAW_IPHONE };

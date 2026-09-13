@@ -16,7 +16,7 @@ export type RecordingRate = 15 | 30 | 60;
 export type ImuRate = 50 | 100 | 200;
 
 export interface CaptureSettings {
-  /** User-facing capture method. Mentra is external and therefore has no local RecordingConfig. */
+  /** User-facing capture method on this iPhone. */
   captureMethodId: CaptureMethodId;
   /** Landscape side used by both the app UI and local camera backends. */
   displayOrientation: DisplayOrientation;
@@ -89,12 +89,10 @@ export async function loadCaptureSettings(): Promise<CaptureSettings> {
     const raw = currentRaw ?? legacyRaw;
     if (!raw) return { ...DEFAULT_CAPTURE_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<CaptureSettings> & { recordingConfigId?: string };
-    // `recordingConfigId` was used briefly before external Mentra was modeled
-    // separately. Read it only as a migration alias; new writes use the
-    // semantically correct settings-level captureMethodId.
+    // `recordingConfigId` was used by an older settings schema. Read it only as a migration alias.
     const storedMethod = parsed.captureMethodId ?? parsed.recordingConfigId;
     const captureMethodId: CaptureMethodId =
-      storedMethod === 'arkit' || storedMethod === 'mentra' || storedMethod === 'iphone'
+      storedMethod === 'arkit' || storedMethod === 'iphone'
         ? storedMethod
         : DEFAULT_CAPTURE_SETTINGS.captureMethodId;
     const captureFlow = isCaptureFlowId(parsed.captureFlow)

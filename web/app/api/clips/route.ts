@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, gt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clips, uploadUnits } from "@/db/schema";
-import { requireAccountId } from "@/lib/auth";
+import { authenticateAccount } from "@/lib/auth";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
 import { verifyRawSessionUploadMetadata } from "@/lib/r2";
 import { validateRawSourceManifest } from "@/lib/raw-source";
 import { SHA256_RE } from "@/lib/source-manifest";
 import { UNIT_ID_RE } from "@/lib/unit-id";
+import { reservationCutoff } from "@/lib/upload-reservation";
 import type {
   CreateClipRequest,
   CreateClipResponse,
@@ -19,12 +20,9 @@ import type {
 // 撮影アカウント (= Bearer token の sub) の所有クリップ一覧を新しい順に返す。
 // optional query: unitId を渡すと絞り込む (= 端末の冪等チェック用)。
 export async function GET(req: Request) {
-  let accountId: string;
-  try {
-    accountId = await requireAccountId(req);
-  } catch (r) {
-    return r as Response;
-  }
+  const authentication = await authenticateAccount(req);
+  if (!authentication.ok) return authentication.response;
+  const { accountId } = authentication;
 
   const url = new URL(req.url);
   const unitId = url.searchParams.get("unitId");
@@ -57,19 +55,16 @@ const createSchema = z.object({
   videoBytes: z.number().int().positive(),
   sourceManifestSha256: z.string().regex(SHA256_RE),
   sourceFiles: z.array(sourceFileSchema).min(2).max(32),
-  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra", "iphone"]),
+  recordingConfig: z.enum(["ultra_wide", "arkit", "iphone"]),
   durationMs: z.number().int().positive().optional(),
   deviceModel: z.string().min(1).max(64).optional(),
   consentEventId: z.string().min(1).max(64).optional(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
 export async function POST(req: Request) {
-  let accountId: string;
-  try {
-    accountId = await requireAccountId(req);
-  } catch (r) {
-    return r as Response;
-  }
+  const authentication = await authenticateAccount(req);
+  if (!authentication.ok) return authentication.response;
+  const { accountId } = authentication;
 
   let raw: unknown;
   try {
@@ -120,6 +115,7 @@ export async function POST(req: Request) {
     eq(uploadUnits.unitId, parsed.data.unitId),
     eq(uploadUnits.accountId, accountId),
     eq(uploadUnits.recordingConfig, parsed.data.recordingConfig),
+    gt(uploadUnits.createdAt, reservationCutoff()),
   )).limit(1);
   if (reservations.length === 0) {
     return NextResponse.json({ error: "unit id is not reserved for this account and recording config" }, { status: 403 });

@@ -290,7 +290,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const [displayOrientation, setDisplayOrientation] = useState<DisplayOrientation>(
     'landscapeRight',
   );
-  const [externalCaptureSelected, setExternalCaptureSelected] = useState(false);
   const [activeConfigId, setActiveConfigId] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [availByConfig, setAvailByConfig] = useState<Record<string, boolean>>({});
@@ -350,7 +349,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     loadCaptureSettings()
       .then((s) => {
         const selected = recordingConfigForMethod(s.captureMethodId);
-        setExternalCaptureSelected(!selected);
         if (selected) setSelectedConfigId(selected.id);
         setDisplayOrientation(s.displayOrientation);
         cycleRef.current = {
@@ -368,7 +366,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // route. The iPhone RGB+IMU config records AAC even in gesture mode; the
   // voice flow also needs input even when ARKit is selected.
   useEffect(() => {
-    if (!settingsLoaded || externalCaptureSelected) return;
+    if (!settingsLoaded) return;
     const allowsRecordingIOS = selectedConfigId === 'iphone'
       || getCaptureFlow(flowId).usesVoiceCommands;
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS }).catch(() => {});
@@ -420,7 +418,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // volume +/- は通常のシステム音量操作へ戻る。
   useEffect(() => {
     const flow = getCaptureFlow(flowId);
-    if (!flow.usesHardwareCaptureEvents || externalCaptureSelected || activeConfigId !== config.id) return;
+    if (!flow.usesHardwareCaptureEvents || activeConfigId !== config.id) return;
     const sub = subscribeHardwareCaptureEvent(() => {
       hardwareCaptureRef.current.seq += 1;
       hardwareCaptureRef.current.at = Date.now();
@@ -435,7 +433,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       hardwareCaptureRef.current.consumed = hardwareCaptureRef.current.seq;
       stopHardwareCaptureEvents().catch(() => {});
     };
-  }, [activeConfigId, config.id, externalCaptureSelected, flowId]);
+  }, [activeConfigId, config.id, flowId]);
 
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
@@ -510,13 +508,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [externalCaptureSelected, settingsLoaded, selectedConfigId]);
+  }, [settingsLoaded, selectedConfigId]);
 
   // 撮影構成の session ハンドオフ (= DevSandbox と同じ直列化)。 config が変わるたびに
   // 「旧 session 完全停止 (await) → カメラ解放待ち → 新 session 開始」 を直列実行する。
   // permission 許可後のみ動く。
   useEffect(() => {
-    if (permission !== 'granted' || !settingsLoaded || externalCaptureSelected) return;
+    if (permission !== 'granted' || !settingsLoaded) return;
     let cancelled = false;
     const target = config;
     sessionOpRef.current = sessionOpRef.current
@@ -561,7 +559,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       .catch((e) => sink({ step: 'capture', level: 'error', message: `session 切替失敗: ${errMsg(e)}` }))
       .finally(() => { if (!cancelled) setSwitching(false); });
     return () => { cancelled = true; };
-  }, [config, displayOrientation, externalCaptureSelected, flowId, permission, settingsLoaded]);
+  }, [config, displayOrientation, flowId, permission, settingsLoaded]);
 
   // アンマウント時に稼働中 session を停止する。
   useEffect(() => {
@@ -1184,7 +1182,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           deviceModel: Device.modelId ?? null,
         }),
       )
-      .catch(() => {});
+      .catch((cause) => {
+        const message = `緊急停止後の録画登録に失敗しました: ${errMsg(cause)}`;
+        console.error(message, cause);
+        sink({ step: 'capture', level: 'error', message });
+      });
   }, []);
 
   // クリーンアップ (= 録画中なら停止 + 登録。 session 自体は handoff effect の unmount cleanup が止める)
@@ -1225,17 +1227,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const availKnown = Object.keys(availByConfig).length > 0;
   const noConfigAvailable = availKnown && RECORDING_CONFIGS.every((c) => !availByConfig[c.id]);
 
-  if (settingsLoaded && externalCaptureSelected) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.eyebrow}>{t('settings.capture.method.mentra')}</Text>
-        <Text style={styles.body}>{t('tab.captureMentraHint')}</Text>
-        <Pressable style={styles.btn} onPress={() => navigation.goBack()}>
-          <Text style={styles.btnLabel}>{t('common.back')}</Text>
-        </Pressable>
-      </View>
-    );
-  }
   if (!settingsLoaded || permission === 'pending' || available === null) {
     return (
       <View style={styles.center}>

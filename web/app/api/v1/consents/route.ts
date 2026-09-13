@@ -11,7 +11,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { consentEvents } from "@/db/schema";
-import { requireAccountId } from "@/lib/auth";
+import { authenticateAccount } from "@/lib/auth";
 
 const RequestSchema = z.object({
   eventType: z.enum(["consent", "reconsent", "withdrawal"]),
@@ -33,12 +33,9 @@ const RequestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  let accountId: string;
-  try {
-    accountId = await requireAccountId(req);
-  } catch (r) {
-    return r as Response;
-  }
+  const authentication = await authenticateAccount(req);
+  if (!authentication.ok) return authentication.response;
+  const { accountId } = authentication;
 
   let raw: unknown;
   try {

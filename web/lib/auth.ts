@@ -12,20 +12,21 @@ function unauthorized(message: string): Response {
   });
 }
 
-/**
- * Bearer JWT を検証して account_id (uuid) を返す。 失敗時は Response を throw する
- * (= 呼び出し側は `catch (r) { return r as Response }` で返す)。
- */
-export async function requireAccountId(req: Request): Promise<string> {
+export type AccountAuthentication =
+  | { ok: true; accountId: string }
+  | { ok: false; response: Response };
+
+/** Bearer JWTを検証する。認証基盤自体の障害は通常の例外として呼び出し側へ伝える。 */
+export async function authenticateAccount(req: Request): Promise<AccountAuthentication> {
   const auth = req.headers.get("authorization");
   if (!auth || !auth.startsWith("Bearer ")) {
-    throw unauthorized("Authorization: Bearer <token> required");
+    return { ok: false, response: unauthorized("Authorization: Bearer <token> required") };
   }
   const token = auth.slice("Bearer ".length).trim();
 
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data?.user) {
-    throw unauthorized("invalid or expired token");
+    return { ok: false, response: unauthorized("invalid or expired token") };
   }
-  return data.user.id;
+  return { ok: true, accountId: data.user.id };
 }

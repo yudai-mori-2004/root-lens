@@ -117,12 +117,10 @@ export async function recoverOrphanRecordings(): Promise<number> {
   const doc = FileSystem.documentDirectory;
   if (!doc) return 0;
   const recRoot = `${doc}recordings/`;
-  let names: string[];
-  try {
-    names = await FileSystem.readDirectoryAsync(recRoot);
-  } catch {
-    return 0; // recordings/ does not exist yet (nothing recorded so far)
-  }
+  const rootInfo = await FileSystem.getInfoAsync(recRoot);
+  if (!rootInfo.exists) return 0;
+  if (!rootInfo.isDirectory) throw new Error('recordings path is not a directory');
+  const names = await FileSystem.readDirectoryAsync(recRoot);
   const known = new Set<string>();
   for (const c of Object.values(dataflowStore.getState().clips)) {
     const rel = docRelative(c.sessionDir);
@@ -197,7 +195,7 @@ export function enqueueAdvance(clipId: string, sink: EventSink): void {
   dataflowStore.getState().patchClip(clipId, { state: 'queued', errorMessage: null });
   advanceQueue = advanceQueue
     .then(() => advanceClip(clipId, sink))
-    .catch(() => {});
+    .catch((error) => sink({ step: 'upload', level: 'error', message: errMsg(error) }));
 }
 
 /**

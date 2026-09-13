@@ -10,7 +10,6 @@ export { registerClip } from './register';
 export {
   fetchMyClips,
   fetchClipMediaUrl,
-  attachClipConsent,
   deleteServerClip,
   ClipApiError,
 } from './list';
