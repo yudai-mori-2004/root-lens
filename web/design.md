@@ -18,7 +18,7 @@ Plain institutional editorial. The tone is direct, practical, and visibly mainta
 
 The reference is the structural clarity of Material Cultures: a simple name and navigation row, a white page ground, black hairline rules, content-led columns, and rectangular information rows. RootLens does not reproduce that site's imagery or page details.
 
-- Home: one compact statement of the work, centred Background and Business sections, then three unnumbered navigation choices.
+- Home: one compact statement of the work, followed by Background and Business sections within the same centred text measure, then three unnumbered navigation choices. Text inside that measure is left-aligned to one shared axis.
 - Contribute: navigation followed directly by full-width accordion rows, then the footer. No standalone hero, summary strip, or closing CTA.
 - Buy: compact introduction, factual summary, then bordered sections in reading order.
 - Data policy: a three-part overview followed by the same three stages in detail.
@@ -40,6 +40,7 @@ All surfaces are flat. Do not use gradients, translucency, glass effects, grain,
 - Geist is available for supporting Latin text; Geist Mono is reserved for compact identifiers or metadata.
 - Headings use the same sans-serif family as the body. Hierarchy comes from size, weight, spacing, and rules rather than a display typeface.
 - Long headings must wrap naturally. Do not force poster-like line breaks.
+- A centred content measure controls line length; headings and prose align to its left edge unless a page-level title is intentionally centred.
 
 ## Shape and rules
 

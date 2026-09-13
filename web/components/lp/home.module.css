@@ -1,4 +1,4 @@
-/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · genre: plain institutional editorial · macrostructure: compact introduction + centred background and business account + terminal route row · theme: studied-DNA (source: materialcultures.org) · contrast: pass (40–41) · nav: studied disclosure · footer: Ft4 · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · genre: plain institutional editorial · macrostructure: single-column editorial measure + terminal route row · theme: studied-DNA (source: materialcultures.org) · contrast: pass (40–41) · nav: studied disclosure · footer: Ft4 · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
 
 .page {
   min-height: 100dvh;
@@ -19,16 +19,16 @@
 .introBody {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-xs);
   border-top: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--public-body-size);
-  line-height: 1.65;
-  text-align: center;
+  line-height: 1.7;
+  text-align: left;
 }
 
 .introBody p {
-  max-width: 62rem;
+  max-width: 48rem;
 }
 
 .introTitle h1 {
@@ -50,21 +50,19 @@
 }
 
 .overview {
-  padding: var(--space-sm) var(--content-gutter);
-  text-align: center;
+  padding: var(--space-lg) var(--content-gutter) var(--space-xl);
+  text-align: left;
 }
 
 .overviewContent {
-  max-width: 52rem;
-  margin: 0 auto;
+  max-width: var(--content-max);
 }
 
 .overviewBlock + .overviewBlock {
-  margin-top: var(--space-md);
+  margin-top: var(--space-lg);
 }
 
 .overviewBlock h2 {
-  margin: 0 auto;
   font-size: var(--public-section-size);
   font-weight: 600;
   line-height: 1.4;
@@ -72,11 +70,11 @@
 
 .overviewText {
   max-width: 48rem;
-  margin: var(--space-sm) auto 0;
+  margin-top: var(--space-sm);
   display: grid;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   font-size: var(--public-body-size);
-  line-height: 1.85;
+  line-height: 1.75;
   color: var(--color-ink);
 }
 
