@@ -50,45 +50,88 @@
 }
 
 .illustrationCluster {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
   padding: var(--space-md) 0;
 }
 
 .illustrationCircle {
   position: relative;
-  flex: 0 0 clamp(12rem, 22vw, 17rem);
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 50%;
   border: var(--rule-thin) solid var(--color-rule-strong);
   background: var(--color-paper);
 }
 
 .illustrationCircle + .illustrationCircle {
-  margin-left: clamp(-1.25rem, -1.5vw, -0.75rem);
+  border-left: 0;
 }
 
-.illustrationCircle img {
+.illustrationFrame {
   object-fit: cover;
+  opacity: 0;
+  transform: scale(0.985);
+  will-change: opacity, transform;
+  animation: revealPanel 18s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+.frameWork {
+  animation-delay: var(--step-delay);
+}
+
+.frameExtraction {
+  animation-delay: calc(6s + var(--step-delay));
+}
+
+.frameRevenue {
+  animation-delay: calc(12s + var(--step-delay));
 }
 
 .illustrationLeft {
-  transform: translateY(0.5rem) rotate(-7deg);
+  --step-delay: 0s;
 }
 
 .illustrationCenter {
-  z-index: 1;
-  transform: translateY(-0.5rem) rotate(4deg);
+  --step-delay: 0.65s;
 }
 
 .illustrationRight {
-  transform: translateY(0.4rem) rotate(-4deg);
+  --step-delay: 1.3s;
+}
+
+@keyframes revealPanel {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  4.5%, 30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  36.7% {
+    opacity: 0;
+    transform: scale(1.01);
+  }
 }
 
 .introTitleLine {
   display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illustrationFrame {
+    animation: none;
+  }
+
+  .frameWork {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .overview {
@@ -173,14 +216,6 @@
 
   .illustrationCluster {
     padding: var(--space-sm) 0;
-  }
-
-  .illustrationCircle {
-    flex-basis: 34vw;
-  }
-
-  .illustrationCircle + .illustrationCircle {
-    margin-left: -3vw;
   }
 
 }

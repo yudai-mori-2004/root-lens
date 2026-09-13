@@ -6,23 +6,33 @@ import s from "./home.module.css";
 export default async function HomePage() {
   const locale = publicLocale(await getLocale());
   const pageCopy = publicPages[locale].home;
-  const workplaceIllustrations = [
+  const illustrationColumns = [
     {
-      src: "/illustrations/work-bakery.jpg",
-      alt: locale === "ja" ? "パンを並べる作業のイラスト" : "Illustration of arranging bread",
       className: s.illustrationLeft,
+      frames: [
+        "/illustrations/work-bakery.jpg",
+        "/illustrations/extraction-pictogram-1.jpg",
+        "/illustrations/revenue-pictogram-1.jpg",
+      ],
     },
     {
-      src: "/illustrations/work-grocery.jpg",
-      alt: locale === "ja" ? "青果を陳列する作業のイラスト" : "Illustration of stocking produce",
       className: s.illustrationCenter,
+      frames: [
+        "/illustrations/work-grocery.jpg",
+        "/illustrations/extraction-pictogram-2.jpg",
+        "/illustrations/revenue-pictogram-2.jpg",
+      ],
     },
     {
-      src: "/illustrations/work-restaurant.jpg",
-      alt: locale === "ja" ? "料理を盛り付ける作業のイラスト" : "Illustration of plating food",
       className: s.illustrationRight,
+      frames: [
+        "/illustrations/work-restaurant.jpg",
+        "/illustrations/extraction-pictogram-3.jpg",
+        "/illustrations/revenue-pictogram-3.jpg",
+      ],
     },
   ];
+  const frameClasses = [s.frameWork, s.frameExtraction, s.frameRevenue];
 
   return (
     <main className={s.page}>
@@ -37,17 +47,26 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <figure className={s.workplaceFigure}>
+      <figure
+        className={s.workplaceFigure}
+        aria-label={locale === "ja"
+          ? "現場作業、データ取得、収益還元の流れ"
+          : "The flow from workplace activity to data collection and revenue return"}
+      >
         <div className={s.illustrationCluster}>
-          {workplaceIllustrations.map((illustration) => (
-            <div className={`${s.illustrationCircle} ${illustration.className}`} key={illustration.src}>
-              <Image
-                src={illustration.src}
-                alt={illustration.alt}
-                fill
-                sizes="(max-width: 640px) 34vw, 17rem"
-                priority
-              />
+          {illustrationColumns.map((column) => (
+            <div className={`${s.illustrationCircle} ${column.className}`} key={column.frames[0]}>
+              {column.frames.map((src, frameIndex) => (
+                <Image
+                  className={`${s.illustrationFrame} ${frameClasses[frameIndex]}`}
+                  src={src}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 33vw, 21rem"
+                  loading="eager"
+                  key={src}
+                />
+              ))}
             </div>
           ))}
         </div>
