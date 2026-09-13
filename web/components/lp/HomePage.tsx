@@ -12,22 +12,22 @@ export default async function HomePage() {
       frames: [
         "/illustrations/work-bakery.jpg",
         "/illustrations/extraction-cut-1.jpg",
-        "/illustrations/revenue-cut-1.jpg",
+        "/illustrations/payment-into-rootlens.jpg",
       ],
     },
     {
       className: s.illustrationCenter,
       frames: [
         "/illustrations/work-grocery.jpg",
-        "/illustrations/extraction-cut-2.jpg",
-        "/illustrations/revenue-cut-2.jpg",
+        "/illustrations/robot-research-use.jpg",
+        "/illustrations/rootlens-distribution-hub.jpg",
       ],
     },
     {
       className: s.illustrationRight,
       frames: [
         "/illustrations/work-restaurant.jpg",
-        "/illustrations/extraction-cut-3.jpg",
+        "/illustrations/robot-development.jpg",
         "/illustrations/revenue-cut-3.jpg",
       ],
     },
@@ -50,8 +50,8 @@ export default async function HomePage() {
       <figure
         className={s.workplaceFigure}
         aria-label={locale === "ja"
-          ? "現場作業、データ取得、収益還元の流れ"
-          : "The flow from workplace activity to data collection and revenue return"}
+          ? "現場作業の撮影、データの取得、ロボット開発、収益還元の流れ"
+          : "The flow from workplace capture and data collection to robot development and revenue return"}
       >
         <div className={s.illustrationCluster}>
           {illustrationColumns.map((column) => (
