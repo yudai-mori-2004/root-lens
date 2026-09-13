@@ -268,8 +268,8 @@ Claruは8月10日時点で従来のパン屋サンプルを確認している。
 
 ## 関連資料
 
-- Claru向けMentra能力説明：`output/pdf/RootLens_Claru_Mentra_Live_Response.pdf`
-- Claru向けiPhone能力説明：`output/pdf/RootLens_Claru_iPhone_15_Pro_Response.pdf`
+- Claru向けMentra能力説明：`progress/business/archive/partners/claru/mentra-live-capability.pdf`
+- Claru向けiPhone能力説明：`progress/business/archive/partners/claru/iphone-15-pro-capability.pdf`
 - Claruへの供給能力・価格返信案：`/Users/forest/Downloads/Claru_reply_EN.txt`
 - 店舗基本合意：`document/business/documents/current/agreements/site-cooperation.md`
 - 撮影参加者同意：`document/business/documents/current/consents/participant-consent.md`

@@ -19,7 +19,7 @@ root-lens/
 │   ├── session_cutter/       Long-session clip extraction
 │   ├── hand-visibility-qc/   Hand-visibility quality checks
 │   └── sample-select/        Sample statistics and selection
-├── fixtures/          Contracts shared across runtimes
+├── tests/             Cross-runtime test vectors
 └── document/          Legal sources, task records, and historical specifications
 ```
 

@@ -7,7 +7,7 @@
 - 正本：`document/business/documents/`
 - 画像：`document/business/assets/`
 - スタイル：`document/business/styles/`
-- PDF出力：`output/pdf/business/`
+- PDF出力：`progress/business/`
 - 実際の署名・電子同意記録・支払記録：リポジトリ外の管理領域
 
 PDF生成時だけOSの一時ディレクトリにHTMLを作成する。一時HTMLは生成後に削除され、正本や成果物として保持しない。
@@ -31,7 +31,7 @@ document/business/
 ├── package.json
 └── README.md
 
-output/pdf/business/
+progress/business/
 ├── current/                        # 現行文書のPDF
 └── archive/                        # 過去資料のPDF
 ```

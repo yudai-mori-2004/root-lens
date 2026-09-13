@@ -15,7 +15,7 @@ from reportlab.platypus import Paragraph
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / "output/pdf/business/RootLens_progress_handout_since_2026-08-05.pdf"
+OUTPUT = ROOT / "progress/business/RootLens_progress_handout_since_2026-08-05.pdf"
 
 FONT_PATH = Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")
 FONT_NAME = "RootLensJapanese"

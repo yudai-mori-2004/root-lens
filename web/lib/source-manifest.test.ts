@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import fixture from "../../fixtures/source-manifest-v1.json";
+import testVector from "../../tests/source-manifest-v1.json";
 
 import { canonicalSourceManifest, sourceManifestSha256 } from "./source-manifest";
 
@@ -17,9 +17,9 @@ describe("source manifest", () => {
       .toBe(sourceManifestSha256("unit_demo_20260930T044055123Z_7K2M9Q4R", reversed));
   });
 
-  it("matches the cross-runtime contract fixture", () => {
-    const manifest = canonicalSourceManifest(fixture.unitId, fixture.files);
-    expect(JSON.stringify(manifest)).toBe(fixture.canonicalJson);
-    expect(sourceManifestSha256(fixture.unitId, fixture.files)).toBe(fixture.sha256);
+  it("matches the cross-runtime test vector", () => {
+    const manifest = canonicalSourceManifest(testVector.unitId, testVector.files);
+    expect(JSON.stringify(manifest)).toBe(testVector.canonicalJson);
+    expect(sourceManifestSha256(testVector.unitId, testVector.files)).toBe(testVector.sha256);
   });
 });

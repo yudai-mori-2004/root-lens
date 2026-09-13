@@ -12,7 +12,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const businessRoot = path.resolve(scriptDir, "..");
 const repoRoot = path.resolve(businessRoot, "../..");
 const documentsRoot = path.join(businessRoot, "documents");
-const outputRoot = path.join(repoRoot, "output/pdf/business");
+const outputRoot = path.join(repoRoot, "progress/business");
 const stylesRoot = path.join(businessRoot, "styles");
 const systemChrome =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

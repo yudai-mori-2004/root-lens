@@ -53,9 +53,6 @@ progress/
 
 # Personal application artifacts (PII; this repository is public)
 /document/applications/
-/output/docx/applications/
-/output/pdf/applications/
-/output/xlsx/applications/
 
 # Superseded RootCap design explorations (canonical design lives in hardware/rootcap/)
 /hardware/rootcap/candidates/
