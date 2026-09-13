@@ -1,4 +1,4 @@
-import { requireNativeViewManager, requireOptionalNativeModule } from 'expo-modules-core';
+import { requireNativeView, requireOptionalNativeModule } from 'expo';
 import type { ComponentType } from 'react';
 import type { ViewProps } from 'react-native';
 
@@ -17,7 +17,7 @@ export interface ArkitCapturePreviewProps extends ViewProps {}
 // in the build (e.g. Expo Go). When null, the UI shows a placeholder instead.
 export const ArkitCapturePreviewView: ComponentType<ArkitCapturePreviewProps> | null = (() => {
   try {
-    return requireNativeViewManager<ArkitCapturePreviewProps>('ArkitCapture');
+    return requireNativeView<ArkitCapturePreviewProps>('ArkitCapture');
   } catch {
     return null;
   }
@@ -290,7 +290,7 @@ export function subscribeMarkerCommand(
 /** Subscribe to hand tracking (fires at ~15 Hz). */
 export function subscribeHandTrack(listener: (e: HandTrackEvent) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };
-  // expo-modules-core Modules implement the EventEmitter interface.
+  // Expo native modules implement the EventEmitter interface.
   const sub = (nativeModule as any).addListener?.('onHandTrack', listener);
   if (sub && typeof sub.remove === 'function') return sub;
   // Fallback for the older API shape.

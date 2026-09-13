@@ -106,7 +106,7 @@ const RailItem: React.FC<{
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row' },
   content: { flex: 1 },
-  page: { ...StyleSheet.absoluteFillObject },
+  page: { ...StyleSheet.absoluteFill },
   pageHidden: { opacity: 0, zIndex: -1 },
 
   rail: {

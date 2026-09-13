@@ -57,5 +57,5 @@ export const BackgroundGlow: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  wrap: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  wrap: { ...StyleSheet.absoluteFill, zIndex: 0 },
 });

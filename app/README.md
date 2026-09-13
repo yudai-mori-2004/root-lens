@@ -131,6 +131,8 @@ the independent field-device path described in `mentra-os/README.md`.
 
 ## Development
 
+Use Node.js 22 and Xcode with an iOS 16.4 or newer deployment target.
+
 ```bash
 npm install
 cd ios && LANG=en_US.UTF-8 pod install && cd ..

@@ -7,7 +7,7 @@
 //
 // ⚠ Dataflow layer: must not import react / react-native.
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { SERVER_URL } from '../../env';
 import { getAuthHeader } from '../../services/auth/instance';
@@ -122,7 +122,7 @@ export async function uploadToR2(
   const sizes: Record<string, number> = {};
   let totalBytes = 0;
   for (const name of names) {
-    const info = await FileSystem.getInfoAsync(input.files[name], { size: true });
+    const info = await FileSystem.getInfoAsync(input.files[name]);
     if (!info.exists) throw new Error(`${name} not found: ${input.files[name]}`);
     const size = (info as { size?: number }).size ?? 0;
     sizes[name] = size;

@@ -225,7 +225,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
 
     // Current thermal state. Changes during recording arrive via the onThermalState event.
     AsyncFunction("getThermalState") { () -> String in
-      return ArkitCaptureController.thermalStateString(ProcessInfo.processInfo.thermalState)
+      return DeviceHealthMonitor.thermalStateString(ProcessInfo.processInfo.thermalState)
     }
 
     // Battery level (0..1, -1 when unknown) and charging state. Drives the long-recording auto-stop.

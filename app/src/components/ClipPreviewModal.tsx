@@ -20,7 +20,6 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
-import { ResizeMode, Video } from 'expo-av';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -33,12 +32,13 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { recordUploadConsent, type UploadConsentChecks } from '../services/consent';
 import { useLocale, useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
+import { VideoPlayerView } from './VideoPlayerView';
 
 interface Props {
   visible: boolean;
   clip: Clip | null;
   onClose: () => void;
-  /** 同意記録の成功後に呼ぶ。 hash → R2 → 登録 を開始する (再試行も同じ)。 */
+  /** 同意記録の成功後に呼ぶ。 manifest作成 → R2送信 → 登録を開始する。 */
   onUpload: (clip: Clip) => void;
   onRemove: (clip: Clip) => void;
 }
@@ -130,13 +130,11 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
           <View style={styles.videoPane}>
             <View style={styles.videoBox}>
             {uri ? (
-              <Video
-                source={{ uri }}
+              <VideoPlayerView
+                uri={uri}
                 style={styles.video}
-                resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
-                shouldPlay={!showTerms}
-                isLooping
+                playing={!showTerms}
+                loop
               />
             ) : (
               <View style={styles.videoMissing}>
@@ -369,7 +367,7 @@ const styles = StyleSheet.create({
 
   // 規約全文のポップ内オーバーレイ (= シートと同寸に重ねる)
   termsOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.paper,
   },
   termsHeader: {

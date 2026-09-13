@@ -11,7 +11,7 @@
 //
 // ⚠ Dataflow layer: must not import react / react-native.
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import type { EventSink, DataflowEventInput } from './events';
 import { getRecordingConfig, type RecordingConfig, type RecordingSession } from './recording-configs';
@@ -131,7 +131,7 @@ export async function recoverOrphanRecordings(): Promise<number> {
     if (!name.startsWith('rec-')) continue;
     if (known.has(`recordings/${name}`)) continue;
     const dir = `${recRoot}${name}/`;
-    const mp4 = await FileSystem.getInfoAsync(`${dir}rgb.mp4`, { size: true });
+    const mp4 = await FileSystem.getInfoAsync(`${dir}rgb.mp4`);
     if (!mp4.exists || mp4.isDirectory || (mp4.size ?? 0) < MIN_RECOVERABLE_MP4_BYTES) {
       await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
       continue;
@@ -301,7 +301,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
       if (!sourceFilesForUpload) {
         for (const source of cur.sourceFiles) {
           const localUri = `${session.sessionDir}${source.name}`;
-          const info = await FileSystem.getInfoAsync(localUri, { size: true });
+          const info = await FileSystem.getInfoAsync(localUri);
           if (!info.exists || (info as { size?: number }).size !== source.bytes) {
             throw new Error(`manifested source file changed or missing: ${source.name}`);
           }

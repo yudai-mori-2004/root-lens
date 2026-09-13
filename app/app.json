@@ -7,12 +7,6 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "io.rootlens.app",
@@ -20,9 +14,6 @@
       "infoPlist": {
         "NSCameraUsageDescription": "カメラで写真や動画を撮影するために使用します",
         "NSMicrophoneUsageDescription": "iPhone撮影モードでは映像とともに現場音声を記録します。また、音声操作を選んだ場合は撮影の開始・終了コマンドの認識にも使用します",
-        "NSPhotoLibraryUsageDescription": "端末の写真にアクセスするために使用します",
-        "NSPhotoLibraryAddUsageDescription": "撮影した写真を保存するために使用します",
-        "NSFaceIDUsageDescription": "セキュアな認証のために使用します",
         "NSMotionUsageDescription": "撮影中の端末の動き (加速度・ジャイロ) を記録し、映像との整合性検証に使用します",
         "ITSAppUsesNonExemptEncryption": false,
         "NSSpeechRecognitionUsageDescription": "「さつえいスタート」「さつえいストップ」の音声コマンドを端末内で認識するために使用します。音声が端末の外に送られることはありません"
@@ -37,9 +28,7 @@
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -52,15 +41,10 @@
           "microphonePermission": "動画撮影で音声を録音するために使用します"
         }
       ],
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "端末の写真にアクセスするために使用します",
-          "savePhotosPermission": "撮影した写真を保存するために使用します"
-        }
-      ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-audio",
+      "expo-video"
     ],
     "extra": {
       "eas": {

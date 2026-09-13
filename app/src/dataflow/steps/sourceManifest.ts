@@ -1,6 +1,6 @@
 // Assign a stable unit id, write it into metadata, and hash every source file.
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { nativeSha256File } from '../../native/fileHash';
 import type { EventSink } from '../events';
@@ -61,7 +61,7 @@ export async function buildSourceManifest(
   let totalBytes = 0;
   for (const spec of outputFiles) {
     const uri = sessionUri(session, spec.name);
-    const info = await FileSystem.getInfoAsync(uri, { size: true });
+    const info = await FileSystem.getInfoAsync(uri);
     if (!info.exists) {
       if (spec.required) throw new Error(`required source file missing: ${spec.name}`);
       continue;
@@ -81,7 +81,7 @@ export async function buildSourceManifest(
   const sourceFiles: SourceFileIntegrity[] = [];
   let completedBytes = 0;
   for (const name of Object.keys(files).sort()) {
-    const info = await FileSystem.getInfoAsync(files[name], { size: true });
+    const info = await FileSystem.getInfoAsync(files[name]);
     const bytes = (info as { size?: number }).size ?? 0;
     const digest = await nativeSha256File(files[name]);
     if (!digest || !HEX64.test(digest)) throw new Error(`SHA-256 failed for ${name}`);

@@ -13,7 +13,7 @@
 // 消えても miss 時に起こし直すだけ (= 動画本体は端末に無いという方針は不変)。
 
 import { useEffect, useState } from 'react';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
 import { fetchClipMediaUrl } from '../dataflow';

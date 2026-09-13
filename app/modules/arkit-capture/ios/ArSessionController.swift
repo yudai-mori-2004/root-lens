@@ -146,8 +146,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var deviceMetricsFileHandle: FileHandle?
   private var prevArkitQuat: simd_quatf?
   private var prevArkitTs: Double = -1
-  private var metricsCacheTs: Double = -1
-  private var metricsCache: [String: Any] = [:]
+  private let deviceHealth = DeviceHealthMonitor()
   // Camera-IMU extrinsic estimator: aligns VIO angular velocity against the gyro
   // stream during normal recording, caches per device model across sessions.
   private lazy var camImuEstimator = CameraImuExtrinsicEstimator(deviceModel: self.currentDeviceModel())
@@ -271,13 +270,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var readinessFramesSeen = 0
   private var consecutiveNormalFrames = 0
   private(set) var isSessionReady = false
-
-  // Thermal-state log (recording only). events is touched only on sensorFileQueue.
-  private var thermalObserver: NSObjectProtocol?
-  private var thermalEvents: [[String: Any]] = []
-  // Battery level at recording start (0..1, -1 unknown). Recorded with the end
-  // level into metadata.json at stop, accumulating real per-recording drain data.
-  private var batteryStartLevel: Float = -1
 
   // Brightness before dimming (restored on undim). Main thread only.
   private var brightnessBeforeDim: CGFloat?
@@ -538,8 +530,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.deviceMetricsFileHandle = metricsHandle
     self.prevArkitQuat = nil
     self.prevArkitTs = -1
-    self.metricsCacheTs = -1
-    self.metricsCache = [:]
     self.rgbRange = StreamRange()
     self.depthRange = StreamRange()
     self.pcRange = StreamRange()
@@ -552,7 +542,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if !sessionRunning { startSession() }
     handTracker.setRecordingMode(true)
     startMotionUpdates()
-    startThermalMonitoring()
+    deviceHealth.start { [weak self] state in
+      self?.delegate?.arkitCapture(didChangeThermalState: state)
+    }
 
     return sessionDir
   }
@@ -619,7 +611,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       MeshExporter.writeMeshJsonl(anchors: meshAnchors, into: dir)
     }
 
-    stopThermalMonitoring(mergingInto: dir)
+    deviceHealth.finish(mergingInto: dir)
     mergeEstimatorMetadata(into: dir)
 
     // Capture diagnostics before resetting (they go into the error message on
@@ -840,24 +832,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "tracking_reason": trackingPair.reason,
     ]
 
-    if timestamp - metricsCacheTs >= 0.5 || metricsCache.isEmpty {
-      metricsCacheTs = timestamp
-      let device = UIDevice.current
-      let thermal = ProcessInfo.processInfo.thermalState
-      metricsCache = [
-        "battery_level": Double(device.batteryLevel),
-        "battery_state": device.batteryState.rawValue,
-        "battery_state_str": Self.batteryStateString(device.batteryState),
-        "cpu_usage": currentCpuUsage(),
-        "memory_used_mb": currentFootprintMB(),
-        "memory_available_mb": availableMemoryMB(),
-        "thermal_state": thermal.rawValue,
-        "thermal_state_str": Self.thermalStateString(thermal),
-        "device_model": currentDeviceModel(),
-      ]
-    }
-    var metricsRow = metricsCache
-    metricsRow["timestamp_ns"] = tsNs
+    let metricsRow = deviceHealth.metricsRow(
+      timestamp: timestamp,
+      timestampNs: tsNs,
+      deviceModel: currentDeviceModel()
+    )
 
     let arkitHandle = arkitImuFileHandle
     let metricsHandle = deviceMetricsFileHandle
@@ -875,126 +854,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
       writeLine(arkitHandle, arkitRow, "arkit_imu.jsonl")
       writeLine(metricsHandle, metricsRow, "device_metrics.jsonl")
-    }
-  }
-
-  static func batteryStateString(_ s: UIDevice.BatteryState) -> String {
-    switch s {
-    case .unplugged: return "unplugged"
-    case .charging:  return "charging"
-    case .full:      return "full"
-    case .unknown:   return "unknown"
-    @unknown default: return "unknown"
-    }
-  }
-
-  /// Sum of per-thread cpu_usage for this process (1.0 = one full core).
-  private func currentCpuUsage() -> Double {
-    var threadsList: thread_act_array_t?
-    var threadsCount = mach_msg_type_number_t(0)
-    guard task_threads(mach_task_self_, &threadsList, &threadsCount) == KERN_SUCCESS,
-          let list = threadsList else { return 0 }
-    defer {
-      vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: list)),
-                    vm_size_t(Int(threadsCount) * MemoryLayout<thread_t>.stride))
-    }
-    var total: Double = 0
-    for i in 0..<Int(threadsCount) {
-      var info = thread_basic_info()
-      var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
-      let kr = withUnsafeMutablePointer(to: &info) {
-        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-          thread_info(list[i], thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
-        }
-      }
-      if kr == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 {
-        total += Double(info.cpu_usage) / Double(TH_USAGE_SCALE)
-      }
-    }
-    return total
-  }
-
-  /// Resident footprint (phys_footprint) in MB.
-  private func currentFootprintMB() -> Double {
-    var info = task_vm_info_data_t()
-    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-    let kr = withUnsafeMutablePointer(to: &info) {
-      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-        task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-      }
-    }
-    guard kr == KERN_SUCCESS else { return 0 }
-    return Double(info.phys_footprint) / (1024.0 * 1024.0)
-  }
-
-  /// Memory the OS would still grant this process, in MB.
-  private func availableMemoryMB() -> Double {
-    return Double(os_proc_available_memory()) / (1024.0 * 1024.0)
-  }
-
-  // MARK: - Thermal monitoring (the long-recording safety valve)
-
-  static func thermalStateString(_ s: ProcessInfo.ThermalState) -> String {
-    switch s {
-    case .nominal:  return "nominal"
-    case .fair:     return "fair"
-    case .serious:  return "serious"
-    case .critical: return "critical"
-    @unknown default: return "unknown"
-    }
-  }
-
-  /// Nanoseconds on the same clock as ARFrame.timestamp (systemUptime), so thermal events align with the frame stream.
-  private static func uptimeNs() -> Int64 {
-    Int64(ProcessInfo.processInfo.systemUptime * 1_000_000_000.0)
-  }
-
-  private func startThermalMonitoring() {
-    let initial = ProcessInfo.processInfo.thermalState
-    sensorFileQueue.async {
-      self.thermalEvents = [["timestamp_ns": Self.uptimeNs(),
-                             "state": Self.thermalStateString(initial)]]
-    }
-    DispatchQueue.main.async {
-      UIDevice.current.isBatteryMonitoringEnabled = true
-      self.batteryStartLevel = UIDevice.current.batteryLevel
-    }
-    thermalObserver = NotificationCenter.default.addObserver(
-      forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: nil
-    ) { [weak self] _ in
-      guard let self = self else { return }
-      let str = Self.thermalStateString(ProcessInfo.processInfo.thermalState)
-      NSLog("[ArkitCaptureController] thermal state -> %@", str)
-      self.sensorFileQueue.async {
-        self.thermalEvents.append(["timestamp_ns": Self.uptimeNs(), "state": str])
-      }
-      self.delegate?.arkitCapture(didChangeThermalState: str)
-    }
-  }
-
-  /// Stop monitoring and merge the thermal transitions (thermal_events) and the
-  /// measured battery drain into metadata.json (which was written on the first
-  /// frame, hence read-modify-write).
-  private func stopThermalMonitoring(mergingInto dir: URL) {
-    if let obs = thermalObserver {
-      NotificationCenter.default.removeObserver(obs)
-      thermalObserver = nil
-    }
-    var events: [[String: Any]] = []
-    sensorFileQueue.sync { events = self.thermalEvents; self.thermalEvents = [] }
-    var endLevel: Float = -1
-    DispatchQueue.main.sync { endLevel = UIDevice.current.batteryLevel }
-    let url = dir.appendingPathComponent("metadata.json")
-    guard let data = try? Data(contentsOf: url),
-          var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-      NSLog("[ArkitCaptureController] metadata.json not readable, thermal_events dropped")
-      return
-    }
-    if !events.isEmpty { obj["thermal_events"] = events }
-    obj["battery"] = ["start_level": batteryStartLevel, "end_level": endLevel]
-    batteryStartLevel = -1
-    if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
-      try? out.write(to: url, options: .atomic)
     }
   }
 

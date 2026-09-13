@@ -9,8 +9,8 @@
 // 記録が成功するまでアップロードを開始しない (= 証跡なしの同意を作らない)。
 // 同意記録の要件は document/legal/consent-log-spec/ja.md。
 
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex } from '@noble/hashes/utils';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 

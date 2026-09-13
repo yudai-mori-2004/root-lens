@@ -1,0 +1,43 @@
+diff --git a/node_modules/expo-file-system/ios/Legacy/NetworkingHelpers.swift b/node_modules/expo-file-system/ios/Legacy/NetworkingHelpers.swift
+index a2198c3..b5cd581 100644
+--- a/node_modules/expo-file-system/ios/Legacy/NetworkingHelpers.swift
++++ b/node_modules/expo-file-system/ios/Legacy/NetworkingHelpers.swift
+@@ -16,6 +16,8 @@ func createUrlSession(type: SessionType, delegate: URLSessionDelegate) -> URLSes
+   let configuration = type == .foreground ? URLSessionConfiguration.default : URLSessionConfiguration.background(withIdentifier: UUID().uuidString)
+   configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+   configuration.urlCache = nil
++  configuration.timeoutIntervalForRequest = 600
++  configuration.timeoutIntervalForResource = 86400
+   return URLSession(configuration: configuration, delegate: delegate, delegateQueue: .main)
+ }
+ 
+diff --git a/node_modules/expo-file-system/src/legacy/FileSystem.ts b/node_modules/expo-file-system/src/legacy/FileSystem.ts
+index e53ad0a..f8ff9b0 100644
+--- a/node_modules/expo-file-system/src/legacy/FileSystem.ts
++++ b/node_modules/expo-file-system/src/legacy/FileSystem.ts
+@@ -442,15 +442,16 @@ export class UploadTask extends FileSystemCancellableNetworkTask<UploadProgressD
+     }
+ 
+     this.addSubscription();
+-    const result = await ExponentFileSystem.uploadTaskStartAsync(
+-      this.url,
+-      this.fileUri,
+-      this.uuid,
+-      this.options
+-    );
+-    this.removeSubscription();
+-
+-    return result;
++    try {
++      return await ExponentFileSystem.uploadTaskStartAsync(
++        this.url,
++        this.fileUri,
++        this.uuid,
++        this.options
++      );
++    } finally {
++      this.removeSubscription();
++    }
+   }
+ }
+ 

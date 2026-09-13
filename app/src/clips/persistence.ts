@@ -10,7 +10,7 @@
 //   - v2 key separates the unit-id pipeline from pre-production upload state.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { dataflowStore, clipList, type Clip } from '../dataflow';
 

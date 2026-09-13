@@ -4,7 +4,7 @@
 //   黄 = マーク / 強調 (ワードマークの Lens と同系)
 //   ピンク = 行動 (録画・アップロード・サインイン)
 //   ライム = 進捗・蓄積 (アップロード進捗、 日別グラフ)
-// 日本語は M PLUS 1、 数値の読み出しは DotGothic (= LP のドット文字)、 hash 類は JetBrains Mono。
+// 日本語は Noto Sans JP、 数値の読み出しは DotGothic (= LP のドット文字)、 hash 類は JetBrains Mono。
 // 主役は映像、 UI は黒子 — 面はあくまで紫黒、 色は点で置く。
 
 import { Platform } from 'react-native';

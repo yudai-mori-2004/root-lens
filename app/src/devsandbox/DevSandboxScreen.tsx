@@ -1,7 +1,7 @@
 // 開発者用データフロー確認サンドボックス。
 //
 // 目的: UI フローから完全に独立した状態で、 単体クリップのデータフロー
-// (録画 → hash → アップロード → 登録) を 1 ボタンずつ叩いて検証する。
+// (録画 → source manifest 作成 → アップロード → 登録) を 1 ボタンずつ叩いて検証する。
 // 本番 UI (RootNavigator 配下の screens) とは別系統。 EXPO_PUBLIC_USE_SANDBOX=1 のビルドで App.tsx がこれをルートにする。
 //
 // このファイルは UI 層なので react / react-native / zustand binding を自由に使う。
@@ -334,9 +334,9 @@ export const DevSandboxScreen: React.FC = () => {
           <SandboxButton label="録画開始" onPress={onStartRecording} disabled={!canRecord || !!busy} />
           <SandboxButton label="録画停止" onPress={onStopRecording} disabled={!canStop || !!busy} />
         </View>
-        {/* 送信 (= hash → R2 アップ → /api/clips 登録) */}
+        {/* 送信 (= source manifest 作成 → R2 アップ → /api/clips 登録) */}
         <View style={styles.row}>
-          <SandboxButton label="送信 (hash → アップロード → 登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
+          <SandboxButton label="送信 (manifest → アップロード → 登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
         </View>
         <View style={styles.row}>
           <SandboxButton label="ログクリア" onPress={() => dataflowStore.getState().clearEvents()} disabled={!!busy} subtle />

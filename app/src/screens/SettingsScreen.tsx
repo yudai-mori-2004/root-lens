@@ -28,7 +28,7 @@ import { Camera } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import type { RootStackParamList } from '../app/types';
 
@@ -152,7 +152,7 @@ export const SettingsScreen: React.FC = () => {
       let total = 0;
       for (const name of items) {
         try {
-          const info = await FileSystem.getInfoAsync(`${dir}${name}`, { size: true });
+          const info = await FileSystem.getInfoAsync(`${dir}${name}`);
           if (info.exists && 'size' in info) total += (info as { size: number }).size;
         } catch {}
       }
@@ -764,9 +764,9 @@ const Section: React.FC<{ title: string; tone?: 'normal' | 'muted'; children: Re
   title, tone, children,
 }) => {
   const flatten = (nodes: React.ReactNode): React.ReactNode[] =>
-    React.Children.toArray(nodes).flatMap((node) =>
+      React.Children.toArray(nodes).flatMap((node) =>
       React.isValidElement(node) && node.type === React.Fragment
-        ? flatten(node.props.children)
+        ? flatten((node.props as { children?: React.ReactNode }).children)
         : [node],
     ).filter(Boolean);
   const items = flatten(children);
@@ -1135,7 +1135,7 @@ const styles = StyleSheet.create({
   validationRoot: { flex: 1, backgroundColor: '#05020A', alignItems: 'flex-end', justifyContent: 'center' },
   validationPreviewFallback: { backgroundColor: '#120B1B' },
   validationScrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(5, 2, 10, 0.46)',
   },
   validationPanel: {

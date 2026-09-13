@@ -5,7 +5,7 @@
 // frames.jsonl, imu.jsonl, and metadata.json. The JSON schemas preserve raw
 // timestamps and carry the measured video-to-IMU residual separately.
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
   captureIphoneSnapshot,

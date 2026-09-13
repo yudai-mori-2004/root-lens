@@ -16,13 +16,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { ResizeMode, Video } from 'expo-av';
 
 import { fetchClipMediaUrl, ClipApiError, type ServerClipStatus } from '../dataflow';
 import { formatCardDate, formatCardTime, formatDuration, configLabel } from './ClipCard';
 import { useUploadedClipFrame } from '../services/clipFrames';
 import { useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
+import { VideoPlayerView } from './VideoPlayerView';
 
 interface Props {
   visible: boolean;
@@ -101,12 +101,10 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
           <View style={styles.videoPane}>
             <View style={styles.videoBox}>
             {mediaUrl ? (
-              <Video
-                source={{ uri: mediaUrl }}
+              <VideoPlayerView
+                uri={mediaUrl}
                 style={styles.video}
-                resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
-                shouldPlay
+                playing
               />
             ) : (
               <View style={styles.videoPlaceholder}>
@@ -227,9 +225,9 @@ const styles = StyleSheet.create({
   },
   video: { width: '100%', height: '100%' },
   videoPlaceholder: { flex: 1 },
-  videoPoster: { ...StyleSheet.absoluteFillObject, opacity: 0.45 },
+  videoPoster: { ...StyleSheet.absoluteFill, opacity: 0.45 },
   videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

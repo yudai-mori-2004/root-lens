@@ -11,7 +11,7 @@
 // クリアして次回起動で新規アカウントを生成させる。
 
 import * as SecureStore from 'expo-secure-store';
-import { ed25519 } from '@noble/curves/ed25519';
+import { ed25519 } from '@noble/curves/ed25519.js';
 import bs58 from 'bs58';
 
 import type { AuthProvider, AuthState } from './types';

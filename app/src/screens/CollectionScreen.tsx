@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   counterTape: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255, 230, 0, 0.22)',
     borderRadius: 2,
     transform: [{ skewX: '-8deg' }],

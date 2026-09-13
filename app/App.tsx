@@ -5,21 +5,17 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import {
-  useFonts,
-  NotoSansJP_300Light,
-  NotoSansJP_400Regular,
-  NotoSansJP_500Medium,
-  NotoSansJP_700Bold,
-  NotoSansJP_900Black,
-} from '@expo-google-fonts/noto-sans-jp';
-import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_500Medium,
-} from '@expo-google-fonts/jetbrains-mono';
-import { Anton_400Regular } from '@expo-google-fonts/anton';
-import { DotGothic16_400Regular } from '@expo-google-fonts/dotgothic16';
+import { NotoSansJP_300Light } from '@expo-google-fonts/noto-sans-jp/300Light';
+import { NotoSansJP_400Regular } from '@expo-google-fonts/noto-sans-jp/400Regular';
+import { NotoSansJP_500Medium } from '@expo-google-fonts/noto-sans-jp/500Medium';
+import { NotoSansJP_700Bold } from '@expo-google-fonts/noto-sans-jp/700Bold';
+import { NotoSansJP_900Black } from '@expo-google-fonts/noto-sans-jp/900Black';
+import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono/400Regular';
+import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
+import { Anton_400Regular } from '@expo-google-fonts/anton/400Regular';
+import { DotGothic16_400Regular } from '@expo-google-fonts/dotgothic16/400Regular';
 
 import { RootNavigator } from './src/app/RootNavigator';
 import { DevSandboxScreen } from './src/devsandbox/DevSandboxScreen';

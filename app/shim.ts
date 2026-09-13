@@ -4,6 +4,7 @@
 //   - Buffer (= native module (wideCapture) のバイナリ受け渡し)
 
 import 'react-native-get-random-values';
-import { Buffer } from 'buffer';
+import { Buffer as NodeBuffer } from 'buffer';
 
-global.Buffer = global.Buffer || Buffer;
+const runtime = globalThis as typeof globalThis & { Buffer?: typeof NodeBuffer };
+runtime.Buffer ??= NodeBuffer;

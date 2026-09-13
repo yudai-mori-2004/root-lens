@@ -1,4 +1,4 @@
-import { requireNativeViewManager, requireOptionalNativeModule } from 'expo-modules-core';
+import { requireNativeView, requireOptionalNativeModule } from 'expo';
 import type { ComponentType } from 'react';
 import type { ViewProps } from 'react-native';
 
@@ -12,7 +12,7 @@ export interface IphoneCapturePreviewProps extends ViewProps {}
 
 export const IphoneCapturePreviewView: ComponentType<IphoneCapturePreviewProps> | null = (() => {
   try {
-    return requireNativeViewManager<IphoneCapturePreviewProps>('IphoneCapture');
+    return requireNativeView<IphoneCapturePreviewProps>('IphoneCapture');
   } catch {
     return null;
   }

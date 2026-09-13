@@ -20,7 +20,7 @@ import Speech
 //     keeps playing through the speaker while the mic listens.
 //   - Apple ends a recognition task after roughly one minute, so the task is
 //     restarted in a loop for shift-long listening.
-//   - expo-av rebuilds the audio session for every sound it plays, and its
+//   - expo-audio can rebuild the audio session when a sound plays, and its
 //     .playAndRecord configuration lacks .defaultToSpeaker, which lands
 //     playback on the quiet earpiece receiver. A route-change observer pushes
 //     output back to the speaker whenever that happens.
@@ -118,7 +118,7 @@ final class SpeechCommandController: NSObject {
   }
 
   /// .playAndRecord without .defaultToSpeaker routes playback to the earpiece
-  /// receiver (capped around -9 dB), and expo-av reconfigures the session that
+  /// receiver (capped around -9 dB), and expo-audio reconfigures the session that
   /// way on its first sound after the listener starts. Route changes are the
   /// only hook for noticing, so push output back to the speaker there.
   private func reassertSpeakerRoute() {

@@ -8,7 +8,7 @@
 //   (../../native/arkitCapture) uses react-native internally, but only its
 //   function exports are imported here (never the React preview component).
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
   isArkitCaptureAvailable,
