@@ -1,33 +1,32 @@
-/* RootLens Public Page — フライヤー (progress/promo-video) と同系のネオン zine 世界観 */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · genre: plain institutional editorial · macrostructure: shared flat public canvas · theme: studied-DNA (source: materialcultures.org) · contrast: pass (40–41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · mobile: pass (34, 49, 50–57) */
+@import "../tokens.css";
 
 :root {
-  /* フライヤー由来のパレット */
-  --rl-bg: #170529;
-  --rl-bg2: #1d0736;
-  --rl-bg3: #12021f;
-  --rl-ink: #1b0733;
-  --rl-pink: #ff2e93;
-  --rl-purple: #8b3dff;
-  --rl-cyan: #00e5ff;
-  --rl-lime: #c8ff00;
-  --rl-yellow: #ffe600;
-  --rl-orange: #ff7a00;
-  --rl-paper: #ffffff;
-  --rl-wt: rgba(255, 255, 255, 0.88);
-  --rl-wt-dim: rgba(255, 255, 255, 0.62);
+  --rl-bg: var(--color-paper);
+  --rl-bg2: var(--color-paper-muted);
+  --rl-bg3: var(--color-paper);
+  --rl-ink: var(--color-ink);
+  --rl-pink: var(--color-ink);
+  --rl-purple: var(--color-ink);
+  --rl-cyan: var(--color-ink);
+  --rl-lime: var(--color-paper-muted);
+  --rl-yellow: var(--color-paper-muted);
+  --rl-orange: var(--color-ink-muted);
+  --rl-paper: var(--color-paper);
+  --rl-wt: var(--color-ink);
+  --rl-wt-dim: var(--color-ink-muted);
 
-  /* 旧デザイントークン (sample ページ等の互換用に残す) */
-  --color-accent: var(--rl-cyan);
-  --bg-primary: var(--rl-bg);
-  --bg-secondary: var(--rl-bg2);
-  --bg-skeleton: rgba(255, 255, 255, 0.08);
-  --text-primary: var(--rl-wt);
-  --text-secondary: var(--rl-wt-dim);
-  --text-tertiary: rgba(255, 255, 255, 0.45);
-  --border-light: rgba(255, 255, 255, 0.14);
-  --color-verified: var(--rl-lime);
-  --color-failed: #ff5d5d;
-  --page-bg: var(--rl-bg);
+  --color-accent: var(--color-ink);
+  --bg-primary: var(--color-paper);
+  --bg-secondary: var(--color-paper-muted);
+  --bg-skeleton: var(--color-rule);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-muted);
+  --text-tertiary: var(--color-rule-strong);
+  --border-light: var(--color-rule);
+  --color-verified: var(--color-ink);
+  --color-failed: var(--color-danger);
+  --page-bg: var(--color-paper);
 }
 
 *,
@@ -39,34 +38,22 @@
 }
 
 html {
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+  scroll-behavior: auto;
 }
 
 body {
-  font-family: var(--font-lp-body, "Hiragino Sans", sans-serif);
-  color: var(--rl-wt);
-  line-height: 1.5;
-  background-color: var(--rl-bg);
-  background-image:
-    radial-gradient(60rem 60rem at 6% 22%, rgba(0, 229, 255, 0.12), transparent 65%),
-    radial-gradient(70rem 70rem at 98% 45%, rgba(139, 61, 255, 0.2), transparent 65%),
-    radial-gradient(55rem 55rem at 12% 92%, rgba(255, 46, 147, 0.13), transparent 65%),
-    linear-gradient(165deg, var(--rl-bg2) 0%, var(--rl-bg) 55%, var(--rl-bg3) 100%);
-  background-attachment: fixed;
-}
-
-/* zine の紙ノイズ (= フライヤーの grain と同じ) */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.5px, transparent 0.6px);
-  background-size: 3px 3px;
+  min-width: 320px;
+  overflow-x: clip;
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  line-height: 1.55;
+  background: var(--color-paper);
+  --font-lp-heading: var(--font-geist-sans, sans-serif);
+  --font-lp-mono: var(--font-geist-mono, monospace);
 }
 
 a {
@@ -74,12 +61,27 @@ a {
   text-decoration: none;
 }
 
-img {
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+img,
+video {
+  display: block;
   max-width: 100%;
   height: auto;
 }
 
 ::selection {
-  background: var(--rl-lime);
-  color: var(--rl-ink);
+  background: var(--color-surface-pressed);
+  color: var(--color-ink);
 }

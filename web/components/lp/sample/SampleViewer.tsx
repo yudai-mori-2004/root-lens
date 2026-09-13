@@ -17,6 +17,7 @@ import TimelineBar from "./TimelineBar";
 import SummaryBlock from "./SummaryBlock";
 import ContentsSection from "./ContentsSection";
 import type { PipelineOption, SessionOption, SummaryData, TimeSeriesData, TrajectoryData } from "./types";
+import styles from "./sampleViewer.module.css";
 
 interface Props {
   pipelines: PipelineOption[];
@@ -24,9 +25,11 @@ interface Props {
   driveUrl: string;
   /** 初期表示するパイプライン ID (無指定なら available=true の最初のもの)。 */
   initialPipelineId?: string;
+  /** 他ページの本文中に埋め込む場合は、ページタイトルと外部リンクを省く。 */
+  embedded?: boolean;
 }
 
-export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }: Props) {
+export default function SampleViewer({ pipelines, driveUrl, initialPipelineId, embedded = false }: Props) {
   const t = useTranslations("pages.sample");
   const firstAvail = useMemo(() => pipelines.find((p) => p.available), [pipelines]);
   const [pipelineId, setPipelineId] = useState<string>(
@@ -42,7 +45,7 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
   const session = sessions.find((s) => s.id === sessionId) ?? sessions[0] ?? null;
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 20px 48px" }}>
+    <div className={embedded ? styles.embedded : styles.page}>
       <Header
         pipelines={pipelines}
         active={pipeline.id}
@@ -56,9 +59,10 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
         activeSession={session}
         onSessionChange={setSessionId}
         nowShowing={t("nowShowing")}
+        embedded={embedded}
       />
       {pipeline.available && session ? (
-        <LoadedViewer key={session.id} assets={session.assets} range={session.range} label={pipeline.label} />
+        <LoadedViewer key={session.id} assets={session.assets} range={session.range} />
       ) : (
         <Placeholder label={pipeline.label} description={pipeline.description} placeholderTail={t("placeholder")} />
       )}
@@ -68,7 +72,7 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
 
 function Header({
   pipelines, active, onChange, description, pageTitle, preparingBadge,
-  driveUrl, driveCta, sessions, activeSession, onSessionChange, nowShowing,
+  driveUrl, driveCta, sessions, activeSession, onSessionChange, nowShowing, embedded,
 }: {
   pipelines: PipelineOption[];
   active: string;
@@ -82,16 +86,17 @@ function Header({
   activeSession: SessionOption | null;
   onSessionChange: (id: string) => void;
   nowShowing: string;
+  embedded: boolean;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+    <div className={styles.viewerHeader}>
       {/* 最上部: タイトルと、 サンプルデータの正 (ドライブ) への導線。 このページで再生して
           いるのはその中の 1 本にすぎない、 という主従を崩さない。 */}
-      <div style={{
+      {!embedded && <div style={{
         display: "flex", flexWrap: "wrap", alignItems: "center",
         justifyContent: "space-between", gap: 12,
       }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#f4f1fa" }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "var(--color-ink)" }}>
           {pageTitle}
         </h1>
         <a
@@ -111,8 +116,8 @@ function Header({
         >
           {driveCta} ↗
         </a>
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      </div>}
+      <div className={styles.pipelineTabs}>
         {pipelines.map((p) => {
           const isActive = p.id === active;
           return (
@@ -121,18 +126,7 @@ function Header({
               type="button"
               disabled={!p.available}
               onClick={() => onChange(p.id)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 999,
-                border: `1px solid ${isActive ? "#ffe600" : "#2c3140"}`,
-                background: isActive ? "#ffe600" : "transparent",
-                color: isActive ? "#131519" : "#e8ebf2",
-                cursor: p.available ? "pointer" : "not-allowed",
-                fontSize: 13,
-                fontWeight: 600,
-                opacity: p.available ? 1 : 0.55,
-                display: "flex", alignItems: "center", gap: 6,
-              }}
+              className={isActive ? styles.pipelineTabActive : styles.pipelineTab}
             >
               {p.label}
               {!p.available && <span style={{ fontSize: 10, fontWeight: 500 }}>({preparingBadge})</span>}
@@ -140,7 +134,7 @@ function Header({
           );
         })}
       </div>
-      <p style={{ margin: 0, color: "#a8afbe", fontSize: 13, lineHeight: 1.6, maxWidth: 900 }}>
+      <p className={styles.pipelineDescription}>
         {description}
       </p>
       {sessions.length > 1 && (
@@ -155,9 +149,9 @@ function Header({
                 style={{
                   padding: "6px 12px",
                   borderRadius: 999,
-                  border: `1px solid ${isActive ? "#ffe600" : "#2c3140"}`,
+                  border: `1px solid ${isActive ? "var(--color-ink)" : "var(--color-rule-strong)"}`,
                   background: "transparent",
-                  color: isActive ? "#ffe600" : "#a8afbe",
+                  color: isActive ? "var(--color-ink)" : "var(--color-ink-muted)",
                   cursor: "pointer",
                   fontSize: 12,
                   fontWeight: 600,
@@ -169,15 +163,15 @@ function Header({
           })}
         </div>
       )}
-      {activeSession && (
-        <div style={{ fontSize: 12, color: "#7a8090" }}>
+      {!embedded && activeSession && (
+        <div style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
           {nowShowing}:{" "}
           <a
             href={activeSession.drive.url}
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: "#e8ebf2", fontFamily: "monospace",
+              color: "var(--color-ink)", fontFamily: "monospace",
               textDecoration: "underline", textUnderlineOffset: 3,
             }}
           >
@@ -208,10 +202,9 @@ function Placeholder({ label, description, placeholderTail }: {
   );
 }
 
-function LoadedViewer({ assets, range, label }: {
+function LoadedViewer({ assets, range }: {
   assets: SessionOption["assets"];
   range?: SessionOption["range"];
-  label: string;
 }) {
   const t = useTranslations("pages.sample");
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -221,7 +214,6 @@ function LoadedViewer({ assets, range, label }: {
 
   useEffect(() => {
     let cancelled = false;
-    setSummary(null); setTrajectory(null); setTimeseries(null); setError(null);
     Promise.all([
       fetch(assets.summary).then((r) => r.json()),
       fetch(assets.trajectory).then((r) => r.json()),
@@ -262,6 +254,7 @@ function LoadedViewer({ assets, range, label }: {
         meshUrl={assets.mesh}
         trajectory={trajectory}
         timeseries={timeseries}
+        recordingConfig={summary.recordingConfig}
       />
       <TimelineBar />
       <SummaryBlock summary={summary} />
@@ -271,36 +264,34 @@ function LoadedViewer({ assets, range, label }: {
 }
 
 function PanelGrid({
-  rgbUrl, depthUrl, meshUrl, trajectory, timeseries,
+  rgbUrl, depthUrl, meshUrl, trajectory, timeseries, recordingConfig,
 }: {
   rgbUrl: string;
   depthUrl: string | null;
   meshUrl: string | null;
   trajectory: TrajectoryData;
   timeseries: TimeSeriesData;
+  recordingConfig: string;
 }) {
   const t = useTranslations("pages.sample.panels");
+  const hasSpatialData = Boolean(depthUrl || meshUrl);
   return (
     // 2x2: 上段 RGB / Depth、 下段 3D シーン / センサー。
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 8,
-      background: "#151820",
-      borderRadius: 8,
-      border: "1px solid #1a1d24",
-      overflow: "hidden",
-    }}>
+    <div className={styles.panelGrid}>
       <PanelCell title={t("rgb")}>
         <RgbPanel src={rgbUrl} />
       </PanelCell>
-      <PanelCell title={t("depth")}>
-        <DepthPanel src={depthUrl} />
-      </PanelCell>
-      <PanelCell title={t("scene")} minHeight={320}>
-        <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
-      </PanelCell>
-      <PanelCell title={t("numeric")} minHeight={320}>
+      {hasSpatialData ? (
+        <>
+          <PanelCell title={t("depth")}>
+            <DepthPanel src={depthUrl} />
+          </PanelCell>
+          <PanelCell title={t("scene")} minHeight={320}>
+            <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
+          </PanelCell>
+        </>
+      ) : null}
+      <PanelCell title={t(recordingConfig === "arkit" ? "numericWithHands" : "numeric")} minHeight={320}>
         <NumericPanel data={timeseries} />
       </PanelCell>
     </div>

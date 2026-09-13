@@ -31,12 +31,12 @@
       },
       "pipelines": {
         "arkit": {
-          "label": "iPhone (LiDAR)",
+          "label": "iPhone Pro",
           "description": "Recorded on iPhone 15 Pro or newer with LiDAR. Video, depth, camera pose, IMU, hand tracking, and a room mesh — all aligned on a single timeline."
         },
         "mentra": {
-          "label": "Smart glasses (Mentra Live)",
-          "description": "Captured with the Mentra Live smart glasses. Video and IMU only — no LiDAR depth or mesh. On-site recording is in preparation."
+          "label": "Smart glasses",
+          "description": "Captured on site with Mentra Live smart glasses, recording video, acceleration, and angular velocity. There is no LiDAR depth or mesh. A 65-second work segment has been selected for this public preview."
         }
       },
       "preparingBadge": "In preparation",
@@ -47,7 +47,8 @@
         "rgb": "Camera",
         "depth": "LiDAR depth",
         "scene": "Room mesh & path",
-        "numeric": "Sensor readouts"
+        "numeric": "Sensor data",
+        "numericWithHands": "Sensor data / hand tracking"
       },
       "numeric": {
         "hands": "Hands in frame",
@@ -88,6 +89,7 @@
         "section": "Contents",
         "intro": "Time-series topics inside the delivered session.mcap.",
         "depthUnavailable": "Not included in clips recorded on devices without LiDAR.",
+        "unavailable": "Not included in this capture configuration.",
         "tabs": {
           "video": "Video",
           "depth": "Depth",
@@ -113,6 +115,7 @@
         "values": {
           "videoEncoding": "JPEG (quality 85, encoded per frame)",
           "videoProcessing": "EgoBlur gen2",
+          "videoProcessingMentra": "Public range selection",
           "depthUnit": "mm (0 = missing)",
           "depthConfidence": "0 = low / 1 = medium / 2 = high",
           "poseContents": "position (xyz, m) + quaternion (x, y, z, w)",
@@ -120,7 +123,8 @@
           "imuOrientation": "quaternion (x, y, z, w)",
           "imuAccel": "m/s² (gravity included)",
           "imuGyro": "rad/s",
-          "imuCoord": "Device body frame (iOS CoreMotion)"
+          "imuCoord": "Device body frame (iOS CoreMotion)",
+          "imuCoordMentra": "Device body frame (Android Sensor API)"
         }
       }
     }

@@ -24,9 +24,9 @@ export default function NumericPanel({ data }: Props) {
   const handsShape = Array.isArray((data as unknown as { hands: unknown }).hands)
     ? { left: data.hands as unknown as boolean[], right: data.hands as unknown as boolean[] }
     : data.hands;
-  const idx = Math.min(handsShape.left.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
-  const leftOn = !!handsShape.left[idx];
-  const rightOn = !!handsShape.right[idx];
+  const idx = Math.min(data.imu.accel.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
+  const leftOn = handsShape ? !!handsShape.left[idx] : false;
+  const rightOn = handsShape ? !!handsShape.right[idx] : false;
 
   return (
     <div style={{
@@ -37,13 +37,15 @@ export default function NumericPanel({ data }: Props) {
       fontFamily: "'JetBrains Mono', 'SF Mono', ui-monospace, monospace", fontSize: 11,
       minWidth: 0,
     }}>
-      <HandRow
-        leftOn={leftOn}
-        rightOn={rightOn}
-        title={t("hands")}
-        leftLabel={t("leftHand")}
-        rightLabel={t("rightHand")}
-      />
+      {handsShape ? (
+        <HandRow
+          leftOn={leftOn}
+          rightOn={rightOn}
+          title={t("hands")}
+          leftLabel={t("leftHand")}
+          rightLabel={t("rightHand")}
+        />
+      ) : null}
       <SeriesCanvas label={t("accel")} data={data} idxNow={idx} field="accel" />
       <SeriesCanvas label={t("gyro")} data={data} idxNow={idx} field="gyro" />
     </div>

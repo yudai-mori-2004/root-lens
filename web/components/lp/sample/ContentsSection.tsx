@@ -24,6 +24,8 @@ export default function ContentsSection({ summary }: Props) {
   const V = (k: string) => t(`values.${k}`);
 
   const hasDepth = !!summary.camera?.depth;
+  const hasPose = summary.recordingConfig === "arkit";
+  const isMentra = summary.recordingConfig === "mentra";
   const cam = summary.camera;
   const cs: Record<string, unknown> = (summary.captureSettings as Record<string, unknown>) || {};
 
@@ -43,7 +45,7 @@ export default function ContentsSection({ summary }: Props) {
         [L("encoding"), V("videoEncoding")],
         [L("resolution"), videoRes],
         [L("rate"), videoFps],
-        [L("processing"), V("videoProcessing")],
+        [L("processing"), V(isMentra ? "videoProcessingMentra" : "videoProcessing")],
       ],
     },
     {
@@ -59,13 +61,13 @@ export default function ContentsSection({ summary }: Props) {
     },
     {
       id: "pose",
-      rows: [
+      rows: hasPose ? [
         [L("topic"), "/camera/pose"],
         [L("messageType"), "geometry_msgs/PoseStamped"],
         [L("rate"), videoFps],
         [L("coordinateSystem"), V("poseCoord")],
         [L("contents"), V("poseContents")],
-      ],
+      ] : [],
     },
     {
       id: "imu",
@@ -73,10 +75,10 @@ export default function ContentsSection({ summary }: Props) {
         [L("topic"), "/device/imu"],
         [L("messageType"), "sensor_msgs/Imu"],
         [L("rate"), imuRate],
-        [L("orientation"), V("imuOrientation")],
+        ...(!isMentra ? [[L("orientation"), V("imuOrientation")] as [string, string]] : []),
         [L("linearAcceleration"), V("imuAccel")],
         [L("angularVelocity"), V("imuGyro")],
-        [L("coordinateSystem"), V("imuCoord")],
+        [L("coordinateSystem"), V(isMentra ? "imuCoordMentra" : "imuCoord")],
       ],
     },
   ];
@@ -110,23 +112,21 @@ export default function ContentsSection({ summary }: Props) {
         padding: "12px 12px 0",
         borderBottom: "1px solid #1a1d24",
       }}>
-        {tabs.map((tab) => {
-          const disabled = tab.id === "depth" && !hasDepth;
+        {tabs.filter((tab) => !((tab.id === "depth" && !hasDepth) || (tab.id === "pose" && !hasPose))).map((tab) => {
           const isActive = tab.id === activeId;
           return (
             <button
               key={tab.id}
               type="button"
-              disabled={disabled}
               onClick={() => setActiveId(tab.id)}
               style={{
                 padding: "8px 14px",
                 border: "none",
                 background: isActive ? "#151820" : "transparent",
-                color: disabled ? "#4a4f5a" : isActive ? "#f4f1fa" : "#a8afbe",
+                color: isActive ? "#f4f1fa" : "#a8afbe",
                 fontSize: 12,
                 fontWeight: isActive ? 600 : 500,
-                cursor: disabled ? "not-allowed" : "pointer",
+                cursor: "pointer",
                 borderRadius: "4px 4px 0 0",
               }}
             >
@@ -137,8 +137,8 @@ export default function ContentsSection({ summary }: Props) {
       </div>
 
       <div style={{ padding: "16px 20px", fontSize: 13 }}>
-        {active.id === "depth" && !hasDepth ? (
-          <div style={{ color: "#7a8090", fontSize: 12 }}>{t("depthUnavailable")}</div>
+        {(active.id === "depth" && !hasDepth) || (active.id === "pose" && !hasPose) ? (
+          <div style={{ color: "#7a8090", fontSize: 12 }}>{active.id === "depth" ? t("depthUnavailable") : t("unavailable")}</div>
         ) : (
           <div style={{
             display: "grid",

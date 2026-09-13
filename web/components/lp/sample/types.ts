@@ -35,9 +35,9 @@ export interface TimeSeriesData {
     gyro: [number, number, number][];
   };
   /** 各サンプル時点で装着者の左手 / 右手それぞれが映っていたか (handedness で分離)。 */
-  hands: { left: boolean[]; right: boolean[] };
+  hands: { left: boolean[]; right: boolean[] } | null;
   /** ARKit の trackingState (0=notAvailable, 1=limited, 2=normal)。 */
-  tracking: number[];
+  tracking: number[] | null;
 }
 
 /** summary.json: クリップ全体の統計。 4 パネルの下に静的表示される。 */

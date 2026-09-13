@@ -26,22 +26,23 @@ export default function SummaryBlock({ summary }: Props) {
   const t = useTranslations("pages.sample.summary");
   const locale = useLocale();
   const cam = summary.camera;
+  const hasSpatialTracking = summary.recordingConfig === "arkit";
 
   return (
     <div style={{
       display: "grid", gap: 24, padding: "24px 0",
       gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-      color: "#e8ebf2", fontSize: 13,
+      color: "var(--color-ink)", fontSize: 13,
     }}>
       <Section title={t("clipSection")}>
         <Row k={t("durationLabel")} v={fmtDuration(summary.durationSec, locale)} />
         <Row k={t("framesLabel")} v={summary.frames.toLocaleString()} />
-        <Row k={t("fpsLabel")} v={summary.fps.toFixed(1)} />
+        <Row k={t("fpsLabel")} v={`${summary.fps.toFixed(1)} fps`} />
         <Row k={t("deviceLabel")} v={summary.device ?? "—"} />
         <Row k={t("osLabel")} v={summary.osVersion ?? "—"} />
       </Section>
 
-      <Section title={t("spaceSection")}>
+      {hasSpatialTracking && <Section title={t("spaceSection")}>
         <Row k={t("pathLengthLabel")} v={`${summary.pathLengthM.toFixed(1)} m`} />
         <Row k={t("areaLabel")} v={`${summary.areaM2.toFixed(1)} m²`} />
         <Row k={t("bboxLabel")} v={
@@ -52,19 +53,19 @@ export default function SummaryBlock({ summary }: Props) {
             })
             .join(" × ") + " m"
         } />
-      </Section>
+      </Section>}
 
-      <Section title={t("qualitySection")}>
+      {hasSpatialTracking && <Section title={t("qualitySection")}>
         <Row k={t("handRateLabel")} v={`${(summary.handDetectionRate * 100).toFixed(1)}%`} />
         <Row k={t("trackingRateLabel")} v={`${(summary.trackingNormalRate * 100).toFixed(1)}%`} />
-      </Section>
+      </Section>}
 
       {cam && (
         // lens は Apple 内部呼称 (現状全クリップ "wide" 固定) で、 FOV と情報が重複するため
         // 表示しない。 一般スペックとして意味があるのは 解像度 / FOV / 深度解像度。
         <Section title={t("cameraSection")}>
           <Row k={t("resolutionLabel")} v={`${cam.width ?? "?"} × ${cam.height ?? "?"}`} />
-          <Row k={t("fovLabel")} v={cam.field_of_view_deg ? `${cam.field_of_view_deg.toFixed(1)}°` : "—"} />
+          {cam.field_of_view_deg ? <Row k={t("fovLabel")} v={`${cam.field_of_view_deg.toFixed(1)}°`} /> : null}
           {cam.depth && (
             <Row k={t("depthResolutionLabel")} v={`${cam.depth.width} × ${cam.depth.height}`} />
           )}
@@ -78,7 +79,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <div style={{
-        fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a8090",
+        fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--color-ink-muted)",
         marginBottom: 8,
       }}>
         {title}
@@ -96,7 +97,7 @@ function Row({ k, v }: { k: string; v: string }) {
       gap: 12,
       alignItems: "start",
     }}>
-      <span style={{ color: "#7a8090" }}>{k}</span>
+      <span style={{ color: "var(--color-ink-muted)" }}>{k}</span>
       <span style={{ fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{v}</span>
     </div>
   );

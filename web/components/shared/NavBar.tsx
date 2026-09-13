@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import s from "./shared.module.css";
 
 export interface NavItem {
@@ -9,54 +10,66 @@ export interface NavItem {
   label: string;
 }
 
-export default function NavBar({ items }: { items: NavItem[] }) {
-  const pathname = usePathname();
+export default function NavBar({
+  items,
+  secondaryItems,
+}: {
+  items: NavItem[];
+  secondaryItems: NavItem[];
+}) {
   const [open, setOpen] = useState(false);
-
-  const isActive = (href: string) => !href.includes("#") && pathname === href;
 
   return (
     <nav className={s.nav}>
       <div className={s.navInner}>
-        <a href="/" className={s.navLogo}>
-          <img src="/logo.png" alt="" className={s.navLogoIcon} />
-          <span className={s.navLogoText}>
-            Root<em>Lens</em>
-          </span>
-        </a>
+        <Link href="/" className={s.navLogo}>
+          <Image
+            src="/rootlens-wordmark.png"
+            alt="RootLens"
+            width={439}
+            height={146}
+            className={s.navLogoImage}
+            priority
+          />
+        </Link>
         <div className={s.navSpacer} />
-        <div className={s.navLinks}>
-          {items.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={`${s.navLink} ${isActive(item.href) ? s.navLinkActive : ""}`}
-            >
-              {item.label}
-            </a>
-          ))}
-        </div>
         <button
           type="button"
           className={s.navBurger}
           aria-expanded={open}
+          aria-controls="site-navigation"
+          aria-label={open ? "Close navigation" : "Open navigation"}
           onClick={() => setOpen(!open)}
         >
           {open ? "CLOSE" : "MENU"}
         </button>
       </div>
       {open && (
-        <div className={s.navMenu}>
-          {items.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={s.navMenuLink}
-              onClick={() => setOpen(false)}
-            >
-              {item.label}
-            </a>
-          ))}
+        <div className={s.navMenu} id="site-navigation">
+          <div className={s.navMenuMain}>
+            {items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={s.navMenuLink}
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <div className={s.navMenuSecondary}>
+            {secondaryItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={s.navMenuSecondaryLink}
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </nav>

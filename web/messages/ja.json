@@ -31,12 +31,12 @@
       },
       "pipelines": {
         "arkit": {
-          "label": "iPhone (LiDAR あり)",
-          "description": "LiDAR 付きの iPhone(15 Pro 以降)で撮影しました。映像に加えて、部屋の奥行き・カメラの位置と向き・加速度・手の動き・空間の 3D メッシュを、すべて同じ時刻に揃えて記録しています。"
+          "label": "iPhone Pro",
+          "description": "iPhone（LiDAR搭載、15 Pro以降）で撮影しました。RGB映像に加え、深度、カメラ姿勢、IMU、ハンドトラッキング、空間3Dメッシュを共通のタイムラインで記録しています。"
         },
         "mentra": {
-          "label": "スマートグラス (Mentra Live)",
-          "description": "スマートグラスの Mentra Live で撮影します。記録できるのは映像と加速度で、LiDAR の奥行き情報や 3D メッシュはありません。現場での本収録を準備中です。"
+          "label": "スマートグラス",
+          "description": "スマートグラス（Mentra Live）で、現場の映像、加速度、角速度を記録しました。公開用に作業部分の65秒間を切り出しています。"
         }
       },
       "preparingBadge": "準備中",
@@ -45,9 +45,10 @@
       "loadError": "データを読み込めませんでした。時間を置いて再読み込みしてみてください。",
       "panels": {
         "rgb": "カメラ映像",
-        "depth": "LiDAR 深度",
-        "scene": "部屋の 3D モデルと歩いた道",
-        "numeric": "センサーの値"
+        "depth": "LiDAR深度",
+        "scene": "3Dモデルと移動経路",
+        "numeric": "センサーデータ",
+        "numericWithHands": "センサーデータ / ハンドトラッキング"
       },
       "numeric": {
         "hands": "手の映り",
@@ -61,19 +62,19 @@
         "mesh": "LiDAR 非搭載のため 3D モデルはありません"
       },
       "summary": {
-        "clipSection": "この 1 本",
-        "durationLabel": "長さ",
-        "framesLabel": "フレーム数",
-        "fpsLabel": "1 秒あたりのコマ数",
-        "deviceLabel": "撮影に使った端末",
+        "clipSection": "収録情報",
+        "durationLabel": "収録時間",
+        "framesLabel": "総フレーム数",
+        "fpsLabel": "フレームレート",
+        "deviceLabel": "使用端末",
         "osLabel": "OS",
-        "spaceSection": "歩いた場所",
-        "pathLengthLabel": "歩いた距離",
-        "areaLabel": "歩いた範囲",
-        "bboxLabel": "縦・横・高さ",
-        "qualitySection": "認識のよさ",
-        "handRateLabel": "手が映っていた割合",
-        "trackingRateLabel": "位置合わせが安定していた割合",
+        "spaceSection": "移動情報",
+        "pathLengthLabel": "移動距離",
+        "areaLabel": "移動範囲",
+        "bboxLabel": "バウンディングボックス",
+        "qualitySection": "トラッキング品質",
+        "handRateLabel": "手の検出率",
+        "trackingRateLabel": "姿勢推定の安定率",
         "cameraSection": "カメラ",
         "resolutionLabel": "解像度",
         "fovLabel": "視野角",
@@ -86,33 +87,35 @@
       },
       "contents": {
         "section": "コンテンツ",
-        "intro": "納品する session.mcap に含まれる時系列トピックの内訳です。",
+        "intro": "納品するsession.mcapに含まれる時系列トピックの内訳です。",
         "depthUnavailable": "LiDAR 非搭載端末で撮影したクリップには含まれません。",
+        "unavailable": "この収録構成には含まれません。",
         "tabs": {
           "video": "映像",
           "depth": "深度",
-          "pose": "6DoF 姿勢",
+          "pose": "6DoF姿勢",
           "imu": "IMU"
         },
         "labels": {
-          "topic": "トピック",
-          "messageType": "メッセージ型",
-          "encoding": "エンコード",
-          "resolution": "解像度",
-          "rate": "レート",
-          "unit": "単位",
-          "range": "レンジ",
-          "coordinateSystem": "座標系",
-          "contents": "内容",
-          "confidence": "信頼度",
-          "processing": "後処理",
-          "orientation": "姿勢",
-          "linearAcceleration": "線形加速度",
-          "angularVelocity": "角速度"
+          "topic": "トピック：",
+          "messageType": "メッセージ型：",
+          "encoding": "エンコード：",
+          "resolution": "解像度：",
+          "rate": "レート：",
+          "unit": "単位：",
+          "range": "レンジ：",
+          "coordinateSystem": "座標系：",
+          "contents": "内容：",
+          "confidence": "信頼度：",
+          "processing": "後処理：",
+          "orientation": "姿勢：",
+          "linearAcceleration": "線形加速度：",
+          "angularVelocity": "角速度："
         },
         "values": {
-          "videoEncoding": "JPEG (品質 85、1 フレームずつ独立)",
+          "videoEncoding": "JPEG（品質85、フレーム単位で独立）",
           "videoProcessing": "EgoBlur gen2",
+          "videoProcessingMentra": "EgoBlur gen2",
           "depthUnit": "mm (0 = 欠損)",
           "depthConfidence": "0 = 低 / 1 = 中 / 2 = 高",
           "poseContents": "位置 (xyz, m) + クォータニオン (x, y, z, w)",
@@ -120,7 +123,8 @@
           "imuOrientation": "クォータニオン (x, y, z, w)",
           "imuAccel": "m/s² (重力を含む)",
           "imuGyro": "rad/s",
-          "imuCoord": "デバイス本体座標系 (iOS CoreMotion)"
+          "imuCoord": "デバイス本体座標系 (iOS CoreMotion)",
+          "imuCoordMentra": "デバイス本体座標系 (Android Sensor API)"
         }
       }
     }

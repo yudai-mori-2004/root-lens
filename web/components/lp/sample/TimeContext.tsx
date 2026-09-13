@@ -6,7 +6,7 @@
 // なぜ Context か: React state を通すと video の 30 fps 更新でツリー全体が再描画される。
 // ここは購読者だけ再描画したいので、 useSyncExternalStore パターンで実装する。
 
-import { createContext, useCallback, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /** 再生ヘッドの状態。 t は「クリップ先頭からの秒数」 で、 durationSec は summary.json 由来。
  *  rangeStart / rangeEnd はシークと再生を許す時間窓 (スクラバはこの範囲を 0..100% として描く)。
@@ -51,7 +51,7 @@ export function TimeProvider({ durationSec, range, children }: Props) {
     listenersRef.current.forEach((l) => l());
   }, [durationSec, rangeStart, rangeEnd]);
 
-  const store = useRef<Store>({
+  const [store] = useState<Store>(() => ({
     get: () => stateRef.current,
     subscribe: (l) => {
       listenersRef.current.add(l);
@@ -82,7 +82,7 @@ export function TimeProvider({ durationSec, range, children }: Props) {
       stateRef.current = { ...s, playing: !s.playing, t: restart ? s.rangeStart : s.t };
       listenersRef.current.forEach((l) => l());
     },
-  }).current;
+  }));
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
