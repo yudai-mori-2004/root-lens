@@ -46,11 +46,11 @@
 
 .navMenu {
   position: absolute;
-  top: 100%;
-  right: 0;
-  left: 0;
+  top: calc(100% + var(--space-xs));
+  right: var(--page-gutter);
+  width: min(28rem, calc(100vw - (var(--page-gutter) * 2)));
   display: grid;
-  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
+  border: var(--rule-thin) solid var(--color-rule-strong);
   background: var(--color-paper);
 }
 
@@ -60,7 +60,7 @@
 
 .navMenuLink {
   padding: var(--space-sm) var(--page-gutter);
-  border-top: var(--rule-thin) solid var(--color-rule-strong);
+  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--text-md);
   line-height: 1.35;
   color: var(--color-ink);
@@ -75,7 +75,6 @@
   flex-wrap: wrap;
   gap: var(--space-md);
   padding: var(--space-sm) var(--page-gutter);
-  border-top: var(--rule-thin) solid var(--color-rule-strong);
 }
 
 .navMenuSecondaryLink {

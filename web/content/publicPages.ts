@@ -122,8 +122,6 @@ export const publicPages = {
     },
     policy: {
       label: "データポリシー",
-      title: "データが販売先へ届くまで。",
-      summaryTitle: "概要",
       summary: "RootLensは、協力先から取得した撮影データを、AI・ロボットの研究開発を行う企業・研究機関（以下「販売先」）に提供します。データが販売先に届くまでに、三つの段階を設けています。",
       steps: [
         {
@@ -286,8 +284,6 @@ export const publicPages = {
     },
     policy: {
       label: "Data policy",
-      title: "Before data reaches a buyer.",
-      summaryTitle: "Overview",
       summary: "RootLens provides filming data obtained from participating workplaces to companies and research institutions conducting AI and robotics research and development (referred to below as buyers). Data passes through three stages before reaching a buyer.",
       steps: [
         { title: "01 Consent before filming", short: "We obtain an agreement with the workplace and individual consent from staff before filming begins." },

@@ -286,7 +286,7 @@
 }
 
 .policySummary {
-  padding: var(--space-xl) var(--page-gutter);
+  padding: var(--space-lg) var(--page-gutter);
   border-bottom: var(--rule-thin) solid var(--color-rule-strong);
 }
 
@@ -327,7 +327,7 @@
 
 .policyOverviewList {
   max-width: 64rem;
-  margin: var(--space-lg) 0 0;
+  margin: 0 auto;
   list-style: none;
   text-align: left;
 }

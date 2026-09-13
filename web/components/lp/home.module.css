@@ -19,14 +19,16 @@
 .introBody {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  align-items: center;
+  gap: var(--space-xs);
   border-top: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--text-md);
-  line-height: 1.9;
+  line-height: 1.65;
+  text-align: center;
 }
 
 .introBody p {
-  max-width: 56rem;
+  max-width: 62rem;
 }
 
 .introTitle h1 {

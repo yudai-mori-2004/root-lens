@@ -25,12 +25,10 @@ export default async function DataPolicyPage() {
       <main className={s.accordionPage}>
         <header className={s.contributeOverview}>
           <h1>{copy.label}</h1>
-          <p>{copy.title}</p>
+          <p>{copy.summary}</p>
         </header>
 
-        <section className={s.policySummary} aria-labelledby="policy-overview-title">
-          <h2 id="policy-overview-title">{copy.summaryTitle}</h2>
-          <p>{copy.summary}</p>
+        <section className={s.policySummary} aria-label={locale === "ja" ? "データ提供の三段階" : "Three stages of data provision"}>
           <ol className={s.policyOverviewList}>
             {copy.steps.map((step, index) => (
               <li key={step.title}>
