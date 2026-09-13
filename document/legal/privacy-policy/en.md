@@ -1,146 +1,135 @@
-# Privacy Policy (privacy-policy)
+# Privacy Policy
 
-**Type**: User-facing (production, binding) / **Status**: Draft (counsel review before publishing) / **Language**: en (mirror of [ja.md](ja.md), authoritative)
+This policy describes how RootLens handles personal information.
 
-> Important: This is an external legal document and **requires review by qualified counsel before publication** ([`legal-policy`](../legal-policy/en.md) §10). This draft reflects the [`legal-policy`](../legal-policy/en.md) decisions (D1–D8).
->
-> The existing public version (`web/components/lp/PrivacyPolicyPage.tsx`) describes the business only as a "content authenticity platform" and omits data sale, licensing, staking, KYC, and third parties, **diverging from the actual business**. This document is the authoritative replacement.
+## 1. Operator
 
-## 0. Presentation (layered)
+The Service is operated by RootLens ("we," "us," or "our"). We are currently preparing to incorporate. Until incorporation is complete, the individual operator serves as the business operator handling personal information. The operator's name and address will be provided without delay upon request.
 
-- **Layer 1 = Summary (§1)**: plain, non-binding, for comprehension.
-- **Layer 2 = Full text (§2 onward)**: this document is **authoritative and binding**. If they conflict, the full text prevails.
-- Consent/acknowledgement is logged with version + hash via [`consent-log-spec`](../consent-log-spec/en.md).
+Contact: contact@rootlens.io
 
-## 1. Summary (non-binding)
+## 2. Scope
 
-> - **What we collect**: **video** of housework and work tasks (including audio in recording modes that support audio capture), sensor data such as hand motion, device info, account info, and the information needed to pay filming fees.
-> - **What we use it for**: building training data for AI and robots and **providing/selling it to companies in and outside Japan**. Revenue funds the filming fees paid to the cooperating sites and staff.
-> - **Privacy processing**: faces etc. are blurred before sharing, but you may not become fully unidentifiable (we do not say "anonymized").
-> - **Your rights**: you may request disclosure, correction, deletion, suspension of use, and withdrawal of consent. However, data already used for training cannot be removed from past training.
-> - **Recording rules**: only the recording user and adults who consented to being recorded may appear; do not record children.
-> - **Contact**: contact@rootlens.io
->
-> This is a summary. The official content is in the full text below.
+This policy applies to the handling of personal information through our website, applications, and data collection and sales business. It covers recording staff, representatives of cooperating workplaces, people who may appear in recordings, and website users.
 
-## 2. Operator & scope
+Specific procedures for recording are set out in the Workplace Agreement and the Recording Participation Consent Form.
 
-### 2.1 Operator (personal-data handler / controller)
-RootLens ("we"; entity formation in progress; until then the operating individual is the handler). Contact: contact@rootlens.io. The operator's name and address are provided without delay upon request.
-> Audit note: the existing page's contact `contact@titleprotocol.org` is incorrect; this document standardizes on `contact@rootlens.io`.
+## 3. Information We Collect
 
-### 2.2 Scope
-This policy applies to the handling of personal data across our app, website, and data-sale service. It concerns not only the recording user but also representatives of cooperating businesses and **people who may be captured** in recordings (see "9. Third parties, children, private spaces").
+We collect the following information:
 
-## 3. Information we collect
-- **Video** from the head-mounted camera and **audio** captured by recording modes that support audio recording
-- Sensor data per capture configuration (hand pose, IMU, LiDAR, etc.)
-- Device/technical info (model, OS, app version, capture settings)
-- Account information (account identifiers we issue, login credentials)
-- Information needed to pay filming fees (bank account details, payment records)
-- Names and contact details of representatives of cooperating businesses
-- Information you provide with inquiries or requests (including identity verification)
-- Usage/logs
+- Video, audio, and sensor data captured by recording equipment, including IMU, LiDAR, and hand-tracking data
+- Information about devices used for recording, including the model, operating system, application version, and recording settings
+- Account information, including IDs and login information issued by us
+- Information required to pay recording cooperation fees, including bank account details and payment records
+- Names and contact details of representatives of cooperating workplaces
+- Information provided in inquiries and disclosure requests, including information used for identity verification
+- Logs relating to use of the website and applications
 
-## 4. Purposes
+## 4. Purposes of Use
 
-We use the information we collect for the following purposes, according to whose information it is.
+We use the information for the following purposes according to the category of person concerned.
 
-**Recording staff (the person filming)**
-1. Creating training data for AI/robots (including reviewing video and sensor data, blurring faces, labeling content, and quality management)
-2. Licensing/providing/selling the resulting datasets to companies and research institutions in and outside Japan
-3. Paying filming fees, and the identity verification, bank-account management, and payment record-keeping this requires (including tax and other statutory record obligations)
-4. Managing accounts and confirming the user is 18 or older
-5. Confirming that recording follows this policy and the recording rules (including reviewing every clip before delivery)
-6. Keeping and managing records of the consent given
+**Information about recording staff**
 
-**Representatives of cooperating businesses (stores, etc.)**
-7. Communication about the filming cooperation, contract management, and paying and recording the filming fees
+- Creating datasets for AI and robotics research and development, including review of video and sensor data, masking, annotation, and quality control
+- Licensing, providing, and selling the resulting datasets to companies and research institutions in and outside Japan
+- Paying recording cooperation fees and performing the related identity verification, bank account management, and retention of payment records, including compliance with statutory record-keeping obligations
+- Managing accounts and verifying age
+- Confirming that recording complies with this policy and the recording rules
+- Retaining and managing consent records
 
-**People who appear in recordings**
-8. Blurring faces and reviewing clips to exclude any in which a non-consenting person is identifiable
-9. Handling inquiries and requests (suspension of use, deletion) about appearing in footage
+**Information about representatives of cooperating workplaces**
 
-**Everyone**
-10. Detecting and handling fraud and illegal content
-11. Responding to inquiries and to disclosure/correction/deletion requests (including identity verification)
-12. Providing, maintaining, and improving the service
-13. Complying with legal obligations
+- Communications concerning recording cooperation, management of agreements, payment of recording cooperation fees, and retention of related records
 
-## 5. Third-party provision, sale, sublicensing
-- We **license/provide/sell** datasets to outside parties. This is the core of our business.
-- The terms of a license are set out in the **license document** concluded between us and the recipient, and in our Terms of Service.
-- Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations**.
+**Information about people who appear in recordings**
 
-## 6. Entrusting data handling
-We may entrust all or part of the handling of personal data to outside providers within the scope needed for the purposes above (cloud storage and processing, face blurring, content labeling, etc.). We select providers appropriately, conclude contracts containing data-protection clauses, and supervise them as necessary and appropriate.
+- Masking and excluding from provision data in which a person who has not consented can be identified
+- Responding to inquiries and requests to suspend use or delete data relating to an appearance in a recording
 
-## 7. Provision to third parties outside Japan
-Data **may be provided to companies outside Japan**. Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
+**Purposes common to everyone**
 
-## 8. Privacy processing
-Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized." For that reason, we do not treat blurred footage as data that no longer concerns you. It remains handled on the basis of your consent: if you withdraw consent, data not yet used for training is deleted. What remains possible after training use is described in "11. Your rights."
+- Detecting and responding to misconduct and illegal content
+- Responding to inquiries and requests for disclosure, correction, suspension of use, or deletion
+- Providing, maintaining, and improving the Service
+- Complying with legal obligations
 
-## 9. Third parties, children, private spaces
-- We assume and require that **only the recording user and adults who consented to being recorded appear**, and limit recording to tasks where customers and other bystanders stay out of frame.
-- Recording takes place under a prior agreement with the cooperating business and within the scope agreed with it. We do not record places or scenes the business does not want recorded, and we stop immediately when asked.
-- **Incidental, momentary captures** that still occur (someone passing by) are **face-blurred before delivery**. Clips in which a non-consenting person remains **identifiable are not delivered**.
-- Every clip is **reviewed one by one before delivery**; clips containing children, illegal content, or private spaces (bathroom/bedroom/toilet, locker or break rooms, etc.) are excluded and deleted. Confirmed illegal material is handled and reported as required by law.
+## 5. Provision to Third Parties
 
-### 9.1 If you may appear in a recording
-You may request review, suspension of use, or deletion of footage you may appear in. Requests: contact@rootlens.io (please tell us the location and date).
+We license, provide, and sell datasets to companies and research institutions in and outside Japan. Our agreements require recipients to prohibit re-identification, limit use, and pass the same obligations on to any further recipients.
 
-## 10. Retention
-- Recorded video and sensor data (unprocessed): retained for as long as needed to build and quality-check the datasets, then deleted.
-- Payment and transaction records: retained as required by tax and other laws (in principle, seven years).
-- Consent records: retained while the related data is handled, to preserve accountability.
-- After the retention period, information is deleted or rendered unidentifiable.
+License terms are set out in the license documents entered into between us and each recipient and in our Terms of Use.
 
-## 11. Your rights
-- You may request disclosure (including disclosure of third-party provision records), correction, suspension of use, deletion, and withdrawal of consent.
-- **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
-- Requests are accepted by email and handled within the statutory period after identity verification. No fee is charged. However, actual costs such as postage may apply if you request delivery by mail.
-- Requests: contact@rootlens.io
+## 6. Entrustment of Handling
 
-## 12. Withdrawal of consent and its effect
-The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are as described in "11. Your rights" above. Training already performed cannot be undone.
+We may entrust all or part of the handling of personal data to external service providers to the extent necessary to achieve the purposes of use. We appropriately select each service provider, enter into an agreement containing personal information protection provisions, and exercise necessary and appropriate supervision.
 
-## 13. Security measures
-To prevent leakage, loss, or damage of personal data, we take the following measures.
+## 7. Provision to Third Parties Outside Japan
 
-- **Policies and rules**: we define and follow this policy and internal handling rules.
-- **Organizational measures**: we designate a person responsible, limit who handles data and with what authority, and record handling status.
-- **Personnel measures**: recording staff and data handlers are trained on the recording rules and data protection.
-- **Physical measures**: recording devices and storage media are managed for transport and storage.
-- **Technical measures**: encryption in transit and at rest, access control, and least-privilege access.
-- **External environment**: personal data is stored and processed on servers of cloud providers in the United States. We implement the above measures with an understanding of the data-protection framework of the United States.
+Data may be provided to companies outside Japan. Recipients are limited to businesses that are contractually required to prohibit re-identification, limit use, and pass on the applicable obligations.
 
-Breaches are reported to the Personal Information Protection Commission and notified to the persons concerned as required by law.
+## 8. Masking
 
-## 14. Children's information
-We do not allow children as subjects. The recording user must be 18 or older.
+Before data is provided, we mask the faces of third parties who have not consented, license plates, name badges, documents, and similar items.
 
-## 15. Applicable regions
-We expand availability in stages. Currently Japan-first.
+This processing reduces the possibility of re-identification, but a person may still be identified from their build, surroundings, belongings, or other characteristics. We therefore continue to manage processed data on the basis of consent.
 
-## 16. Amendments
-This policy may be amended. Amendments are announced by posting on this website, and material changes are additionally notified individually to account holders. The amended policy takes effect on the date stated when posted. Versions and contents of amendments are managed together with consent records.
+## 9. Incidental Captures, Children, and Private Spaces
 
-## 17. Contact
+As a rule, recording is limited to work in which only the recording staff member and adults who have consented to recording appear, and in which people who have not consented will not enter the frame.
+
+Recording takes place within the scope agreed in advance with the cooperating workplace. If an incidental or momentary capture occurs, it is masked before provision. We do not provide data in which a person who has not consented remains identifiable.
+
+All data is reviewed before provision. Data containing children, illegal content, or private spaces is deleted without being provided. If we identify illegal content, we respond in accordance with applicable law.
+
+**If you may appear in a recording**
+Contact contact@rootlens.io with the recording location and date. You may request review of the content, suspension of use, or deletion.
+
+## 10. Retention Periods
+
+- Recorded data before processing: retained for the period required to create and quality-check datasets, then deleted
+- Payment and transaction records: retained as required by law, in principle for seven years
+- Consent records: retained while the related data is handled
+
+Information is deleted or rendered unidentifiable after the applicable retention period.
+
+## 11. Requests for Disclosure, Correction, Deletion, and Other Action
+
+You may request disclosure, including disclosure of third-party provision records, correction, suspension of use, deletion, and withdrawal of consent.
+
+Requests are accepted by email and handled within the period prescribed by law after we verify your identity. No fee is charged. You may be asked to bear actual expenses if, for example, you request delivery by post.
+
+**Scope of deletion**
+Data that has not yet been provided to a recipient will be deleted. For data already provided, we will ask the recipient to suspend use and delete it, but we may not be able to retrieve and delete every copy. If data has already been used to train AI, its effect cannot be removed from the resulting model.
+
+Requests: contact@rootlens.io
+
+## 12. Withdrawal of Consent
+
+Recording staff may withdraw consent at any time. After withdrawal, we stop new collection and sales and delete data that has not yet been provided. The effect on data already provided and trained models is as described in the preceding section.
+
+## 13. Security Measures
+
+We take the following measures to prevent leakage, loss, or damage of personal data:
+
+- **Policies and rules:** We establish and operate in accordance with this policy and rules for handling personal information.
+- **Organizational security measures:** We appoint a person responsible for handling personal data, limit the people who handle it and their authority, and record the status of handling.
+- **Personnel security measures:** We educate recording staff and people who handle data about the appropriate handling of personal information.
+- **Physical security measures:** We manage the removal and storage of recording devices and storage media.
+- **Technical security measures:** We encrypt data in transit and at rest, implement access controls, and limit access to the minimum number of people necessary.
+- **Understanding the external environment:** Personal data is stored and processed on servers operated by cloud service providers in the United States. We implement the security measures described above after reviewing the personal information protection framework in the United States.
+
+If a leak or similar incident occurs, we report it to the Personal Information Protection Commission and notify the individuals concerned as required by law.
+
+## 14. Children's Personal Information
+
+We do not permit children to be recorded as subjects. Recording staff must be at least 18 years old.
+
+## 15. Amendments to This Policy
+
+This policy may be amended. Amendments are announced by posting them on the website, and material changes are also notified individually to account holders. An amended policy takes effect on the effective date stated when it is posted.
+
+## 16. Contact
+
 contact@rootlens.io
-
-## Change log
-| Date | Change |
-|------|--------|
-| (initial) | Authoritative draft reflecting the real business (data sale, staking, KYC, third parties). Layered structure. Counsel review before publishing |
-| (rev 2) | Cleaned internal references (section numbers, internal-doc slugs, D-codes) into plain prose for public output; unified contact to contact@rootlens.io |
-| 2026-07-12 | Removed wallet public key, KYC, and blockchain/NFT references (the features were removed from the system in v0.1.4); added account information to the collected-data list |
-| 2026-07-12 (2) | Revised for the closed on-site operation: section 8 states the out-of-frame task limitation and the handling of incidental captures (blur, exclude if identifiable), with a new 8.1 for people who may appear; section 6 drops the audio-era state exclusion list in favor of recipient country (US) and contractual criteria; operator name/address on request, request procedure, and foreign cloud storage added; detection/blocking wording aligned to the per-clip manual review |
-| 2026-07-12 (3) | Japanese original rewritten in the standard register of published Japanese privacy policies (desu/masu style, conventional headings); no change to the substance. English mirror unaffected |
-| 2026-07-12 (4) | Expanded based on a benchmark against comparable services (Shift, Project Aria) and Japanese data businesses (Macromill, Agoop): purposes rewritten per data subject (naming who filming fees are paid to), collected-data list extended (payment, business representatives, requests), new entrustment section (later sections renumbered), on-site notice and in-site consent confirmation plus locker/break rooms added, retention specified per category, third-party provision records and fees added to requests, security measures published per category including the external environment, and the amendment notice method stated |
-| 2026-07-12 (5) | Withdrew the on-site notice and prior coworker-consent-confirmation promises in section 9 (obligations that do not exist in the actual operation or the filming cooperation agreement); replaced with wording matching the agreement (recording within the agreed scope, no recording where the business objects, immediate stop on request) |
-| 2026-07-12 (6) | Removed "currently, the main recipients are located in the United States" from section 7 (not factual) |
-| 2026-07-12 (7) | Added to section 8 that blurred data is still treated as personal data, handled on consent, with requests still available (the section stated only the negative) |
-| 2026-07-12 (8) | Rewrote the section 8 addition in plain terms: dropped the boilerplate request list (correction does not fit footage) in favor of what a person can actually do (withdraw, pre-training deletion, honest post-training limits per section 11) |
-| 2026-07-12 (9) | Parenthetical cleanup: promoted main statements disguised as asides (core of the business, license terms, fee exceptions, training irreversibility) into full sentences; simplified account identifiers to account ID in the Japanese original |
-| 2026-08-21 | Aligned the policy with the approved legal policy and tester consent by stating that audio-capable recording modes capture audio with video |

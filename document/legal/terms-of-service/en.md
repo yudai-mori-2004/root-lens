@@ -1,110 +1,63 @@
 # Terms of Use
 
-These are the terms of use for RootLens (the "Service"). By using the Service, you agree to these terms. The Japanese version ([ja.md](ja.md)) is authoritative.
+These terms govern the use of RootLens.
 
-## 1. About these terms
+## 1. About These Terms
 
-- The Service is operated by RootLens ("we", "us").
-- Consent applies to this full text. If the confirmation items shown in the app conflict with these terms, these terms prevail.
-- When you consent, we record the version and hash of these terms and of the wording shown on screen.
-- Handling of personal information is set out in the Privacy Policy.
+These Terms of Use govern the use of the website, applications, and data collection and sales services (collectively, the "Service") provided by RootLens ("we," "us," or "our"). By using the Service, you are deemed to have agreed to these terms.
 
-## 2. What the Service is
+The handling of personal information is set out in the Privacy Policy. Specific conditions relating to recording are set out in the Workplace Agreement and the Recording Participation Consent Form.
 
-The Service lets you record everyday activities such as housework from a first-person view, and sells the video and sensor data as training data for AI and robots. You record and upload videos, and receive a reward when a video is sold.
+## 2. Service Description
 
-## 3. Who can use it
+Through the Service, staff members' manual work is recorded from a first-person perspective at cooperating workplaces, and the resulting data is provided and sold to companies and research institutions in and outside Japan for AI and robotics research and development.
 
-- You must be 18 or older.
-- The Service is currently available in Japan only.
+## 3. Categories of Users
 
-## 4. Your account
+- **Cooperating workplace:** A business that manages the recording location and enters into a Workplace Agreement with us.
+- **Recording staff:** A person who records while wearing recording equipment, and a person who may appear during recording. Each signs a Recording Participation Consent Form.
+- **Recipient:** A company or research institution that receives data from us and enters into a separate agreement with us.
 
-- Keep the keys and devices you sign in with under your control.
-- Actions taken with your account are treated as your own.
+Recording staff must be at least 18 years old.
 
-## 5. Data we record
+## 4. Data Use and License
 
-While you record, the app captures the following. Some recording modes also record audio with the video.
+Recorded data is used only for AI and robotics research and development. Within the scope of the Workplace Agreement and the Recording Participation Consent Form, recording staff grant us a non-exclusive license to copy, process, provide, and sell the recorded data.
 
-- Camera video
-- Audio (when using a recording mode that supports audio capture)
-- Sensor data such as hand motion, device motion, and depth (depending on the recording mode)
-- Device information such as model, OS, and app version
+## 5. Recording Cooperation Fees
 
-## 6. How the data is used
+The calculation method, amount, and payment terms for recording cooperation fees are agreed separately with each cooperating workplace in the Workplace Agreement.
 
-Recorded data is used to build training data for AI and robots. For that purpose, it may be provided or sold to external companies and research institutions, including outside Japan.
+## 6. Recording Rules
 
-## 7. Rights and license
+The following rules must be observed when recording:
 
-- You keep the rights to the videos you record.
-- By uploading, you grant us a license, within the scope of these terms and the consent given at upload, to copy, process (such as blurring), provide, and sell the data. This license is non-exclusive.
-- For data already sold, the license survives to the extent needed for the buyer to continue training.
+- Ensure that only adults who have consented to recording appear
+- Do not record children
+- Record only within the scope set out in the Workplace Agreement
+- Do not record private spaces
 
-## 8. Rewards
+## 7. Discontinuation and Deletion
 
-- Rewards for sold videos follow the conditions shown in the app (amount, payment method, timing).
-- We do not guarantee that a video will be sold.
-- Using the Service does not create an employment relationship between you and us. Whether, when, and what you record is entirely up to you.
+Procedures for discontinuing recording and deleting data are set out in the Workplace Agreement and the Recording Participation Consent Form.
 
-## 9. Privacy
+## 8. Prohibited Conduct
 
-- Faces and similar features are blurred before data is provided externally. However, identification may still be possible from build, surroundings, or belongings, so full anonymization is not guaranteed. We do not treat this data as "anonymized."
-- See the Privacy Policy for details.
+- Making false statements about compliance with the recording rules or the status of consent
+- Impersonating another person
+- Submitting false data
+- Interfering with the operation of the Service
 
-## 10. Recording rules
+If a violation occurs, we may exclude the data from sale or suspend payment of recording cooperation fees.
 
-For every video you upload, you agree to and warrant the following:
+## 9. Changes or Suspension of the Service
 
-- Only you and adults who have consented to being recorded and to the use of the data may appear. Do not upload videos in which a non-consenting person appears.
-- Do not record children, even with a guardian's consent. Stop recording if a child enters the frame.
-- Get permission for the recording location (outside your own home, you need the permission of whoever manages the place).
-- Do not record bathrooms, bedrooms, toilets, or changing.
-- Avoid scenes where TV, music, books, or other copyrighted works appear prominently.
+We may change, add to, or suspend the Service.
 
-## 11. If a non-consenting person appears
+## 10. Governing Law
 
-Videos showing a person who has not consented will not be sold, even with your consent. If detected, they are excluded from sale.
+These terms are governed by the laws of Japan.
 
-## 12. Deletion and withdrawal of consent
-
-- You can stop recording and providing data at any time.
-- Data not yet used for training can be deleted on request.
-- Data already used for training can be excluded from future training, but past training results cannot be undone. We do not promise that data can always be completely deleted.
-
-## 13. What you must not do
-
-- Make false declarations about the recording rules or consent confirmations
-- Impersonate someone else
-- Upload data you did not record, or manipulated data presented as recorded
-- Interfere with the operation of the Service (unauthorized access, reverse engineering, automated bulk requests, and the like)
-
-If you violate these terms, we may suspend your account, exclude your data from sale, and withhold reward payments.
-
-## 14. Changes to the Service
-
-- We may change, add to, or discontinue the Service at any time.
-- Important changes will be announced in the app.
-
-## 15. Disclaimer
-
-- The Service is provided as is, with no guarantee of operation or sales opportunities.
-- Except in cases of our intent or gross negligence, our liability related to the Service is capped at the total rewards paid to you in the preceding 12 months.
-
-## 16. Changes to these terms
-
-When we change these terms, we will announce it in the app and ask for renewed consent for important changes. Continuing to use the Service after a change means you accept it.
-
-## 17. Governing law and jurisdiction
-
-These terms are governed by the laws of Japan. The Tokyo District Court has exclusive jurisdiction in the first instance over disputes related to the Service.
-
-## 18. Contact
+## 11. Contact
 
 contact@rootlens.io
-
----
-
-Effective date: July 6, 2026
-Revised: August 21, 2026 (added recording modes that capture audio)

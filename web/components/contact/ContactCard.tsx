@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import s from "../lp/lp.module.css";
+import s from "./contact.module.css";
 
 interface Props {
   email: string;
@@ -42,12 +42,12 @@ export default function ContactCard({ email, copyLabel, copiedLabel }: Props) {
 
   return (
     <div className={s.contactCard}>
-      <div className={s.contactLabel}>E-MAIL</div>
-      <div ref={emailRef} className={s.contactEmail}>
+      <div className={s.label}>E-MAIL</div>
+      <div ref={emailRef} className={s.email}>
         {email}
       </div>
-      <div className={s.contactActions}>
-        <button type="button" onClick={copy} className={s.ctaPrimary}>
+      <div className={s.actions}>
+        <button type="button" onClick={copy} className={s.copyButton}>
           {copied ? copiedLabel : copyLabel}
         </button>
       </div>

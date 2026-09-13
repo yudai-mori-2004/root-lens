@@ -1,0 +1,117 @@
+.page {
+  background: var(--color-paper);
+}
+
+.header {
+  padding: clamp(2.5rem, 4vw, 3.5rem) var(--content-gutter);
+  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
+  text-align: center;
+}
+
+.header h1 {
+  font-size: clamp(1.5rem, 2.6vw, 2.15rem);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.header p {
+  max-width: 50rem;
+  margin: var(--space-md) auto 0;
+  font-size: var(--public-body-size);
+  line-height: 1.7;
+}
+
+.document {
+  padding-bottom: var(--space-xl);
+}
+
+.document h2 {
+  margin-top: var(--space-lg);
+  padding: var(--space-lg) var(--content-gutter) 0;
+  border-top: var(--rule-thin) solid var(--color-rule-strong);
+  font-size: var(--public-section-size);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.document h2:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.document > p:first-child {
+  padding-top: var(--space-lg);
+}
+
+.document h3 {
+  padding: var(--space-md) var(--content-gutter) 0;
+  font-size: var(--public-body-size);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.document p,
+.document ul,
+.document ol {
+  padding-right: var(--content-gutter);
+  padding-left: var(--content-gutter);
+  font-size: var(--public-body-size);
+  line-height: 1.75;
+}
+
+.document h2 + p,
+.document h2 + ul,
+.document h2 + ol,
+.document h3 + p,
+.document h3 + ul,
+.document h3 + ol {
+  margin-top: var(--space-sm);
+}
+
+.document p + p,
+.document p + ul,
+.document p + ol,
+.document ul + p,
+.document ol + p,
+.document ul + ul,
+.document ol + ol {
+  margin-top: var(--space-sm);
+}
+
+.document ul,
+.document ol {
+  padding-left: calc(var(--content-gutter) + 1.4rem);
+}
+
+.document li + li {
+  margin-top: var(--space-2xs);
+}
+
+.document strong {
+  font-weight: 700;
+}
+
+.document hr {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding-top: var(--space-lg);
+    padding-bottom: var(--space-lg);
+  }
+
+  .document {
+    padding-bottom: var(--space-lg);
+  }
+
+  .document h2 {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+  }
+
+  .document > p:first-child {
+    padding-top: var(--space-md);
+  }
+}

@@ -1,0 +1,49 @@
+.contactCard {
+  padding: var(--space-lg) var(--content-gutter) var(--space-xl);
+  border-bottom: var(--rule-thin) solid var(--color-rule-strong);
+  background: var(--color-paper);
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.email {
+  margin-top: var(--space-sm);
+  font-family: var(--font-lp-mono, monospace);
+  font-size: var(--public-section-size);
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  margin-top: var(--space-md);
+}
+
+.copyButton {
+  border: var(--rule-thin) solid var(--color-rule-strong);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: var(--public-body-size);
+  line-height: 1.4;
+}
+
+.copyButton:hover {
+  background: var(--color-wheat-soft);
+}
+
+.copyButton:active {
+  background: var(--color-surface-pressed);
+}
+
+@media (max-width: 640px) {
+  .contactCard {
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-lg);
+  }
+}
