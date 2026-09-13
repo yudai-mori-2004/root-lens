@@ -1,14 +1,12 @@
 import {
-  pgTable, text, integer, bigint, timestamp, index, jsonb, uuid,
+  pgTable, text, integer, bigint, timestamp, index, uniqueIndex, jsonb, uuid, boolean,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
-// v0.1.4: 「データを取って id に紐づけるだけの機械」 の最小 schema。
-//
-// public スキーマは clips / upload_units / consent_events / accounts の4テーブル。アカウントの実体は
-// Supabase Auth (auth.users) が持ち、 accounts はその撮影運用属性 (domain / site の匿名コード)
-// だけを載せる。 店名・契約・振込先などの実世界対応は一切 DB に置かず、 運営の台帳
-// (freee 取引先メモ等) で uuid ↔ 実世界を対応させる (= 店名非公表の構造的保証。
-// 詳細は document/v0.1.4/tasks/13-supabase-auth-accounts/)。
+// v0.1.4の撮影APIは clips / upload_units / consent_events / accounts を使う。
+// 現場の署名・承認フローは organizations 以下のテーブルで、協力先所有のDriveにある原本と
+// RootLensが保持する索引、Desktopの所属、撮影ロットの承認、納品証跡を結び付ける。
+// 銀行口座や署名済み文書の本体はこのDBに保存しない。
 
 export const clips = pgTable(
   "clips",
@@ -141,3 +139,225 @@ export const consentEvents = pgTable(
 
 export type ConsentEvent = typeof consentEvents.$inferSelect;
 export type NewConsentEvent = typeof consentEvents.$inferInsert;
+
+export const organizations = pgTable("organizations", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const sites = pgTable("sites", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  sharedDriveId: text("shared_drive_id").notNull(),
+  rootFolderId: text("root_folder_id").notNull(),
+  siteAgreementsFolderId: text("site_agreements_folder_id").notNull(),
+  staffConsentsFolderId: text("staff_consents_folder_id").notNull(),
+  approvedDataFolderId: text("approved_data_folder_id").notNull(),
+  status: text("status").notNull().default("pending_agreement"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const people = pgTable("people", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  role: text("role").notNull(),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("people_site_idx").on(table.siteId)]);
+
+export const agreementRecords = pgTable("agreement_records", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  personId: text("person_id").references(() => people.id),
+  kind: text("kind").notNull(),
+  documentVersion: text("document_version").notNull(),
+  templateSha256: text("template_sha256").notNull(),
+  docusealSubmissionId: bigint("docuseal_submission_id", { mode: "number" }).notNull(),
+  signedPdfFileId: text("signed_pdf_file_id"),
+  signedPdfSha256: text("signed_pdf_sha256"),
+  certificateFileId: text("certificate_file_id"),
+  certificateSha256: text("certificate_sha256"),
+  signedAt: timestamp("signed_at", { withTimezone: true }),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("agreement_docuseal_submission_idx").on(table.docusealSubmissionId),
+  index("agreement_site_kind_status_idx").on(table.siteId, table.kind, table.status),
+  uniqueIndex("agreement_active_site_idx").on(table.siteId)
+    .where(sql`${table.kind} = 'site_agreement' AND ${table.status} = 'active'`),
+  uniqueIndex("agreement_active_staff_idx").on(table.personId)
+    .where(sql`${table.kind} = 'staff_consent' AND ${table.status} = 'active'`),
+]);
+
+export const driveConnections = pgTable("drive_connections", {
+  siteId: text("site_id").primaryKey().references(() => sites.id),
+  encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
+  googleAccountSubject: text("google_account_subject").notNull(),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const driveOAuthRequests = pgTable("drive_oauth_requests", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  stateSha256: text("state_sha256").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const operatorInvites = pgTable("operator_invites", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  emailSha256: text("email_sha256").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("operator_invites_email_idx").on(table.emailSha256)]);
+
+export const operatorIdentities = pgTable("operator_identities", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  providerSubject: text("provider_subject").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("operator_identity_provider_idx").on(table.provider, table.providerSubject)]);
+
+export const operatorMemberships = pgTable("operator_memberships", {
+  identityId: text("identity_id").notNull().references(() => operatorIdentities.id),
+  personId: text("person_id").notNull().references(() => people.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("operator_membership_identity_person_idx").on(table.identityId, table.personId),
+  uniqueIndex("operator_membership_person_idx").on(table.personId),
+]);
+
+export const desktopLoginRequests = pgTable("desktop_login_requests", {
+  id: text("id").primaryKey(),
+  stateSha256: text("state_sha256").notNull().unique(),
+  clientState: text("client_state").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const desktopAuthorizationCodes = pgTable("desktop_authorization_codes", {
+  id: text("id").primaryKey(),
+  codeSha256: text("code_sha256").notNull().unique(),
+  identityId: text("identity_id").notNull().references(() => operatorIdentities.id),
+  codeChallenge: text("code_challenge").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const desktopSessions = pgTable("desktop_sessions", {
+  id: text("id").primaryKey(),
+  identityId: text("identity_id").notNull().references(() => operatorIdentities.id),
+  tokenSha256: text("token_sha256").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("desktop_sessions_identity_idx").on(table.identityId)]);
+
+export const driveUploadAttempts = pgTable("drive_upload_attempts", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  personId: text("person_id").notNull().references(() => people.id),
+  unitId: text("unit_id").notNull(),
+  sourceManifestSha256: text("source_manifest_sha256").notNull(),
+  approvalEventId: text("approval_event_id").notNull().unique().references(() => approvalEvents.id),
+  folderId: text("folder_id").notNull(),
+  status: text("status").notNull().default("uploading"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("drive_upload_site_unit_idx").on(table.siteId, table.unitId)]);
+
+export const driveUploadFiles = pgTable("drive_upload_files", {
+  id: text("id").primaryKey(),
+  attemptId: text("attempt_id").notNull().references(() => driveUploadAttempts.id),
+  path: text("path").notNull(),
+  bytes: bigint("bytes", { mode: "number" }).notNull(),
+  sha256: text("sha256").notNull(),
+  driveFileId: text("drive_file_id").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("drive_upload_file_path_idx").on(table.attemptId, table.path)]);
+
+export const passkeyCredentials = pgTable("passkey_credentials", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  publicKey: text("public_key").notNull(),
+  counter: bigint("counter", { mode: "number" }).notNull().default(0),
+  transports: jsonb("transports").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("passkey_person_idx").on(table.personId)]);
+
+export const passkeyRegistrations = pgTable("passkey_registrations", {
+  id: text("id").primaryKey(),
+  tokenSha256: text("token_sha256").notNull().unique(),
+  personId: text("person_id").notNull().references(() => people.id),
+  challenge: text("challenge"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const consentSnapshots = pgTable("consent_snapshots", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  snapshotSha256: text("snapshot_sha256").notNull(),
+  records: jsonb("records").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const approvalSignatures = pgTable("approval_signatures", {
+  id: text("id").primaryKey(),
+  tokenSha256: text("token_sha256").notNull().unique(),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  personId: text("person_id").notNull().references(() => people.id),
+  unitId: text("unit_id").notNull(),
+  sourceManifestSha256: text("source_manifest_sha256").notNull(),
+  sourceFiles: jsonb("source_files").notNull(),
+  consentSnapshotId: text("consent_snapshot_id").notNull().references(() => consentSnapshots.id),
+  statementVersion: text("statement_version").notNull(),
+  challenge: text("challenge"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("approval_signature_unit_idx").on(table.siteId, table.unitId)]);
+
+export const approvalEvents = pgTable("approval_events", {
+  id: text("id").primaryKey(),
+  signatureId: text("signature_id").notNull().unique().references(() => approvalSignatures.id),
+  siteId: text("site_id").notNull().references(() => sites.id),
+  unitId: text("unit_id").notNull(),
+  sourceManifestSha256: text("source_manifest_sha256").notNull(),
+  personId: text("person_id").notNull().references(() => people.id),
+  credentialId: text("credential_id").notNull().references(() => passkeyCredentials.id),
+  signedPayloadSha256: text("signed_payload_sha256").notNull(),
+  assertionSha256: text("assertion_sha256").notNull(),
+  receipt: jsonb("receipt").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("approval_event_site_unit_idx").on(table.siteId, table.unitId)]);
+
+export const evidenceBundles = pgTable("evidence_bundles", {
+  id: text("id").primaryKey(),
+  uploadAttemptId: text("upload_attempt_id").notNull().references(() => driveUploadAttempts.id),
+  approvalEventId: text("approval_event_id").notNull().references(() => approvalEvents.id),
+  unitId: text("unit_id").notNull(),
+  deliveryManifestSha256: text("delivery_manifest_sha256").notNull(),
+  payloadSha256: text("payload_sha256").notNull(),
+  algorithm: text("algorithm").notNull(),
+  keyId: text("key_id").notNull(),
+  signature: text("signature").notNull(),
+  evidence: jsonb("evidence").notNull(),
+  providedAt: timestamp("provided_at", { withTimezone: true }).notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("evidence_unit_idx").on(table.unitId),
+  index("evidence_approval_idx").on(table.approvalEventId),
+]);

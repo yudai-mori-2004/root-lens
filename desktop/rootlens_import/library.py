@@ -35,7 +35,7 @@ def settings_path():
 def recordings_directory(site_id, base=None):
     """Use the existing app-local site directory without creating export copies."""
     if not isinstance(site_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", site_id):
-        raise ImportFailure("事業所の設定に誤りがあります。管理者に設定ファイルを確認してもらってください。")
+        raise ImportFailure("事業所の設定に誤りがあります。もう一度ログインしてください。")
     root = settings_path().parent / "data" if base is None else Path(base)
     directory = root / site_id / "recordings"
     if any(is_link(path) for path in (directory, *directory.parents)):

@@ -27,7 +27,7 @@ def main(arguments=None):
     parser.add_argument("--sample-video", type=Path, required=True,
                         help="Generated demonstration footage only; never a real recording")
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--site-id", default="bb-sheep")
+    parser.add_argument("--site-id", default="site_bb_sheep")
     parser.add_argument("--site-name", default="BB SHEEP")
     args = parser.parse_args(arguments)
     sample = args.sample_video.resolve(strict=True)
@@ -52,7 +52,7 @@ def main(arguments=None):
         raise RuntimeError("The demonstration screen did not become ready.")
 
     class DemoUploader:
-        def upload_recording(self, path, on_progress, cancel_event):
+        def upload_recording(self, path, approval_event_id, on_progress, cancel_event):
             digest = json.loads((path / "metadata.json").read_text())["unit_id"]
             on_progress(UploadProgress(digest, "uploading", 8_400_000, 20_000_000, "rgb.mp4"))
             if not release.wait(30) or cancel_event.is_set():
@@ -68,8 +68,9 @@ def main(arguments=None):
         def no_import(**kwargs):
             raise AssertionError("This capture cannot access USB recordings")
         window = ImportWindow(data / "absent-site.json", data / "data", no_import,
-                              lambda profile: DemoUploader(), lambda profile, targets, cancel: {},
-                              cleaner=lambda *args, **kwargs: None)
+                              lambda profile, **kwargs: DemoUploader(), lambda profile, targets, cancel, gateway: {},
+                              cleaner=lambda *args, **kwargs: None, gateway_factory=lambda profile: object(),
+                              approver=lambda *args, **kwargs: "apv_demonstration")
 
         def snapshot(name):
             app.processEvents()
@@ -130,8 +131,7 @@ def main(arguments=None):
                 (clip / "metadata.json").write_text(json.dumps({"schema": "rootlens.mentra.raw.v1",
                     "files": list(FILES), "unit_id": identity, "created_at": f"2026-09-11T0{index}:00:00.000Z",
                     "actual_duration_ms": 8000}), encoding="utf-8")
-            window.set_profile(SiteProfile(args.site_id, args.site_name, "https://drive.google.com/drive/folders/DEMONSTRATION_ONLY",
-                                           service_account={"demonstration_only": True}))
+            window.set_profile(SiteProfile(args.site_id, args.site_name))
             window._drive_checked({}, "")
             for index, clip in enumerate(sorted(root.iterdir())):
                 window._clip_progress(ClipProgress(f"rec-20260911T0{index}0000.000Z", clip, "ready"))

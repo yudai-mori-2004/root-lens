@@ -46,8 +46,8 @@ def main(arguments=None):
         (stage / "アプリケーション").symlink_to("/Applications", target_is_directory=True)
         (stage / "はじめに.txt").write_text(
             "RootLens Import.app を「アプリケーション」にドラッグしてください。\n"
-            "アプリの「設定」を開き、「事業所の設定を読み込む」から、事業所のDriveにある rootlens-site.json を選びます。\n"
-            "設定済みの場合は、そのまま使えます。\n"
+            "アプリの「設定」を開き、RootLensから招待されたGoogleアカウントでログインします。\n"
+            "ログイン後、使用する事業所を確認してください。\n"
             "スマートグラスをUSBケーブルでつなぎ、「接続」を押してください。\n"
             "録画の映像と音声を確認したら、「アップロード」を押します。\n"
             "保存を確認できた録画は、スマートグラスから削除されます。\n"

@@ -7,8 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
-from dataclasses import replace
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
@@ -58,11 +57,11 @@ class DesktopTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name).resolve()
         self.profile_path = self.root / "config/site.json"
-        self.profile = SiteProfile("fixture-site", "説明用事業所", "https://drive.google.com/drive/folders/abcdefghij",
-                                   service_account={"test_only": True})
+        self.profile = SiteProfile("site_fixture", "説明用事業所")
         self.importer = Mock(return_value=SyncSummary(self.root, 0, 0, 0, 0))
         self.window = desktop.ImportWindow(self.profile_path, self.root / "data", self.importer,
-                                           drive_reader=lambda profile, hashes, cancel_event: {})
+                                           drive_reader=lambda profile, hashes, cancel_event, gateway: {},
+                                           gateway_factory=lambda profile: object())
 
     def tearDown(self):
         if self.window.busy:
@@ -87,13 +86,13 @@ class DesktopTests(unittest.TestCase):
     def test_startup_does_not_show_local_copies_without_device_confirmation(self):
         root = recordings_directory(self.profile.site_id, self.root / "data")
         clip = make_recording(root)
-        save_site_profile(replace(self.profile, service_account=None), self.profile_path)
+        save_site_profile(self.profile, self.profile_path)
         self.window._load_saved_profile()
         self.importer.assert_not_called()
         self.assertEqual(self.window.records, [])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
         self.assertEqual(self.window.connect_button.text(), "接続")
-        self.assertFalse(self.window.connect_button.isEnabled())
+        self.assertTrue(self.window.connect_button.isEnabled())
 
     def test_first_launch_requires_site_before_connection(self):
         self.assertFalse(self.window.connect_button.isEnabled())
@@ -142,7 +141,7 @@ class DesktopTests(unittest.TestCase):
         order = []
         identity = unit_id(50)
         snapshots = {identity: object()}
-        reader = Mock(side_effect=lambda profile, unit_ids, cancel: order.append('drive') or snapshots)
+        reader = Mock(side_effect=lambda profile, unit_ids, cancel, gateway: order.append('drive') or snapshots)
         self.window.drive_reader = reader
         def importer(**kwargs):
             order.append('device')
@@ -155,7 +154,7 @@ class DesktopTests(unittest.TestCase):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual(order, ['device', 'drive'])
-        reader.assert_called_once_with(self.profile, {identity}, self.window.cancel_event)
+        reader.assert_called_once_with(self.profile, {identity}, self.window.cancel_event, ANY)
         self.assertTrue(self.window.drive_synced)
 
     def test_ready_progress_adds_clip_and_preserves_current_selection(self):
@@ -253,8 +252,10 @@ class DesktopTests(unittest.TestCase):
         with patch.object(desktop, 'reveal_folder') as reveal:
             self.window.show_recording_folder()
         reveal.assert_called_once_with(clips[0])
-        with patch.object(desktop.QDesktopServices, 'openUrl', return_value=True):
+        with patch.object(desktop.QDesktopServices, 'openUrl', return_value=True) as opened:
             self.window.open_drive()
+        self.assertEqual(opened.call_args.args[0].toString(),
+                         "https://www.rootlens.io/evidence/sites/site_fixture/approved-data")
         self.assertEqual(set(clips[0].iterdir()), before)
         self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "未アップロード")
 

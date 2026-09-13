@@ -86,13 +86,10 @@ def main():
     if not license_file.is_file():
         raise RuntimeError("Windows Python's bundled LICENSE.txt is missing")
     shutil.copyfile(license_file, notices / "PYTHON-LICENSE.txt")
-    from cryptography.hazmat.backends.openssl.backend import backend
-    for version in {ssl.OPENSSL_VERSION, backend.openssl_version_text()}:
-        openssl_notice(version, notices)
+    openssl_notice(ssl.OPENSSL_VERSION, notices)
     (output / "inputs.json").write_text(json.dumps({
         "platform_tools_url": ADB_URL, "platform_tools_sha256": ADB_SHA256,
         "python": platform.python_version(), "python_openssl": ssl.OPENSSL_VERSION,
-        "cryptography_openssl": backend.openssl_version_text(),
         "qt": manifest["qt_version"], "qt_notice_files": len(manifest["files"]),
     }, indent=2) + "\n", encoding="utf-8")
     print(f"Prepared Windows build inputs in {output}")

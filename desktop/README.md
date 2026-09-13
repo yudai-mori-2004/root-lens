@@ -1,124 +1,76 @@
-# RootLens
+# RootLens Desktop
 
-スマートグラスに残る未アップロードの録画を USB で確認します。
-「アップロード」を押すと、事業所の Google Drive「承認済みデータ」に保存し、進捗と完了を表示します。
-このアップロードが、現場合意書に基づく事業所の承認です。
+スマートグラスに残る録画をUSB経由で確認し、現場監督者が承認した録画を事業所のGoogle Driveへ保存します。
 
-現場での操作は[アップロード手順](docs/field-guide.md)、導入担当者向けの説明は
-[PC の初回設定](docs/initial-setup.md)と[管理者向け案内](docs/administrator-guide.md)を参照してください。
-Drive の配置は `RootLens / 撮影協力 / ［事業所名］/ 承認済みデータ` です。
-実際のフォルダへのリンクは[Drive の配置](docs/drive-layout.md)にあります。
+現場での操作は[アップロード手順](docs/field-guide.md)、導入は[PCの初回設定](docs/initial-setup.md)、
+権限とDriveの管理は[管理者向け案内](docs/administrator-guide.md)を参照してください。
 
-## 操作とデータの流れ
+## 利用者の流れ
 
-スマートグラスを USB でつなぎ、「接続」を押すと、端末に残っていて Google Drive に未アップロードの
-録画を一覧に表示します。録画を選ぶと右側で映像と音声を再生でき、
-「前の録画」「次の録画」で続けて確認できます。
+1. 設定画面から、RootLensに招待されたGoogleアカウントでログインする。
+2. スマートグラスをUSBで接続し、端末に残る未アップロードの録画を取得する。
+3. 映像と音声を確認し、提供を認める録画をアップロードする。
+4. RootLensサーバーがDrive上の4ファイルを照合した後、端末上の録画を削除する。
 
-一覧は接続のたびに、まず端末の録画を取得し、その録画だけを Drive と照合して作り直します。
-Drive に蓄積された全録画は取得しません。起動時は空で、PC に残っている
-コピーや過去の完了記録から録画を表示しません。Drive の状態を確認できない場合も、
-未アップロードと推定せず、接続をやり直すよう表示します。
+Googleログインは、利用者本人と所属事業所を確認するために使います。DesktopアプリはGoogle Driveの
+秘密鍵、更新トークン、フォルダIDを保持しません。ログイン後に発行されたRootLensセッションだけを
+macOS KeychainまたはWindows Credential Managerへ保存します。
 
-内容を確認した録画を選び、「アップロード」を押します。事業所設定に入ったサービスアカウントを使い、
-その事業所の「承認済みデータ」へ送信します。各録画フォルダには撮影アプリが作成した次の4ファイルが入ります。
+## 録画と保存確認
+
+一つの録画は次の4ファイルで構成します。
 
 ```text
-rec-<撮影日時>-<hash12>/
+<unit_id>/
   rgb.mp4
   frames.jsonl
   imu.jsonl
   metadata.json
 ```
 
-アップロード中は進捗を表示します。保存先の全ファイルを照合した後、
-端末の4ファイルともサイズと SHA-256 が一致することを確認してから、端末の録画を削除します。
-「アップロードが完了しました」と表示し、対象を一覧から外します。
-Drive への保存後に USB が抜けた場合は、次の「接続」で保存内容を再確認し、端末からの削除を再試行します。
+Desktopアプリは各ファイルのサイズとSHA-256から`source_manifest_sha256`を作ります。RootLens APIは、
+ログインした利用者の事業所所属を確認し、事業所に接続済みのDriveへ、一つのファイルにだけ使える
+再開可能アップロードURLを発行します。DesktopアプリはそのURLへファイル本体だけを送ります。
+
+RootLensサーバーは、Drive上の保存先、`site_id`、`unit_id`、`source_manifest_sha256`、各ファイルの
+サイズとSHA-256を再確認します。すべて一致した録画だけを完了扱いにします。端末から削除する直前にも
+現在のDriveを照合し、保存内容が変わっていれば削除を止めます。
 
 ## 実装の責務
 
 | モジュール | 責務 |
 | --- | --- |
-| `rootlens_import/core.py` | USB 接続の固定、確定済み録画の取り込み、4ファイルの照合、重複・中断処理 |
-| `rootlens_import/device_sync.py` | 端末を起点とした対象の取得、Drive 照合、取り込み・削除の連携 |
-| `rootlens_import/device_cleanup.py` | 全4ファイルの照合後の端末削除、中断した削除の再試行 |
-| `rootlens_import/site.py` | 事業所・アップロード認証設定の読み込み・検証・保存 |
-| `rootlens_import/library.py` | 今回端末から確認した録画のプレビュー用コピーの読み出し |
-| `rootlens_import/drive.py` | 指定した録画だけの Drive 照会、再開可能な送信、保存された4ファイルの照合 |
-| `rootlens_import/upload_state.py` | 送信の再開位置、Drive の ID、照合結果の保存 |
-| `rootlens_import/desktop.py` | 録画一覧、USB 取り込み・アップロードと画面操作の連携 |
-| `rootlens_import/preview.py` | ローカル録画の映像・音声再生とプレイヤーの解放 |
-| `packaging/` | PC アプリのビルドと必要な部品の同梱 |
+| `rootlens_import/account.py` | ブラウザでのGoogleログイン、RootLensセッション、事業所API |
+| `rootlens_import/site.py` | ログイン後に選択した事業所のローカル保存 |
+| `rootlens_import/core.py` | USB接続、4ファイルの取り込みと照合、中断処理 |
+| `rootlens_import/device_sync.py` | 端末を起点としたDrive照合、取り込み、削除の連携 |
+| `rootlens_import/device_cleanup.py` | Drive照合後の端末削除と再試行 |
+| `rootlens_import/drive.py` | サーバー発行URLへの再開可能アップロードと完了確認 |
+| `rootlens_import/upload_state.py` | 送信試行と再開位置の保存 |
+| `rootlens_import/library.py` | 今回取り込んだ録画のプレビュー用読み出し |
+| `rootlens_import/desktop.py` | ログイン、録画一覧、再生、アップロードの画面連携 |
+| `rootlens_import/preview.py` | 映像・音声再生とプレイヤーの解放 |
 
-USB 取り込みの正本は `core.py` です。`desktop/scripts/import-recordings.py` も同じ実装を呼びます。
-接続中に別端末や無線 ADB へ切り替わらないよう、USB transport ID を固定します。
-取り込み中のデータは完成した録画と分けて保存し、全4ファイルを照合してから録画フォルダを確定します。
+送信履歴は再開にだけ使い、アップロード済みかどうかの正本にはしません。接続のたびに、現在端末にある
+録画だけをRootLens API経由でDriveと照合します。Driveを確認できないときは未アップロードと推定しません。
 
-Drive への送信では、ローカルの4ファイルを照合し、アップロード先への書き込み権限を確認します。
-ファイルは再開可能な方式で送信し、Drive 側のサイズと SHA-256 を4ファイルとも確認した後、
-ローカルの原本を再照合して完了を記録します。再試行では送信済みのファイルを照合し、
-途中のファイルは Drive が受信した位置から再開します。
+## ローカル保存
 
-送信状態は再開用に録画フォルダの外へ保存しますが、一覧やアップロード済みの判定には使いません。
-プレビュー用コピーと送信の再開情報がなくても、同じ端末と同じ Drive から同じ一覧を構成できます。
-確認は「接続」を押した時点の状態に基づき、端末や Drive の変更を常時監視するものではありません。
+アプリは選択中の事業所、プレビュー用録画、送信再開情報を事業所ごとに分けて保存します。
 
-Drive に保存済みの録画は、端末の全4ファイルのサイズ・SHA-256 を照合し、削除直前にも Drive を確認します。
-削除対象は端末内で同じ親の削除待ちフォルダへ移し、移動を永続化してから既知のファイルだけを削除します。
-フォルダ名には元の録画名・動画のハッシュ・保存先と4ファイルの照合情報のハッシュを含めます。
-これにより、途中で止まっても別の PC で削除を再試行できます。Drive や残存ファイルが変わっていた場合は削除を止めます。
-撮影アプリが作成する既知の診断・作業ファイルも、正規4ファイルの保存を確認した後に削除します。未知のファイルは削除しません。
-未保存の録画をプレビュー用に取り込む際も、全4ファイルの SHA-256 を照合します。
+- Windows: `%LOCALAPPDATA%/RootLens Import/`
+- macOS: `~/Library/Application Support/RootLens Import/`
 
-## 保存先と事業所設定
-
-初回は「設定」から「事業所の設定を読み込む」を選び、管理者から受け取った
-`rootlens-site.json` を読み込みます。設定には事業所名、「承認済みデータ」の URL、
-その事業所専用のサービスアカウント情報をまとめます。
-次回の起動では保存した事業所設定を読み込みます。録画一覧は「接続」を押して取得します。
-
-```text
-<アプリのローカル保存領域>/data/<site_id>/
-  recordings/
-    rec-<撮影日時>-<hash12>/
-```
-
-アプリのローカル保存領域は、Windows では `%LOCALAPPDATA%/RootLens Import/`、Mac では
-`~/Library/Application Support/RootLens Import/` です。事業所ごとに保存先を分けます。
-端末の録画には事業所の識別子がないため、撮影した事業所は自動判別しません。
-事業所専用の端末を使い、別の現場の録画があるときは内容を確認して扱います。
-
-## 撮影前の同意と事業所の承認
-
-撮影前に「撮影参加に関する同意書」への本人の署名を得て、RootLens が別途管理します。
-撮影後は事業所から承認を任された担当者が映像と音声を確認し、アプリで
-「承認済みデータ」へアップロードします。現場合意書第5条第3項に従い、この操作を販売先への提供を認める承認とします。
-
-RootLens は匿名化後の確認用リンクと完了日時を事業所へ案内し、匿名化処理の完了後7日間は
-販売先へ提供しません。RootLens 側で必要な運用は[管理者向け案内](docs/administrator-guide.md)に記載しています。
+選択中の事業所情報には`site_id`、表示名、RootLens APIの接続先だけを含めます。端末の録画から事業所は
+自動判別できないため、別の現場で端末を使った場合は内容と選択中の事業所を確認します。
 
 ## 開発と検証
-
-0.4.5 は、接続した端末と現在の Drive から未アップロードの録画を表示します。
-起動時や接続に失敗したときは一覧を空にし、PC のコピーや完了履歴から一覧を復元しません。
-Drive から移動・削除された録画が端末に残っている場合は次の接続で再び対象となり、以前の完了履歴に妨げられずに
-アップロードできます。中断した送信には再開用の記録を使います。
-
-一覧、USB 照合、Drive への中断・再開、保存後の照合をテストしています。
-PC のコピーや完了履歴を一覧の判定に使わず、中断した端末削除も現在の端末と Drive から再開します。
-各 OS のビルド・受け入れ検証の結果は
-[Task 22](../../document/v0.1.4/tasks/22-mentra-stateless-viewer/README.md)を参照してください。
-
-現在の事業所フォルダでの配布方法を継続します。Mac は ad-hoc 署名、Windows は未署名で、
-Mac の一般配布に向けた署名・公証の準備は今回の対象に含めません。
-サービスアカウントと事業所フォルダの構成は
-[Task 20](../../document/v0.1.4/tasks/20-mentra-field-submission/README.md)に記録しています。
 
 ```bash
 PYTHONPATH=desktop python3 -m rootlens_import
 python3 desktop/scripts/test_import_recordings.py
-PYTHONPATH=desktop python3 -m unittest discover -s desktop/tests -v
+PYTHONPATH=desktop python3 -m unittest discover -s desktop/tests -p 'test_*.py'
 ```
 
-配布物の作成方法と依存ライブラリは [packaging](packaging/README.md) を参照してください。
+配布物の作成方法は[packaging](packaging/README.md)、合意から納品までの証跡設計は
+[Consent evidence chain](../document/v0.1.4/tasks/24-consent-evidence-chain/README.md)を参照してください。

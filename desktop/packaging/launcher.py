@@ -33,9 +33,6 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["--check-media"]:
         from media_check import main
         sys.exit(main(sys.argv[2:]))
-    if sys.argv[1:2] == ["--check-drive"]:
-        from drive_check import main
-        sys.exit(main(sys.argv[2:]))
     if sys.argv[1:2] == ["--check-runtime"]:
         from runtime_check import main
         sys.exit(main(sys.argv[2:]))

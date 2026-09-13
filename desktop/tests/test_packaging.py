@@ -1,4 +1,4 @@
-"""Check windowed diagnostic output and the credential-free runtime verifier."""
+"""Check windowed diagnostic output and the RootLens runtime verifier."""
 
 import importlib.util
 import hashlib
@@ -24,6 +24,12 @@ def load_module(name):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_credential_store_dependency_follows_build_platform(self):
+        build = load_module("build")
+        requirements = build.build_requirements(PACKAGING / "requirements-build.txt")
+        assertion = self.assertIn if sys.platform == "win32" else self.assertNotIn
+        assertion(("pywin32-ctypes", "0.2.3"), requirements)
+
     def test_windowed_cli_writes_utf8_diagnostic_without_standard_streams(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "診断.log"
@@ -50,7 +56,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertEqual(sys.argv, ["app"])
                 stream.close()
 
-    def test_runtime_uses_only_bundled_adb_and_unauthenticated_https(self):
+    def test_runtime_uses_bundled_adb_and_rootlens_https(self):
         check = load_module("runtime_check")
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary).resolve()
@@ -69,12 +75,13 @@ class PackagingTests(unittest.TestCase):
                     patch.object(check.core, "find_adb", return_value=str(directory / "runtime" / "adb.exe")), \
                     patch.object(check.subprocess, "run", return_value=Mock(stdout="Android Debug Bridge\nVersion 37.0.0-test\n")), \
                     patch.object(check.certifi, "where", return_value=str(certificates)), \
+                    patch.object(check.keyring, "get_keyring", return_value=Mock(priority=5)), \
                     patch.object(check.requests, "Session", return_value=context), patch("builtins.print") as output:
                 self.assertEqual(check.main([]), 0)
-                self.assertTrue(json.loads(output.call_args.args[0])["rsa_signing"])
+                self.assertTrue(json.loads(output.call_args.args[0])["credential_store_client"])
                 self.assertTrue(json.loads(output.call_args.args[0])["app_icon"])
             self.assertFalse(session.trust_env)
-            session.get.assert_called_once_with("https://www.googleapis.com/drive/v3/about?fields=kind",
+            session.get.assert_called_once_with("https://www.rootlens.io/api/v1/desktop-auth/session",
                                                 timeout=(10, 20), allow_redirects=False, verify=str(certificates))
 
     def test_runtime_rejects_adb_from_outside_bundle_without_network(self):
@@ -121,7 +128,7 @@ class PackagingTests(unittest.TestCase):
             manifest = json.loads(image.with_suffix(".dmg.manifest.json").read_text())
             self.assertEqual(manifest["signing"]["kind"], "ad-hoc")
             self.assertEqual(manifest["signing"]["stapled_notarization"], "not-checked")
-            self.assertIn("事業所の設定を読み込む", captured["instructions"])
+            self.assertIn("Googleアカウントでログイン", captured["instructions"])
             self.assertIn("スマートグラス", captured["instructions"])
             self.assertNotIn("動作確認用", captured["instructions"])
             self.assertFalse(any(call.args[0][0] == "spctl" for call in run.call_args_list))

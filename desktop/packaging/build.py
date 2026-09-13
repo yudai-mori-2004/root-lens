@@ -16,9 +16,28 @@ import tempfile
 
 PLATFORM_TOOLS_VERSION = "37.0.0"
 NETWORK_PACKAGES = (
-    "google-auth", "requests", "certifi", "cffi", "charset-normalizer",
-    "cryptography", "idna", "pyasn1", "pyasn1-modules", "pycparser", "urllib3",
-)
+    "keyring", "requests", "certifi", "charset-normalizer", "idna", "urllib3",
+    "jaraco.classes", "jaraco.context", "jaraco.functools", "more-itertools",
+) + (("pywin32-ctypes",) if sys.platform == "win32" else ())
+
+
+def build_requirements(path):
+    """Return pinned requirements that apply to the current build platform."""
+    result = []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        requirement, separator, marker = line.partition(";")
+        if separator:
+            marker = marker.strip()
+            if marker == 'sys_platform == "win32"' and sys.platform != "win32":
+                continue
+            if marker != 'sys_platform == "win32"':
+                raise RuntimeError(f"Unsupported requirement marker: {marker}")
+        name, expected = requirement.strip().split("==", 1)
+        result.append((name, expected))
+    return result
 
 
 def verify_icon_assets(pc):
@@ -73,17 +92,13 @@ def main():
     import PySide6
     from PySide6.QtCore import qVersion
     import PyInstaller
-    from cryptography.hazmat.backends.openssl.backend import backend as crypto_backend
     if PySide6.__version__ != "6.11.2":
         parser.error("Install the exact PySide6 version in requirements-build.txt.")
     if PyInstaller.__version__ != "6.22.0":
         parser.error("Install the exact versions in requirements-build.txt.")
-    for requirement in (packaging / "requirements-build.txt").read_text().splitlines():
-        if not requirement.strip() or requirement.startswith("#"):
-            continue
-        name, expected = requirement.split("==")
+    for name, expected in build_requirements(packaging / "requirements-build.txt"):
         if metadata.version(name) != expected:
-            parser.error(f"Install {requirement} from requirements-build.txt.")
+            parser.error(f"Install {name}=={expected} from requirements-build.txt.")
     runtime = args.platform_tools.expanduser().resolve(strict=True)
     properties = dict(line.strip().split("=", 1) for line in
                       (runtime / "source.properties").read_text(encoding="utf-8").splitlines()
@@ -123,7 +138,6 @@ def main():
             "qt_version": qVersion(),
             "pyinstaller_version": PyInstaller.__version__,
             "network_library_versions": {name: metadata.version(name) for name in NETWORK_PACKAGES},
-            "cryptography_openssl_version": crypto_backend.openssl_version_text(),
             "platform": sys.platform,
             "architecture": platform.machine(),
             "app_icon_sha256": icon_manifest["source_sha256"],

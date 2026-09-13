@@ -13,15 +13,17 @@
 
 ## 読み手と判断
 
-この仕様は、Web、現場PCアプリ、納品パイプラインを実装する担当者と、同意・承認の証跡を確認する担当者が読む。実装前に、署名サービスの導入範囲、現場監督者の承認方法、納品物へ含める情報を確定するための文書である。
+この仕様は、Web、現場PCアプリ、納品パイプラインを実装・運用する担当者と、同意・承認の証跡を確認する担当者が読む。署名サービス、現場監督者の承認方法、納品物へ含める情報と、その検証方法を一つの通常フローとして定める。
 
 ## 現在の状態
 
 - Webの `consent_events` は、撮影端末上のクリックラップ同意をアカウント、文書版、文書ハッシュ、対象スコープと結び付けてappend-onlyで保存する。
 - 撮影単位は`unit_id`で識別し、rawを構成する全ファイルは`source_manifest_sha256`で検証する。R2とDBも`unit_id`で参照する。
-- 現場PCアプリは、録画を構成する4ファイルのSHA-256と`source_manifest_sha256`を計算し、事業所専用のサービスアカウントでGoogle Driveの「承認済みデータ」へアップロードする。
-- 現在のPCアプリから分かるのは事業所と対象データである。操作した現場監督者個人、表示した承認文、承認時刻を一体の記録として残していない。
-- 現場合意書と撮影参加に関する同意書は、署名済みファイルを運営側で個別に管理している。
+- 現場PCアプリは、招待された現場監督者がGoogleアカウントでRootLensへログインし、OSの資格情報ストアにRootLensセッションを保存する。Google Driveの認証情報はPCへ配布しない。
+- 現場PCアプリは、録画を構成する4ファイルのSHA-256と`source_manifest_sha256`を計算する。RootLensサーバーが事業所のDrive接続を使ってファイル単位の再開可能アップロードURLを発行し、PCはそのURLへファイル本体だけを送る。
+- 現場PCアプリは対象データを確定してWebの承認画面を開き、現場監督者のパスキー署名が完了した場合だけアップロードへ進む。承認後にも4ファイルを再読込し、変更があればアップロードしない。
+- Webは現場合意書と撮影参加に関する同意書の署名依頼をDocuSealへ作成し、完了したPDFと署名証明書を協力先のDriveへ保存する。撮影ロットの承認時には、その時点の有効な記録を同意スナップショットとして固定する。
+- 納品パイプラインはraw、同意スナップショット、現場監督者の承認receipt、納品ファイルを結ぶ`rootlens-evidence.json`を生成し、KMS鍵で署名する。検証ページとCLIは証跡署名と各ハッシュを検証する。
 
 ## 採用する構成
 
@@ -65,6 +67,16 @@ RootLens/
 | 提供前承認 | 確定した一つの撮影ロット | PCアプリから開始するパスキー電子署名 | 撮影ロットごと |
 
 提供前承認を毎回DocuSealで行わない。提供前承認は契約文書の締結ではなく、すでに合意した手順に従って、特定のデータを提供工程へ進める操作だからである。現場監督者はPCアプリで対象データを確認し、PCアプリから開始されるパスキー認証によって電子署名する。手書きの署名画像は必須にせず、承認者の個人認証、承認意思、対象データ、表示文面、時刻を暗号的に結び付ける。
+
+### DesktopのログインとDrive接続
+
+現場監督者はDesktopアプリの「Googleでログイン」からシステムブラウザを開く。DesktopはPKCEのchallengeとIPv4 loopback callbackをRootLensへ登録し、Googleログイン完了後に一回限りのRootLens認可コードをloopbackで受け取る。認可コードをPKCE verifierと交換して得る不透明なRootLensセッションだけを、macOS Keychain又はWindows Credential Managerへ保存する。
+
+Googleログインは人と事業所所属の確認に使う。Googleが返す`sub`を変更されない外部IDとして保存し、メールアドレスは招待との初回照合にだけ使う。招待されていないGoogleアカウントや、対象事業所への有効な所属がない利用者は、事業所APIを利用できない。
+
+協力先のGoogle Drive接続は、事業所管理者が別の管理導線で一度だけ行う。更新トークンはRootLensサーバーで暗号化して保管する。DesktopへDriveの更新トークン、サービスアカウント鍵、共有ドライブID、フォルダIDを渡さない。
+
+撮影データのアップロードでは、RootLensサーバーが所属、対象事業所、`unit_id`、source manifestを確認し、Drive上の保存先とファイルIDを作成する。サーバーは各ファイルについて単一ファイルにだけ使えるGoogleの再開可能アップロードURLをDesktopへ返す。Desktopは認証ヘッダーを付けずにファイル本体を送る。送信後、サーバーがDriveから親フォルダ、`appProperties`、サイズ、SHA-256を再取得して一致を確認した場合だけ完了とする。
 
 ## 当事者と識別子
 
@@ -117,7 +129,7 @@ PCアプリで、撮影者や映り込んだスタッフをクリップごとに
 
 署名セッションを作成するとき、Webは `site_id` から現場合意と、その現場で取得した全スタッフの同意記録を取得する。各記録には署名日時と承認時点の状態を含める。
 
-Webは、適用する現場合意の `agreement_record_id` と、スタッフ同意一式の `agreement_record_id` を安定した順序で並べ、`consent_snapshot` として固定する。そのSHA-256を `consent_snapshot_sha256` として保存する。`/evidence/sites/<site_id>/agreements`は現在のDriveフォルダを開く導線とし、`/evidence/agreements/<agreement_record_id>`は特定の署名記録を開く導線とする。納品物は後者の記録IDを参照し、現在のフォルダURLだけには依存しない。
+Webは、適用する現場合意の `agreement_record_id` と、スタッフ同意一式の `agreement_record_id` を安定した順序で並べ、`consent_snapshot` として固定する。そのSHA-256を `consent_snapshot_sha256` として保存する。`/evidence/sites/<site_id>/site-agreements`と`/evidence/sites/<site_id>/staff-consents`は現在の各Driveフォルダを開く導線とし、`/evidence/agreements/<agreement_record_id>`は特定の署名記録を開く導線とする。納品物は後者の記録IDを参照し、現在のフォルダURLだけには依存しない。
 
 フォルダが移動又は再作成された場合は、Driveの`appProperties`又はファイル名に含まれる`agreement_record_id`から原本を再発見し、RootLensの索引を更新する。別のファイルへ置き換える場合は、保存済みSHA-256との一致を必須とする。完全に削除された文書を識別子やハッシュから復元することはできないため、削除制限、ゴミ箱からの復元、保持又はバックアップは原本を管理する協力先の運用として定める。
 
@@ -137,7 +149,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 
 6. ブラウザはパスキーを呼び出し、challengeへWebAuthn署名を行う。challengeはサーバ側で `source_manifest_sha256` と `consent_snapshot_sha256` に対応するため、署名者、承認文、対象データ、現場合意、スタッフ同意一式が一つの電子署名記録として結び付く。
 7. WebはWebAuthn署名を検証し、`person_id`、`site_id`、`source_manifest_sha256`、`consent_snapshot_sha256`、承認文の版、承認時刻、credential ID、認証器のsign count、challengeのSHA-256をappend-onlyの承認イベントとして保存する。
-8. Webは承認内容とWebAuthn署名のハッシュを含むreceiptを生成し、RootLensの証跡署名鍵で署名する。
+8. Webは、署名対象の承認payload、パスキー公開鍵、WebAuthn assertion、検証前後のcounterを含むreceiptを生成する。最終納品時に、このreceiptを含む証跡全体をRootLensの証跡署名鍵で署名する。
 9. PCアプリは署名済みreceiptをAPIから取得し、receipt内の `source_manifest_sha256` が現在のローカルファイルと一致する場合だけアップロードを開始する。
 10. 一つでもファイル又は同意スナップショットが変わった場合は電子署名を無効とし、新しい撮影ロットとして再署名を求める。
 
@@ -209,17 +221,39 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
     }
   },
   "approval": {
+    "schema": "io.rootlens.approval-receipt.v1",
     "event_id": "apv_...",
-    "approver_id": "person_...",
-    "approver_authority_record_id": "auth_...",
-    "approved_at": "...",
-    "statement": "この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。",
-    "statement_version": "lot-approval-ja-1",
-    "signature_method": "webauthn",
-    "approved_source_manifest_sha256": "...",
-    "approved_consent_snapshot_sha256": "...",
+    "signed_payload": {
+      "schema": "io.rootlens.approval-challenge.v1",
+      "signature_id": "approval_...",
+      "person_id": "person_...",
+      "site_id": "site_...",
+      "unit_id": "unit_bakery-01_20260913T073000000Z_7K2M9Q4R",
+      "source_manifest_sha256": "...",
+      "source_files": [
+        {"name": "rgb.mp4", "bytes": 123, "sha256": "..."}
+      ],
+      "consent_snapshot_id": "csp_...",
+      "consent_snapshot_sha256": "...",
+      "statement": "この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。",
+      "statement_version": "lot-approval-ja-1",
+      "issued_at": "...",
+      "expires_at": "..."
+    },
     "signed_payload_sha256": "...",
-    "webauthn_assertion_sha256": "...",
+    "signature_method": "webauthn",
+    "webauthn": {
+      "credential_id": "...",
+      "credential_public_key": "...",
+      "credential_counter_before": 3,
+      "credential_counter_after": 4,
+      "rp_id": "rootlens.io",
+      "origin": "https://www.rootlens.io",
+      "challenge": "...",
+      "assertion": {},
+      "assertion_sha256": "..."
+    },
+    "approved_at": "...",
     "receipt_sha256": "..."
   },
   "delivery": {
@@ -234,7 +268,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
     "url": "https://rootlens.io/verify/evd_..."
   },
   "attestation": {
-    "algorithm": "Ed25519",
+    "algorithm": "ECDSA_P256_SHA256",
     "key_id": "rootlens-evidence-2026-01",
     "payload_sha256": "...",
     "signature": "<base64url>"
@@ -242,7 +276,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 }
 ```
 
-`attestation` を除くpayloadをJSON Canonicalization Schemeに従って正規化し、そのSHA-256へ署名する。検証用公開鍵と失効・更新履歴はRootLensが公開する。証跡署名鍵はWebアプリやPCアプリの環境変数へ直接置かず、クラウドKMS等の非エクスポート鍵で管理する。
+`attestation` を除くpayloadをキー順が安定したJSONへ正規化し、SHA-256を算出する。AWS KMSの非エクスポートP-256鍵は、そのdigestへ`ECDSA_SHA_256`で署名する。検証用公開鍵と失効・更新履歴はRootLensが公開する。秘密鍵はWebアプリやPCアプリへ置かない。
 
 ### 含めない情報
 
@@ -262,7 +296,6 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 | `sites` | 事業所、所属する協力先 |
 | `people` | 署名者・承認者の不透明ID、所属、役割、状態 |
 | `agreement_records` | 文書種別・版・ハッシュ、DriveファイルID、DocuSeal submission ID、完了時刻、状態 |
-| `agreement_participants` | 合意記録と署名者の対応 |
 | `approval_signatures` | 有効期限付きの一回限り電子署名セッション |
 | `approval_events` | 撮影ロット、承認者、承認文、認証情報を含むappend-only記録 |
 | `consent_snapshots` | 承認時点で対象となったスタッフ同意記録の集合 |
@@ -274,15 +307,34 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 
 | API | 用途 |
 | --- | --- |
+| `POST /api/internal/sites/{site_id}/supervisors` | 現場監督者のGoogleアカウントを事業所へ招待する |
+| `POST /api/v1/desktop-auth/start` | DesktopのPKCEログインを開始する |
+| `GET /api/oauth/google/login/callback` | Google本人確認後、Desktop用の一回限り認可コードを発行する |
+| `POST /api/v1/desktop-auth/token` | 認可コードとPKCE verifierをRootLensセッションへ交換する |
+| `GET /api/v1/desktop-auth/session` | 保存済みセッションと所属事業所を確認する |
+| `POST /api/v1/drive-uploads` | 事業所Driveへ送るファイルと再開可能アップロードURLを準備する |
+| `POST /api/v1/drive-uploads/{attempt_id}/verify` | Drive上の保存先、属性、サイズ、SHA-256を検証する |
+| `POST /api/v1/drive-recordings` | 端末削除前に現在のDrive上の録画を再検証する |
 | `POST /api/internal/signing/submissions` | DocuSealへ現場合意・スタッフ同意の署名依頼を作る |
 | `POST /api/webhooks/docuseal` | 署名ライフサイクルの通知を受け、完了状態を照合する |
 | `POST /api/v1/approval-signatures` | PCアプリが撮影ロットの電子署名セッションを作る |
-| `GET /approve/{token}` | 現場監督者が内容を確認し、パスキーで電子署名するWeb画面 |
+| `GET /approve/{approval_id}#token=...` | 現場監督者が内容を確認し、パスキーで電子署名するWeb画面。tokenはサーバーログへ送られないfragmentに置く |
 | `GET /api/v1/approval-signatures/{id}` | PCアプリが署名状態とreceiptを取得する |
 | `POST /api/internal/evidence` | 納品パイプラインが証跡ファイルを発行する |
+| `GET /api/v1/evidence-keys/{key_id}` | 証跡署名の検証用公開鍵を取得する |
 | `GET /verify/{evidence_id}` | 権限に応じて整合性と各記録の状態を確認する |
-| `GET /evidence/sites/{site_id}/agreements` | 事業所の現在の合意書フォルダへ案内する |
+| `GET /evidence/sites/{site_id}/site-agreements` | 事業所の現在の現場合意書フォルダへ案内する |
+| `GET /evidence/sites/{site_id}/staff-consents` | 事業所の現在のスタッフ同意書フォルダへ案内する |
+| `GET /evidence/sites/{site_id}/approved-data` | 事業所の承認済みデータフォルダへ案内する |
 | `GET /evidence/agreements/{agreement_record_id}` | 特定の署名記録をDrive上の原本へ案内する |
+
+販売先は納品ディレクトリで次を実行すると、公開鍵、最終証跡署名、納品ファイル、raw manifest、同意スナップショット、現場監督者のパスキー署名を一括検証できる。公開鍵を明示しない場合は、証跡に記録されたRootLensの検証URLと鍵IDから取得する。
+
+```bash
+cd web
+npm run verify:evidence -- /path/to/delivery
+npm run verify:evidence -- /path/to/delivery --public-key /path/to/rootlens-evidence.pem
+```
 
 電子署名セッションのtokenとchallengeは短時間で失効し、一回の署名後に再利用できないようにする。token自体をログ、URL解析、外部サービスへ送らない。
 
@@ -290,7 +342,8 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 
 - 現場合意の署名権限者と、撮影データの承認権限者は分けて登録できる。
 - 協力先が承認権限者を指定し、RootLensが招待する。招待されていない人は承認者になれない。
-- 初回ログインは有効期限付きメールリンクで開始し、承認操作にはパスキーを登録する。
+- 初回ログインは招待されたGoogleアカウントで行い、Googleの`sub`をRootLens上の個人と結び付ける。DesktopはPKCEとloopback callbackを使い、RootLensセッションをOSの資格情報ストアへ保存する。
+- Googleログインは承認者のアカウントと事業所所属を確認する。撮影ロットへの明示的な承認操作には、別途登録したパスキーを使う。
 - 共有メールしかない現場では、招待時に本人名と役割を確認し、個人ごとに別のパスキーを登録する。共有パスワードによる承認は認めない。
 - 権限の付与、変更、失効もappend-onlyの管理記録へ残す。
 - DocuSealの署名済み文書と署名証明書は、文書、署名操作、署名者の認証情報、時刻を一体として協力先のDriveへ保存する。実際に操作した人の特定は、宛先、認証、操作ログ等を合わせて判断するため、署名証明書だけを本人確認の根拠にしない。
@@ -314,7 +367,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 - 署名済み文書の削除制限、保持、バックアップ、復元は、原本を所有する協力先のDrive運用として取り決める。RootLensは索引から原本の所在とハッシュ一致を定期確認する。
 - 署名文書の版を変えた場合、過去の版とハッシュを保持する。
 - 販売先へ提供する検証画面は、記録の有効性、文書版、時刻、ハッシュ一致だけを表示し、本人情報の表示には追加権限を必要とする。
-- 監査ログには署名用URL、パスキー秘密情報、サービスアカウント鍵を記録しない。
+- 監査ログには署名用URL、パスキー秘密情報、RootLensセッション、Google更新トークン、再開可能アップロードURLを記録しない。
 
 ## 実装順序
 
@@ -330,9 +383,11 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 ### Phase 2: 現場監督者の承認
 
 - 協力先、事業所、個人、承認権限を登録する。
+- DesktopのブラウザGoogleログイン、PKCE、loopback callback、OS資格情報ストアへのRootLensセッション保存を実装する。
+- 事業所Driveの認証情報をサーバーへ限定し、サーバー発行の再開可能URLによる送信とDrive再検証へ移行する。
 - Webの電子署名セッション、パスキー署名、append-only承認イベントを実装する。
 - PCアプリに「署名して承認」を設け、ブラウザでの署名完了を待ってからアップロードする。
-- 現在のGoogle Driveアップロードと再開・照合処理は維持する。
+- 現在の再開・照合要件を、サーバー管理のDrive接続とファイル単位アップロードURLで維持する。
 
 ### Phase 3: 証跡ファイル
 

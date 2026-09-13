@@ -116,8 +116,8 @@ registered for the current Windows user. It installs to a unique temporary direc
 uses isolated app-data paths, and keeps existing site settings and recordings out of the
 test. It checks the bundle and installed copy with Python and ADB removed from PATH:
 
-- Bundled ADB version, certificate bundle, ephemeral RSA signing, and an unauthenticated
-  HTTPS request to Google Drive that must return HTTP 401. No site credential is used.
+- Bundled ADB version, certificate bundle, OS credential-store client, and an unauthenticated
+  HTTPS request to the RootLens session API that must return HTTP 401.
 - Bundled logo integrity and actual executable icon resources, with an exported icon PNG.
 - Frozen H.264 video and AAC audio decoding; frozen CLI argument handling and UTF-8 output.
 - GUI startup, silent per-user installation, executable equality, silent uninstall,
@@ -162,25 +162,20 @@ Run core, library and desktop tests before building. On each supported OS, verif
 fresh installation without Python or ADB on PATH; missing-device feedback; import and
 re-import; USB disconnect and cancellation; Explorer/Finder selection of the whole recording
 folder; site-profile loading; embedded video and audio playback; previous/next navigation;
-and upload to the site's restricted Drive destination.
+and login, upload, and server-side verification against a test site's restricted Drive destination.
 Keep unverified platform artifacts out of the site's production app folder.
 
-## Site configuration
+## Site access
 
-Create a dedicated service account for each site and grant it access only to that site's
-shared-drive folder. It does not need a Google Cloud project IAM role for Drive upload.
-Keep the downloaded key outside the repository and executable. Combine it with the approved
-destination in one configuration file:
+Register each field supervisor with a site before using the app. The supervisor opens
+**Googleでログイン** in the desktop settings, completes Google login in the system browser,
+and returns to the app through an IPv4 loopback callback. The desktop stores only the opaque
+RootLens session in the operating system credential store.
 
-```sh
-python packaging/create-site-profile.py --site-id bb-sheep --site-name 'BB SHEEP' --folder-url 'https://drive.google.com/drive/folders/APPROVED_FOLDER_ID' --service-account /private/path/service-account.json --output /private/path/rootlens-site.json
-```
-
-The output is written with owner-only permissions on macOS and must be distributed only
-within that site's restricted folder. The command refuses to overwrite an existing file.
-Staff load this combined JSON once through the app's settings. When replacing a key, create
-a new configuration, update each authorized PC, then revoke the old key. Removing a staff
-member's Drive access alone does not revoke a copied service-account key.
+The site's Google Drive connection is configured separately by a site administrator. Its
+refresh token is encrypted on the RootLens server. The desktop never receives a Google refresh
+token, service-account key, or Drive folder ID. For an upload, the server issues resumable URLs
+that can accept bytes for the selected files only, then independently verifies the files in Drive.
 
 For maintainer smoke checks, the packaged executable accepts `--cli` followed by the
 existing import command's options, including `--clip`. This exercises the same frozen
@@ -193,11 +188,6 @@ or 15-second timeout. Use a synthetic H.264/AAC clip to confirm that the frozen 
 includes the Qt Multimedia backend and codecs. The check does not connect a device,
 change site settings, or upload data.
 
-`--check-drive /private/path/rootlens-site.json` authenticates using the configured service
-account and checks that its destination is a writable shared-drive folder. It performs no
-file creation, upload, or deletion, and never prints the key or access token. Run this from
-the packaged executable to exercise its bundled HTTPS certificates and authentication libraries.
-
 On Windows, a windowed PyInstaller executable has no standard output streams. Prefix any
 diagnostic with `--diagnostic-output <new-log-file>` to write UTF-8 output reliably, for example:
 
@@ -205,6 +195,6 @@ diagnostic with `--diagnostic-output <new-log-file>` to write UTF-8 output relia
 & '.\RootLens Import.exe' --diagnostic-output C:/build/check-runtime.log --check-runtime
 ```
 
-The diagnostic refuses to overwrite an existing output file. `--check-runtime` tests only
-bundled dependencies and public, unauthenticated HTTPS; it never reads `site.json` or connects
-to a recording device. See [PyInstaller's windowed-mode behavior](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#sys-stdin-sys-stdout-and-sys-stderr-in-noconsole-windowed-applications-windows-only).
+The diagnostic refuses to overwrite an existing output file. `--check-runtime` tests bundled
+dependencies and the public RootLens authentication boundary; it does not read a site file,
+use a login session, or connect to a recording device. See [PyInstaller's windowed-mode behavior](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#sys-stdin-sys-stdout-and-sys-stderr-in-noconsole-windowed-applications-windows-only).

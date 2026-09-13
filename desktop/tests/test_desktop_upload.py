@@ -1,12 +1,11 @@
 """Drive UI state transitions with synthetic local clips and no network access."""
 
-from dataclasses import replace
 import hashlib
 from pathlib import Path
 import tempfile
 import threading
 import unittest
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 from PySide6.QtCore import Qt
 
@@ -25,9 +24,7 @@ class UploadDesktopTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name).resolve()
-        self.profile = SiteProfile("upload-ui-test", "説明用事業所",
-                                   "https://drive.google.com/drive/folders/TESTFOLDER00000",
-                                   service_account={"test_only": "never sent to a network"})
+        self.profile = SiteProfile("site_upload_ui_test", "説明用事業所")
         self.drive_snapshot = {}
         self.release = threading.Event()
         self.started = threading.Event()
@@ -36,6 +33,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.cleaner = Mock(side_effect=self.clean_uploaded_device)
         self.importer = Mock(side_effect=self.import_current_device)
         self.drive_reader = Mock(side_effect=self.read_drive)
+        self.approver = Mock(return_value="apv_test")
         self.window = self.new_window()
         directory = recordings_directory(self.profile.site_id, self.root / "data")
         self.clips = [make_recording(directory, i) for i in range(2)]
@@ -45,7 +43,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.device_records = list(self.records)
         self.observe_device(self.records)
 
-    def read_drive(self, profile, unit_ids, cancel_event):
+    def read_drive(self, profile, unit_ids, cancel_event, gateway):
         return {identity: snapshot for identity, snapshot in self.drive_snapshot.items() if identity in unit_ids}
 
     def source_for(self, record):
@@ -90,7 +88,8 @@ class UploadDesktopTests(unittest.TestCase):
                 self.device_records.remove(record)
         return SyncSummary(kwargs['output'], existing=ready, cleaned=saved, sources=sources)
 
-    def uploaded_to_drive(self, path, on_progress, cancel_event):
+    def uploaded_to_drive(self, path, approval_event_id, on_progress, cancel_event):
+        self.assertEqual(approval_event_id, "apv_test")
         record = next(record for record in self.records if record.path == path)
         files = {name: {"id": "fake-" + name, "size": (path / name).stat().st_size,
                         "sha256": hashlib.sha256((path / name).read_bytes()).hexdigest()}
@@ -105,7 +104,8 @@ class UploadDesktopTests(unittest.TestCase):
     def new_window(self):
         return desktop.ImportWindow(self.root / "absent.json", self.root / "data",
                                     importer=self.importer, uploader_factory=self.factory,
-                                    drive_reader=self.drive_reader, cleaner=self.cleaner)
+                                    drive_reader=self.drive_reader, cleaner=self.cleaner,
+                                    gateway_factory=lambda _profile: object(), approver=self.approver)
 
     def restart_window(self):
         self.window.close()
@@ -124,33 +124,23 @@ class UploadDesktopTests(unittest.TestCase):
         APPLICATION.processEvents()
         self.temporary.cleanup()
 
-    def holding_upload(self, path, on_progress, cancel_event):
+    def holding_upload(self, path, approval_event_id, on_progress, cancel_event):
         self.started.set()
         if not self.release.wait(4):
             raise AssertionError("test worker was not released")
         if cancel_event.is_set():
             raise ImportCancelled("cancelled")
-        return self.uploaded_to_drive(path, on_progress, cancel_event)
+        return self.uploaded_to_drive(path, approval_event_id, on_progress, cancel_event)
 
     def begin_held_upload(self):
         self.uploader.upload_recording.side_effect = self.holding_upload
         self.window.start_upload()
         self.assertTrue(self.started.wait(1))
 
-    def test_connection_and_upload_require_the_site_upload_settings(self):
-        self.window.set_profile(replace(self.profile, service_account=None))
-        self.assertFalse(self.window.upload_button.isEnabled())
-        self.assertFalse(self.window.connect_button.isEnabled())
-        self.window.start_upload()
-        self.window.start_import()
-        self.factory.assert_not_called()
-        self.importer.assert_not_called()
-        self.drive_reader.assert_not_called()
-
     def test_upload_has_one_worker_with_fixed_selection_and_keeps_preview_navigation(self):
         main_thread = threading.get_ident()
         factory_threads = []
-        self.factory.side_effect = lambda profile: (factory_threads.append(threading.get_ident()) or self.uploader)
+        self.factory.side_effect = lambda profile, **_kwargs: (factory_threads.append(threading.get_ident()) or self.uploader)
         self.begin_held_upload()
         self.window.start_upload()
         self.window.start_import()
@@ -166,8 +156,18 @@ class UploadDesktopTests(unittest.TestCase):
         self.window.select_relative(1)
         self.assertEqual(self.window.preview.path, self.clips[1] / "rgb.mp4")
         self.assertEqual(self.window.upload_record.path, self.clips[0])
-        self.assertEqual(self.uploader.upload_recording.call_args.args, (self.clips[0],))
+        self.assertEqual(self.uploader.upload_recording.call_args.args, (self.clips[0], "apv_test"))
+        self.approver.assert_called_once_with(
+            self.clips[0], ANY, cancel_event=self.window.cancel_event, open_browser=ANY)
         self.assertTrue(self.window.folder_button.isEnabled())
+
+    def test_upload_does_not_start_when_explicit_approval_fails(self):
+        self.approver.side_effect = ImportFailure("承認されませんでした")
+        self.window.start_upload()
+        wait_for(lambda: not self.window.busy)
+        self.uploader.upload_recording.assert_not_called()
+        self.assertIn("承認されませんでした", self.window.status_label.text())
+        self.assertEqual([record.path for record in self.window.records], self.clips)
 
     def test_progress_does_not_hide_recording_before_verified_upload_result(self):
         self.begin_held_upload()
@@ -251,7 +251,8 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertIs(self.cleaner.call_args.args[0], original)
         self.assertIs(self.cleaner.call_args.kwargs['cancel_event'], self.window.cancel_event)
         self.cleaner.call_args.kwargs['drive_reader']({original.unit_id})
-        self.drive_reader.assert_called_once_with(self.profile, {original.unit_id}, self.window.cancel_event)
+        self.drive_reader.assert_called_once_with(
+            self.profile, {original.unit_id}, self.window.cancel_event, ANY)
         self.assertEqual(self.window.selected_recording().path, self.clips[1])
 
     def test_cleanup_failure_keeps_drive_success_as_non_uploadable_pending_row(self):

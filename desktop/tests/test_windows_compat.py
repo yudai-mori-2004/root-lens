@@ -194,7 +194,7 @@ except ImportFailure:
         self.assertFalse(junction.is_symlink())
         with self.assertRaises(core.ImportFailure):
             library.recordings_directory("fixture", junction)
-        profile = site.SiteProfile("fixture", "試験", "https://drive.google.com/drive/folders/TESTFOLDER00000")
+        profile = site.SiteProfile("site_fixture", "試験")
         with self.assertRaises(core.ImportFailure):
             site.save_site_profile(profile, junction / "site.json")
         with self.assertRaises(core.ImportFailure):

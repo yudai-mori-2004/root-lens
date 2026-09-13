@@ -9,13 +9,17 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify:evidence": "node scripts/verify-evidence.mjs",
     "gen:legal": "node scripts/gen-legal.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1131.0",
     "@aws-sdk/client-s3": "^3.1131.0",
     "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.3",
     "@supabase/supabase-js": "^2.110.2",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.5",

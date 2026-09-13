@@ -5,11 +5,12 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+import webbrowser
 
 from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QMainWindow,
+    QApplication, QDialog, QHBoxLayout, QHeaderView, QLabel, QMainWindow,
     QMessageBox, QProgressBar, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -17,6 +18,8 @@ from PySide6.QtWidgets import (
 from .core import ClipProgress, ImportCancelled, ImportFailure
 from .device_sync import sync_recordings, cleanup_uploaded_recording
 from .branding import APP_NAME, app_icon
+from .account import RootLensAccount
+from .approval import approve_recording
 from .drive import DriveUploader, UploadProgress, UploadResult
 from .library import read_recording, recordings_directory, settings_path
 from .preview import VideoPreview
@@ -31,9 +34,9 @@ PROGRESS_LABELS = {
 }
 
 
-def read_drive_recordings(profile, unit_ids, cancel_event):
+def read_drive_recordings(profile, unit_ids, cancel_event, gateway):
     """Fetch current Drive files without consulting local upload history."""
-    uploader = DriveUploader(profile)
+    uploader = DriveUploader(profile, gateway=gateway)
     try:
         return uploader.current_recordings(unit_ids, cancel_event=cancel_event)
     finally:
@@ -71,11 +74,13 @@ class ImportSignals(QObject):
     drive_checked = Signal(object, str)
     upload_progress = Signal(object)
     upload_done = Signal(object, str, bool, str)
+    login_done = Signal(object, str)
 
 
 class ImportWindow(QMainWindow):
     def __init__(self, profile_path=None, data_root=None, importer=None,
-                 uploader_factory=None, drive_reader=None, cleaner=None):
+                 uploader_factory=None, drive_reader=None, cleaner=None, account=None,
+                 gateway_factory=None, approver=None):
         super().__init__()
         self.profile_path = Path(profile_path) if profile_path is not None else settings_path()
         self.data_root = data_root
@@ -83,6 +88,9 @@ class ImportWindow(QMainWindow):
         self.cleaner = cleaner or cleanup_uploaded_recording
         self.uploader_factory = uploader_factory or DriveUploader
         self.drive_reader = drive_reader or read_drive_recordings
+        self.account = account or RootLensAccount()
+        self.gateway_factory = gateway_factory or self.account.gateway
+        self.approver = approver or approve_recording
         self.profile = None
         self.recordings_root = None
         self.records = []
@@ -113,6 +121,7 @@ class ImportWindow(QMainWindow):
         self.signals.drive_checked.connect(self._drive_checked)
         self.signals.upload_progress.connect(self._upload_progress)
         self.signals.upload_done.connect(self._upload_finished)
+        self.signals.login_done.connect(self._login_finished)
         self._build()
         self._load_saved_profile()
 
@@ -250,6 +259,7 @@ class ImportWindow(QMainWindow):
 
     def _load_saved_profile(self):
         if not self.profile_path.exists():
+            self.status_label.setText("「設定」からGoogleアカウントへログインしてください。")
             return
         try:
             self.set_profile(load_site_profile(self.profile_path))
@@ -259,8 +269,6 @@ class ImportWindow(QMainWindow):
     def set_profile(self, profile):
         if self.busy:
             raise ImportFailure("現在の作業が終わってから事業所を変更してください。")
-        if profile.status != "active":
-            raise ImportFailure("この設定はひな形です。管理者から事業所の設定ファイルを受け取ってください。")
         directory = recordings_directory(profile.site_id, self.data_root)
         self.preview.clear()
         self.profile = profile
@@ -278,8 +286,6 @@ class ImportWindow(QMainWindow):
         self.upload_progress_bar.setVisible(False)
         self.site_label.setText(profile.site_name)
         self.status_label.setText("スマートグラスをUSB-Cでつなぎ、「接続」を押してください。")
-        if not self.profile.service_account:
-            self.status_label.setText("「設定」から事業所の設定ファイルを読み込んでください。")
         self.refresh_recordings()
         self._update_controls()
 
@@ -294,31 +300,75 @@ class ImportWindow(QMainWindow):
         layout.setSpacing(16)
         current = QLabel(f"現在の事業所：{self.profile.site_name if self.profile else '未設定'}")
         layout.addWidget(current)
-        upload_setting = QLabel("アップロード設定：読み込み済み" if self.profile and self.profile.service_account
-                               else "アップロード設定：未設定")
-        layout.addWidget(upload_setting)
-        explanation = QLabel("事業所のGoogle Driveからダウンロードした「rootlens-site.json」を選んでください。")
+        explanation = QLabel("招待されたGoogleアカウントでログインしてください。ブラウザで認証した後、このアプリへ戻ります。")
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
-        choose = QPushButton("事業所の設定を読み込む")
-
-        def load():
-            filename, _ = QFileDialog.getOpenFileName(dialog, "事業所の設定を読み込む", "", "事業所の設定ファイル (*.json)")
-            if not filename:
-                return
-            try:
-                profile = load_site_profile(filename)
-                if profile.status != "active":
-                    raise ImportFailure("この設定はひな形です。管理者に設定ファイルを確認してもらってください。")
-                recordings_directory(profile.site_id, self.data_root)
-                save_site_profile(profile, self.profile_path)
-                self.set_profile(profile)
-                dialog.accept()
-            except (ImportFailure, OSError, ValueError) as error:
-                QMessageBox.warning(dialog, "設定を読み込めません", str(error))
-        choose.clicked.connect(load)
-        layout.addWidget(choose)
+        login = QPushButton("Googleでログイン")
+        login.clicked.connect(lambda: (dialog.accept(), self.start_login()))
+        layout.addWidget(login)
+        if self.profile:
+            logout = QPushButton("ログアウト")
+            logout.clicked.connect(lambda: (dialog.accept(), self.logout()))
+            layout.addWidget(logout)
         dialog.exec()
+
+    def start_login(self):
+        if self.busy or self.closing:
+            return
+        self.busy = True
+        self.job_kind = "login"
+        self.cancel_event.clear()
+        self.status_label.setText("ブラウザでGoogleアカウントへログインしてください…")
+        self.progress.setVisible(True)
+        self._update_controls()
+
+        def run():
+            try:
+                result = self.account.login(webbrowser.open, self.cancel_event)
+                self.signals.login_done.emit(result, "")
+            except Exception as error:
+                self.signals.login_done.emit(None, str(error))
+        self.worker = threading.Thread(target=run, name="rootlens-login", daemon=True)
+        self.worker.start()
+
+    def _login_finished(self, result, error):
+        self.busy = False
+        self.job_kind = None
+        self.worker = None
+        self.progress.setVisible(False)
+        if error:
+            self.status_label.setText(error)
+            self._update_controls()
+            return
+        sites = result["sites"]
+        selected = sites[0]
+        if len(sites) > 1:
+            from PySide6.QtWidgets import QInputDialog
+            labels = [site["name"] for site in sites]
+            label, accepted = QInputDialog.getItem(self, "事業所を選択", "使用する事業所", labels, 0, False)
+            if not accepted:
+                self.status_label.setText("事業所を選択してください。")
+                self._update_controls()
+                return
+            selected = sites[labels.index(label)]
+        profile = SiteProfile(selected["id"], selected["name"], self.account.api_origin)
+        save_site_profile(profile, self.profile_path)
+        self.set_profile(profile)
+
+    def logout(self):
+        try:
+            self.account.logout()
+            self.profile_path.unlink(missing_ok=True)
+            self.profile = None
+            self.recordings_root = None
+            self.records = []
+            self.all_records = []
+            self.refresh_recordings(rescan=False)
+            self.site_label.setText("事業所：未設定")
+            self.status_label.setText("ログアウトしました。「設定」からGoogleアカウントへログインしてください。")
+        except ImportFailure as error:
+            self.status_label.setText(str(error))
+        self._update_controls()
 
     def selected_recording(self):
         item = self.recording_list.currentItem()
@@ -412,16 +462,16 @@ class ImportWindow(QMainWindow):
             return
         record = self.selected_recording()
         index = self.records.index(record) if record else -1
-        self.connect_button.setEnabled(bool(self.profile and self.profile.service_account)
+        self.connect_button.setEnabled(bool(self.profile)
                                        and not self.busy and not self.closing)
         self.settings_button.setEnabled(not self.busy and not self.closing)
         self.folder_button.setEnabled(record is not None and not self.closing)
         self.drive_button.setEnabled(self.profile is not None and not self.closing)
-        upload_ready = (record is not None and self.profile is not None and self.profile.service_account
+        upload_ready = (record is not None and self.profile is not None
                         and not self.busy and not self.closing)
         self.upload_button.setEnabled(bool(upload_ready))
-        self.upload_button.setToolTip("" if self.profile and self.profile.service_account
-                                     else "「設定」から事業所の設定を読み込んでください。")
+        self.upload_button.setToolTip("" if self.profile
+                                     else "「設定」からGoogleアカウントへログインしてください。")
         self.cancel_upload_button.setVisible(self.busy and self.job_kind == "upload")
         self.cancel_upload_button.setEnabled(self.busy and self.job_kind == "upload" and not self.cancel_event.is_set())
         allowed = [i for i, item in enumerate(self.records)
@@ -430,7 +480,7 @@ class ImportWindow(QMainWindow):
         self.next_button.setEnabled(index >= 0 and any(i > index for i in allowed))
 
     def start_import(self):
-        if self.profile is None or not self.profile.service_account or self.busy or self.closing:
+        if self.profile is None or self.busy or self.closing:
             return
         self.busy = True
         self.device_sources.clear()
@@ -453,7 +503,8 @@ class ImportWindow(QMainWindow):
                 summary = self.importer(output=directory, log=self.signals.log.emit,
                                         cancel_event=self.cancel_event, on_clip=self.signals.clip.emit,
                                         site_id=profile.site_id,
-                                        drive_reader=lambda unit_ids: self.drive_reader(profile, unit_ids, self.cancel_event),
+                                        drive_reader=lambda unit_ids: self.drive_reader(
+                                            profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
                                         on_drive_checked=lambda recordings: self.signals.drive_checked.emit(recordings, ""))
                 self.signals.done.emit(summary, "", False)
             except ImportCancelled:
@@ -533,7 +584,7 @@ class ImportWindow(QMainWindow):
 
     def start_upload(self):
         record = self.selected_recording()
-        if (record is None or self.profile is None or not self.profile.service_account
+        if (record is None or self.profile is None
                 or self.busy or self.closing or self.completion_error):
             return
         try:
@@ -547,12 +598,12 @@ class ImportWindow(QMainWindow):
         self.upload_record = record
         self.upload_saved = False
         self.cancel_event.clear()
-        self.upload_states[record.unit_id] = "録画を確認中"
-        self.upload_status_label.setText(f"{record.created_text} の録画を確認しています…")
+        self.upload_states[record.unit_id] = "承認待ち"
+        self.upload_status_label.setText(f"{record.created_text} — ブラウザで提供を承認してください。")
         self.upload_status_label.setVisible(True)
         self.upload_progress_bar.setRange(0, 0)
         self.upload_progress_bar.setVisible(True)
-        self.status_label.setText("アップロードする録画を確認しています…")
+        self.status_label.setText("ブラウザで、この録画の提供を承認してください。")
         self._update_controls()
         self.refresh_recordings(rescan=False)
         profile = self.profile
@@ -562,15 +613,21 @@ class ImportWindow(QMainWindow):
             uploader = None
             result, error, cancelled, cleanup_error = None, "", False, ""
             try:
-                uploader = self.uploader_factory(profile)
-                result = uploader.upload_recording(record.path, on_progress=self.signals.upload_progress.emit,
+                gateway = self.gateway_factory(profile)
+                approval_event_id = self.approver(
+                    record.path, gateway, cancel_event=self.cancel_event, open_browser=webbrowser.open,
+                )
+                uploader = self.uploader_factory(profile, gateway=gateway)
+                result = uploader.upload_recording(record.path, approval_event_id,
+                                                   on_progress=self.signals.upload_progress.emit,
                                                    cancel_event=self.cancel_event)
                 if isinstance(result, UploadResult) and result.unit_id == record.unit_id:
                     self.signals.upload_progress.emit(UploadProgress(record.unit_id, "cleaning_device",
                                                       result.total_bytes, result.total_bytes))
                     self.signals.log.emit("保存を確認しました。スマートグラスから録画を削除しています…")
                     try:
-                        self.cleaner(source, drive_reader=lambda unit_ids: self.drive_reader(profile, unit_ids, self.cancel_event),
+                        self.cleaner(source, drive_reader=lambda unit_ids: self.drive_reader(
+                            profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
                                      log=self.signals.log.emit, cancel_event=self.cancel_event)
                     except (ImportFailure, OSError):
                         cleanup_error = "アップロードは完了しました。端末からの削除は、次の接続で再試行します。"
@@ -670,7 +727,8 @@ class ImportWindow(QMainWindow):
                 self.status_label.setText(str(error))
 
     def open_drive(self):
-        if self.profile and not QDesktopServices.openUrl(QUrl(self.profile.approved_drive_url)):
+        if self.profile and not QDesktopServices.openUrl(QUrl(
+                self.profile.api_base_url + "/evidence/sites/" + self.profile.site_id + "/approved-data")):
             self.status_label.setText("Google Driveを開けませんでした。ブラウザから事業所のGoogle Driveを開いてください。")
 
     def closeEvent(self, event):
@@ -683,6 +741,7 @@ class ImportWindow(QMainWindow):
             return
         self.preview.clear()
         self._refresh_timer.stop()
+        self.account.close()
         event.accept()
 
 

@@ -1,4 +1,4 @@
-"""Validate packaged ADB, HTTPS trust, and key signing without a site credential."""
+"""Validate packaged ADB and the RootLens HTTPS login boundary."""
 
 import argparse
 import hashlib
@@ -7,9 +7,7 @@ from pathlib import Path
 import subprocess
 
 import certifi
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from google.oauth2.service_account import Credentials
+import keyring
 import requests
 
 from rootlens_import import core
@@ -36,21 +34,12 @@ def main(arguments=None):
         certificates = Path(certifi.where())
         if not certificates.is_file():
             raise RuntimeError("Bundled TLS certificates are missing")
-        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                serialization.NoEncryption()).decode()
-        credentials = Credentials.from_service_account_info({
-            "type": "service_account", "project_id": "rootlens-runtime-check",
-            "private_key_id": "ephemeral", "private_key": pem,
-            "client_email": "test@rootlens-runtime-check.iam.gserviceaccount.com",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }, scopes=["https://www.googleapis.com/auth/drive"])
-        message = b"RootLens local runtime verification; this is not an upload"
-        signature = credentials.sign_bytes(message)
-        key.public_key().verify(signature, message, padding.PKCS1v15(), hashes.SHA256())
+        credential_store = keyring.get_keyring()
+        if getattr(credential_store, "priority", 0) <= 0:
+            raise RuntimeError("Bundled OS credential store is unavailable")
         with requests.Session() as session:
             session.trust_env = False
-            response = session.get("https://www.googleapis.com/drive/v3/about?fields=kind",
+            response = session.get("https://www.rootlens.io/api/v1/desktop-auth/session",
                                    timeout=(10, 20), allow_redirects=False, verify=str(certificates))
             try:
                 if response.status_code != 401:
@@ -58,11 +47,11 @@ def main(arguments=None):
             finally:
                 response.close()
         print(json.dumps({"ok": True, "bundled_adb": True, "adb_version": "37.0.0", "app_icon": True,
-                          "certificate_bundle": True, "rsa_signing": True,
-                          "drive_https_status": 401, "site_credentials_used": False}))
+                          "certificate_bundle": True, "credential_store_client": True,
+                          "rootlens_https_status": 401}))
         return 0
     except Exception:
-        print(json.dumps({"ok": False, "error": "Bundled runtime or unauthenticated HTTPS verification failed."}))
+        print(json.dumps({"ok": False, "error": "Bundled runtime or RootLens HTTPS verification failed."}))
         return 1
 
 
