@@ -20,7 +20,7 @@ export default async function BuyPage() {
 
   return (
     <SiteLayout>
-      <main className={s.page}>
+      <main className={s.accordionPage}>
         <header className={s.contributeOverview}>
           <h1>{copy.label}</h1>
           {copy.overview.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}

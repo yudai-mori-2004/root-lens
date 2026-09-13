@@ -107,6 +107,7 @@
 }
 
 .accordionList {
+  border-top: var(--rule-thin) solid var(--color-rule-strong);
   border-bottom: var(--rule-thin) solid var(--color-rule-strong);
 }
 
