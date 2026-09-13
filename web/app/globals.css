@@ -27,6 +27,8 @@
   --color-verified: var(--color-ink);
   --color-failed: var(--color-danger);
   --page-bg: var(--color-paper);
+  --public-body-size: clamp(1rem, 1.35vw, 1.12rem);
+  --public-section-size: clamp(1.2rem, 2vw, 1.5rem);
 }
 
 *,

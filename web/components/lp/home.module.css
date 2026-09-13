@@ -16,13 +16,19 @@
   padding: var(--space-lg) var(--page-gutter);
 }
 
+.introTitle {
+  width: 100%;
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
 .introBody {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-xs);
   border-top: var(--rule-thin) solid var(--color-rule-strong);
-  font-size: var(--text-md);
+  font-size: var(--public-body-size);
   line-height: 1.65;
   text-align: center;
 }
@@ -61,7 +67,7 @@
 
 .overviewBlock h2 {
   margin: 0 auto;
-  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-size: var(--public-section-size);
   font-weight: 600;
   line-height: 1.4;
 }
@@ -71,7 +77,7 @@
   margin: var(--space-sm) auto 0;
   display: grid;
   gap: var(--space-md);
-  font-size: clamp(1rem, 1.35vw, 1.12rem);
+  font-size: var(--public-body-size);
   line-height: 1.85;
   color: var(--color-ink);
 }
@@ -89,7 +95,7 @@
   justify-content: center;
   padding: var(--space-lg) var(--page-gutter);
   border-bottom: var(--rule-thin) solid var(--color-rule-strong);
-  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  font-size: var(--public-section-size);
   font-weight: 600;
   line-height: 1.4;
   text-align: center;
