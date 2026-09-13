@@ -1,13 +1,12 @@
 // Assign a stable unit id, write it into metadata, and hash every source file.
 
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex } from '@noble/hashes/utils';
 import * as FileSystem from 'expo-file-system';
 
 import { nativeSha256File } from '../../native/fileHash';
 import type { EventSink } from '../events';
 import type { OutputFileSpec, RecordingSession } from '../recording-configs';
 import type { SourceFileIntegrity, SourceManifestResult } from '../types';
+import { sourceManifestSha256 } from '../sourceManifestContract';
 import { issueUnitId } from './unit';
 
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -15,16 +14,6 @@ const UNIT_ID_RE = /^unit_[a-z0-9][a-z0-9_-]{0,63}_\d{8}T\d{9}Z_[0-9A-HJKMNP-TV-
 
 function sessionUri(session: RecordingSession, name: string): string {
   return `${session.sessionDir.endsWith('/') ? session.sessionDir : `${session.sessionDir}/`}${name}`;
-}
-
-function canonicalManifest(unitId: string, files: SourceFileIntegrity[]): string {
-  return JSON.stringify({
-    schema: 'io.rootlens.source-manifest.v1',
-    unit_id: unitId,
-    files: [...files]
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
-      .map(({ name, bytes, sha256: digest }) => ({ name, bytes, sha256: digest })),
-  });
 }
 
 async function readMetadata(session: RecordingSession): Promise<Record<string, unknown>> {
@@ -101,9 +90,7 @@ export async function buildSourceManifest(
     if (totalBytes > 0) onProgress?.(completedBytes / totalBytes);
   }
 
-  const sourceManifestSha256 = bytesToHex(
-    sha256(new TextEncoder().encode(canonicalManifest(unitId, sourceFiles))),
-  );
+  const manifestSha256 = sourceManifestSha256(unitId, sourceFiles);
   const video = sourceFiles.find((file) => file.name === 'rgb.mp4');
   if (!video) throw new Error('source manifest has no rgb.mp4');
 
@@ -111,7 +98,7 @@ export async function buildSourceManifest(
     step: 'source-manifest',
     level: 'success',
     message: `原本マニフェスト確定: ${unitId}`,
-    detail: { unitId, sourceManifestSha256, sourceFiles },
+    detail: { unitId, sourceManifestSha256: manifestSha256, sourceFiles },
   });
-  return { unitId, videoBytes: video.bytes, sourceManifestSha256, sourceFiles, files };
+  return { unitId, videoBytes: video.bytes, sourceManifestSha256: manifestSha256, sourceFiles, files };
 }
