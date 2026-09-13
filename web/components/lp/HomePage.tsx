@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { getLocale } from "next-intl/server";
 import { publicLocale, publicPages } from "../../content/publicPages";
 import s from "./home.module.css";
@@ -18,6 +19,18 @@ export default async function HomePage() {
           {pageCopy.intro.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
         </div>
       </header>
+
+      <figure className={s.workplaceFigure}>
+        <Image
+          className={s.workplacePhoto}
+          src="/photos/workplace-capture-satokaede.jpg"
+          alt={locale === "ja" ? "ベーカリーの厨房で撮影機材を装着して作業する様子" : "A worker wearing capture equipment in a bakery kitchen"}
+          width={1536}
+          height={2048}
+          sizes="(max-width: 64rem) 100vw, 64rem"
+          priority
+        />
+      </figure>
 
       <section className={s.overview} aria-label={locale === "ja" ? "RootLensについて" : "About RootLens"}>
         <div className={s.overviewContent}>

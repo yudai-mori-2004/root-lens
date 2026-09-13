@@ -45,6 +45,18 @@
   max-width: 34ch;
 }
 
+.workplaceFigure {
+  padding: 0 var(--content-gutter) var(--space-lg);
+}
+
+.workplacePhoto {
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+  object-position: center 48%;
+  border: var(--rule-thin) solid var(--color-rule-strong);
+}
+
 .introTitleLine {
   display: block;
 }
@@ -127,6 +139,10 @@
 
   .overviewText {
     margin-top: var(--space-sm);
+  }
+
+  .workplacePhoto {
+    aspect-ratio: 4 / 3;
   }
 
 }
