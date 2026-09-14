@@ -5,43 +5,56 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+from pathlib import Path
 import secrets
 import threading
 from urllib.parse import parse_qs, urlsplit
 
-from .core import ImportFailure, check_cancelled
+from .core import ImportFailure, check_cancelled, is_link
+from .library import settings_path
+from .site import write_private_json
 
 DEFAULT_API_ORIGIN = "https://www.rootlens.io"
-KEYRING_SERVICE = "io.rootlens.desktop"
-KEYRING_ACCOUNT = "session"
+SESSION_SCHEMA = "rootlens.desktop-session.v1"
+SESSION_MAX_BYTES = 16 * 1024
+
+
+def _valid_token(token):
+    return (isinstance(token, str) and 32 <= len(token) <= 4096
+            and token.isascii() and not any(character.isspace() for character in token))
 
 
 class SessionStore:
+    def __init__(self, path=None):
+        self.path = Path(path) if path is not None else settings_path().with_name("session.json")
+
     def load(self):
+        if not self.path.exists():
+            return None
         try:
-            import keyring
-            return keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        except Exception as error:
-            raise ImportFailure("このPCにログイン情報を保存できません。OSの資格情報ストアを確認してください。") from error
+            if is_link(self.path) or not self.path.is_file() or self.path.stat().st_size > SESSION_MAX_BYTES:
+                raise ValueError()
+            value = json.loads(self.path.read_text(encoding="utf-8"))
+            if (not isinstance(value, dict) or set(value) != {"schema", "token"}
+                    or value["schema"] != SESSION_SCHEMA or not _valid_token(value["token"])):
+                raise ValueError()
+            return value["token"]
+        except (OSError, ValueError, UnicodeError, TypeError):
+            raise ImportFailure("このPCのログイン情報を読み込めません。設定からもう一度ログインしてください。") from None
 
     def save(self, token):
+        if not _valid_token(token):
+            raise ImportFailure("ログイン情報を保存できませんでした。設定からもう一度ログインしてください。")
         try:
-            import keyring
-            keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, token)
-        except Exception as error:
-            raise ImportFailure("このPCにログイン情報を保存できません。OSの資格情報ストアを確認してください。") from error
+            write_private_json(self.path, {"schema": SESSION_SCHEMA, "token": token})
+        except (OSError, ImportFailure) as error:
+            raise ImportFailure("このPCにログイン情報を保存できません。管理者に保存場所を確認してもらってください。") from error
 
     def clear(self):
         try:
-            import keyring
-        except Exception as error:
-            raise ImportFailure("このPCのログイン情報を削除できません。OSの資格情報ストアを確認してください。") from error
-        try:
-            keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        except keyring.errors.PasswordDeleteError:
-            pass
-        except Exception as error:
-            raise ImportFailure("このPCのログイン情報を削除できません。OSの資格情報ストアを確認してください。") from error
+            self.path.unlink(missing_ok=True)
+        except OSError as error:
+            raise ImportFailure("このPCのログイン情報を削除できません。管理者に保存場所を確認してもらってください。") from error
 
 
 def _api_origin(value=None):

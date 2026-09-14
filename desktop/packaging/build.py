@@ -16,9 +16,8 @@ import tempfile
 
 PLATFORM_TOOLS_VERSION = "37.0.0"
 NETWORK_PACKAGES = (
-    "keyring", "requests", "certifi", "charset-normalizer", "idna", "urllib3",
-    "jaraco.classes", "jaraco.context", "jaraco.functools", "more-itertools",
-) + (("pywin32-ctypes",) if sys.platform == "win32" else ())
+    "requests", "certifi", "charset-normalizer", "idna", "urllib3",
+)
 
 
 def build_requirements(path):

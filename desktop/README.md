@@ -7,14 +7,14 @@
 
 ## 利用者の流れ
 
-1. 設定画面から、RootLensに招待されたGoogleアカウントでログインする。
+1. 設定画面から、事業所に登録された電話番号を使ってSMSでログインする。
 2. スマートグラスをUSBで接続し、端末に残る未アップロードの録画を取得する。
 3. 映像と音声を確認し、提供を認める録画をアップロードする。
 4. RootLensサーバーがDrive上の4ファイルを照合した後、端末上の録画を削除する。
 
 SMSログインは、利用者本人と所属事業所を確認するために使います。DesktopアプリはGoogle Driveの
 認証情報やフォルダIDを保持しません。ログイン後に発行されたRootLensセッションだけを
-macOS KeychainまたはWindows Credential Managerへ保存します。
+アプリ専用の保存先へ保存し、ログアウト時に削除します。
 
 ## 録画と保存確認
 
@@ -56,7 +56,7 @@ RootLensサーバーは、Drive上の保存先、`site_id`、`unit_id`、`source
 
 ## ローカル保存
 
-アプリは選択中の事業所、プレビュー用録画、送信再開情報を事業所ごとに分けて保存します。
+アプリはログイン情報、選択中の事業所、プレビュー用録画、送信再開情報をアプリ専用の保存先へ保存します。
 
 - Windows: `%LOCALAPPDATA%/RootLens Import/`
 - macOS: `~/Library/Application Support/RootLens Import/`

@@ -1,10 +1,14 @@
 import json
+import os
+from pathlib import Path
+import tempfile
 import threading
 import unittest
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from urllib.request import urlopen
 
-from rootlens_import.account import RootLensAccount
+from rootlens_import.account import RootLensAccount, SessionStore
+from rootlens_import.core import ImportFailure
 
 
 class Store:
@@ -56,6 +60,37 @@ class Session:
 
 
 class AccountTests(unittest.TestCase):
+    def test_session_store_uses_private_file_and_clear_removes_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "session.json"
+            store = SessionStore(path)
+            token = "s" * 43
+            self.assertIsNone(store.load())
+            store.save(token)
+            self.assertEqual(store.load(), token)
+            if os.name != "nt":
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            store.clear()
+            self.assertFalse(path.exists())
+
+    def test_session_store_rejects_malformed_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "session.json"
+            path.write_text('{"schema":"rootlens.desktop-session.v1","token":"short"}')
+            with self.assertRaisesRegex(ImportFailure, "ログイン情報を読み込めません"):
+                SessionStore(path).load()
+
+    @unittest.skipIf(os.name == "nt", "Windows link creation requires elevated privileges")
+    def test_session_store_does_not_follow_symbolic_link(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target.json"
+            target.write_text('{"schema":"rootlens.desktop-session.v1","token":"' + "s" * 43 + '"}')
+            path = root / "session.json"
+            path.symlink_to(target)
+            with self.assertRaisesRegex(ImportFailure, "ログイン情報を読み込めません"):
+                SessionStore(path).load()
+
     def test_browser_login_returns_to_loopback_and_saves_only_rootlens_session(self):
         session, store = Session(), Store()
         account = RootLensAccount("http://127.0.0.1:3000", session=session, store=store)

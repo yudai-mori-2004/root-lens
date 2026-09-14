@@ -116,7 +116,7 @@ registered for the current Windows user. It installs to a unique temporary direc
 uses isolated app-data paths, and keeps existing site settings and recordings out of the
 test. It checks the bundle and installed copy with Python and ADB removed from PATH:
 
-- Bundled ADB version, certificate bundle, OS credential-store client, and an unauthenticated
+- Bundled ADB version, certificate bundle, and an unauthenticated
   HTTPS request to the RootLens session API that must return HTTP 401.
 - Bundled logo integrity and actual executable icon resources, with an exported icon PNG.
 - Frozen H.264 video and AAC audio decoding; frozen CLI argument handling and UTF-8 output.
@@ -168,9 +168,9 @@ Keep unverified platform artifacts out of the site's production app folder.
 ## Site access
 
 Register each field supervisor with a site before using the app. The supervisor opens
-**Googleでログイン** in the desktop settings, completes Google login in the system browser,
+**SMSでログイン** in the desktop settings, completes SMS verification in the system browser,
 and returns to the app through an IPv4 loopback callback. The desktop stores only the opaque
-RootLens session in the operating system credential store.
+RootLens session in its private application-data directory and deletes it on logout.
 
 RootLens manages each site's destination in the **RootLens Submit** shared Drive. The RootLens
 server accesses it with its dedicated service account. The desktop never receives a Google refresh

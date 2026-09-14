@@ -7,7 +7,6 @@ from pathlib import Path
 import subprocess
 
 import certifi
-import keyring
 import requests
 
 from rootlens_import import core
@@ -34,9 +33,6 @@ def main(arguments=None):
         certificates = Path(certifi.where())
         if not certificates.is_file():
             raise RuntimeError("Bundled TLS certificates are missing")
-        credential_store = keyring.get_keyring()
-        if getattr(credential_store, "priority", 0) <= 0:
-            raise RuntimeError("Bundled OS credential store is unavailable")
         with requests.Session() as session:
             session.trust_env = False
             response = session.get("https://www.rootlens.io/api/v1/desktop-auth/session",
@@ -47,8 +43,7 @@ def main(arguments=None):
             finally:
                 response.close()
         print(json.dumps({"ok": True, "bundled_adb": True, "adb_version": "37.0.0", "app_icon": True,
-                          "certificate_bundle": True, "credential_store_client": True,
-                          "rootlens_https_status": 401}))
+                          "certificate_bundle": True, "rootlens_https_status": 401}))
         return 0
     except Exception:
         print(json.dumps({"ok": False, "error": "Bundled runtime or RootLens HTTPS verification failed."}))

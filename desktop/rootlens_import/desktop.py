@@ -7,7 +7,7 @@ import sys
 import threading
 import webbrowser
 
-from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QHeaderView, QLabel, QMainWindow,
@@ -23,7 +23,7 @@ from .approval import approve_recording
 from .drive import DriveUploader, UploadProgress, UploadResult
 from .library import read_recording, recordings_directory, settings_path
 from .preview import VideoPreview
-from .site import load_site_profile, save_site_profile
+from .site import SiteProfile, load_site_profile, save_site_profile
 
 
 PROGRESS_LABELS = {
@@ -115,13 +115,14 @@ class ImportWindow(QMainWindow):
         self._refresh_timer.setInterval(120)
         self._refresh_timer.timeout.connect(self._flush_progress)
         self.signals = ImportSignals(self)
-        self.signals.log.connect(self._show_log)
-        self.signals.clip.connect(self._clip_progress)
-        self.signals.done.connect(self._import_finished)
-        self.signals.drive_checked.connect(self._drive_checked)
-        self.signals.upload_progress.connect(self._upload_progress)
-        self.signals.upload_done.connect(self._upload_finished)
-        self.signals.login_done.connect(self._login_finished)
+        queued = Qt.ConnectionType.QueuedConnection
+        self.signals.log.connect(self._show_log, queued)
+        self.signals.clip.connect(self._clip_progress, queued)
+        self.signals.done.connect(self._import_finished, queued)
+        self.signals.drive_checked.connect(self._drive_checked, queued)
+        self.signals.upload_progress.connect(self._upload_progress, queued)
+        self.signals.upload_done.connect(self._upload_finished, queued)
+        self.signals.login_done.connect(self._login_finished, queued)
         self._build()
         self._load_saved_profile()
 
@@ -259,7 +260,7 @@ class ImportWindow(QMainWindow):
 
     def _load_saved_profile(self):
         if not self.profile_path.exists():
-            self.status_label.setText("「設定」からGoogleアカウントへログインしてください。")
+            self.status_label.setText("「設定」からSMSでログインしてください。")
             return
         try:
             self.set_profile(load_site_profile(self.profile_path))
@@ -331,6 +332,7 @@ class ImportWindow(QMainWindow):
         self.worker = threading.Thread(target=run, name="rootlens-login", daemon=True)
         self.worker.start()
 
+    @Slot(object, str)
     def _login_finished(self, result, error):
         self.busy = False
         self.job_kind = None
@@ -471,7 +473,7 @@ class ImportWindow(QMainWindow):
                         and not self.busy and not self.closing)
         self.upload_button.setEnabled(bool(upload_ready))
         self.upload_button.setToolTip("" if self.profile
-                                     else "「設定」からGoogleアカウントへログインしてください。")
+                                     else "「設定」からSMSでログインしてください。")
         self.cancel_upload_button.setVisible(self.busy and self.job_kind == "upload")
         self.cancel_upload_button.setEnabled(self.busy and self.job_kind == "upload" and not self.cancel_event.is_set())
         allowed = [i for i, item in enumerate(self.records)
@@ -514,14 +516,17 @@ class ImportWindow(QMainWindow):
         self.worker = threading.Thread(target=run, name="rootlens-usb-import", daemon=True)
         self.worker.start()
 
+    @Slot(object, str)
     def _drive_checked(self, recordings, error):
         self.drive_synced = not error
         self.completion_error = error
         self.refresh_recordings(rescan=False)
 
+    @Slot(str)
     def _show_log(self, text):
         self.status_label.setText(text)
 
+    @Slot(object)
     def _clip_progress(self, progress):
         selected = self.selected_recording()
         self.progress_states[progress.name] = progress
@@ -547,6 +552,7 @@ class ImportWindow(QMainWindow):
         self._library_dirty = False
         self.refresh_recordings(rescan=rescan)
 
+    @Slot(object, str, bool)
     def _import_finished(self, summary, error, cancelled):
         self.busy = False
         self.job_kind = None
@@ -650,6 +656,7 @@ class ImportWindow(QMainWindow):
         self.worker = threading.Thread(target=run, name="rootlens-drive-upload", daemon=True)
         self.worker.start()
 
+    @Slot(object)
     def _upload_progress(self, progress):
         if (not self.busy or self.job_kind != "upload" or self.upload_record is None
                 or progress.unit_id != self.upload_record.unit_id):
@@ -680,6 +687,7 @@ class ImportWindow(QMainWindow):
                                              else "アップロードを中止しています…")
             self._update_controls()
 
+    @Slot(object, str, bool, str)
     def _upload_finished(self, result, error, cancelled, cleanup_error=""):
         record = self.upload_record
         self.busy = False

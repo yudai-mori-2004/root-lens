@@ -24,11 +24,12 @@ def load_module(name):
 
 
 class PackagingTests(unittest.TestCase):
-    def test_credential_store_dependency_follows_build_platform(self):
+    def test_build_has_no_os_credential_store_dependency(self):
         build = load_module("build")
         requirements = build.build_requirements(PACKAGING / "requirements-build.txt")
-        assertion = self.assertIn if sys.platform == "win32" else self.assertNotIn
-        assertion(("pywin32-ctypes", "0.2.3"), requirements)
+        names = {name for name, _ in requirements}
+        self.assertTrue(names.isdisjoint({"keyring", "pywin32-ctypes", "jaraco.classes",
+                                          "jaraco.context", "jaraco.functools", "more-itertools"}))
 
     def test_windowed_cli_writes_utf8_diagnostic_without_standard_streams(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -75,11 +76,11 @@ class PackagingTests(unittest.TestCase):
                     patch.object(check.core, "find_adb", return_value=str(directory / "runtime" / "adb.exe")), \
                     patch.object(check.subprocess, "run", return_value=Mock(stdout="Android Debug Bridge\nVersion 37.0.0-test\n")), \
                     patch.object(check.certifi, "where", return_value=str(certificates)), \
-                    patch.object(check.keyring, "get_keyring", return_value=Mock(priority=5)), \
                     patch.object(check.requests, "Session", return_value=context), patch("builtins.print") as output:
                 self.assertEqual(check.main([]), 0)
-                self.assertTrue(json.loads(output.call_args.args[0])["credential_store_client"])
-                self.assertTrue(json.loads(output.call_args.args[0])["app_icon"])
+                report = json.loads(output.call_args.args[0])
+                self.assertNotIn("credential_store_client", report)
+                self.assertTrue(report["app_icon"])
             self.assertFalse(session.trust_env)
             session.get.assert_called_once_with("https://www.rootlens.io/api/v1/desktop-auth/session",
                                                 timeout=(10, 20), allow_redirects=False, verify=str(certificates))
@@ -128,7 +129,7 @@ class PackagingTests(unittest.TestCase):
             manifest = json.loads(image.with_suffix(".dmg.manifest.json").read_text())
             self.assertEqual(manifest["signing"]["kind"], "ad-hoc")
             self.assertEqual(manifest["signing"]["stapled_notarization"], "not-checked")
-            self.assertIn("Googleアカウントでログイン", captured["instructions"])
+            self.assertIn("SMSでログイン", captured["instructions"])
             self.assertIn("スマートグラス", captured["instructions"])
             self.assertNotIn("動作確認用", captured["instructions"])
             self.assertFalse(any(call.args[0][0] == "spctl" for call in run.call_args_list))

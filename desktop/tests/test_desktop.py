@@ -99,6 +99,15 @@ class DesktopTests(unittest.TestCase):
         self.window.start_import()
         self.importer.assert_not_called()
 
+    def test_login_completion_saves_and_selects_the_only_site(self):
+        self.window.busy = True
+        self.window.job_kind = "login"
+        self.window._login_finished({"sites": [{"id": "site_live", "name": "営業所"}]}, "")
+        self.assertEqual(self.window.profile.site_id, "site_live")
+        self.assertEqual(self.window.profile.site_name, "営業所")
+        self.assertEqual(json.loads(self.profile_path.read_text())["site_id"], "site_live")
+        self.assertFalse(self.window.busy)
+
     def test_previous_next_follow_saved_recordings_and_release_old_source(self):
         clips = self.populate()
         self.assertEqual(self.window.preview.path, clips[0] / "rgb.mp4")

@@ -10,7 +10,6 @@ from rootlens_import import __version__
 runtime = Path(os.environ["ROOTLENS_PACKAGING_RUNTIME"])
 names = ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"] if sys.platform == "win32" else ["adb"]
 identity = os.environ.get("ROOTLENS_CODESIGN_IDENTITY") or None
-keyring_backend = "keyring.backends.Windows" if sys.platform == "win32" else "keyring.backends.macOS"
 
 analysis = Analysis(
     [str(packaging / "launcher.py")],
@@ -20,7 +19,7 @@ analysis = Analysis(
            for name in ("NOTICE.txt", "runtime-manifest.json")]
           + [(os.environ["ROOTLENS_RUNTIME_NOTICES"], "THIRD-PARTY-NOTICES"),
              (str(pc / "rootlens_import/assets/rootlens.png"), "rootlens_import/assets")],
-    hiddenimports=[keyring_backend],
+    hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter", "_tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets"],
