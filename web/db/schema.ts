@@ -192,21 +192,6 @@ export const agreementRecords = pgTable("agreement_records", {
     .where(sql`${table.kind} = 'staff_consent' AND ${table.status} = 'active'`),
 ]);
 
-export const driveConnections = pgTable("drive_connections", {
-  id: text("id").primaryKey(),
-  encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
-  googleAccountSubject: text("google_account_subject").notNull(),
-  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const driveOAuthRequests = pgTable("drive_oauth_requests", {
-  id: text("id").primaryKey(),
-  stateSha256: text("state_sha256").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usedAt: timestamp("used_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const operatorInvites = pgTable("operator_invites", {
   id: text("id").primaryKey(),
   personId: text("person_id").notNull().references(() => people.id),

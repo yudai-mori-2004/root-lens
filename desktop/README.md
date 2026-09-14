@@ -13,7 +13,7 @@
 4. RootLensサーバーがDrive上の4ファイルを照合した後、端末上の録画を削除する。
 
 Googleログインは、利用者本人と所属事業所を確認するために使います。DesktopアプリはGoogle Driveの
-秘密鍵、更新トークン、フォルダIDを保持しません。ログイン後に発行されたRootLensセッションだけを
+Driveの認証情報やフォルダIDを保持しません。ログイン後に発行されたRootLensセッションだけを
 macOS KeychainまたはWindows Credential Managerへ保存します。
 
 ## 録画と保存確認

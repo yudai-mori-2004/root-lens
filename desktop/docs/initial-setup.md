@@ -10,7 +10,7 @@ Googleアカウントを事業所へ招待します。Googleアカウントは�
 Google Driveの権限をPCアプリへ渡すためには使いません。
 
 事業所のGoogle Driveは、協力先の管理者が一度だけRootLensへ接続します。接続情報は
-RootLensサーバーで管理し、現場PCへ秘密鍵、更新トークン、フォルダIDを配布しません。
+RootLensサーバーで管理し、現場PCへDriveの認証情報やフォルダIDを配布しません。
 
 ## アプリへログインする
 

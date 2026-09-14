@@ -12,10 +12,10 @@
 担当者を変更する場合は、事業所への所属を失効し、新しい担当者を招待します。
 PCへ配布した秘密鍵を回収・交換する作業はありません。
 
-## Google Driveを接続する
+## Google Driveへ保存する
 
-`rootlens.io` Workspaceの共有ドライブ内に事業所フォルダを用意し、RootLens管理者が管理導線から
-一度だけGoogle Driveを接続します。Googleの更新トークンはRootLensサーバーで暗号化して保存します。Desktopアプリは
+`rootlens.io` Workspaceの共有ドライブ内に事業所フォルダを用意します。RootLensサーバーは、
+共有ドライブのメンバーとして登録した専用サービスアカウントを使ってDriveを操作します。Desktopアプリは
 Driveの認証情報を保持せず、RootLens APIを通じて事業所と保存対象を指定します。
 
 アップロード時、RootLensサーバーは一つのファイルにだけ使える再開可能アップロードURLを発行します。

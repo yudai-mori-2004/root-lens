@@ -23,6 +23,7 @@
     "@supabase/supabase-js": "^2.110.2",
     "@vercel/oidc-aws-credentials-provider": "^3.3.7",
     "drizzle-orm": "^0.45.2",
+    "google-auth-library": "^11.0.2",
     "next": "^16.3.5",
     "next-intl": "^4.14.4",
     "postgres": "^3.4.5",
