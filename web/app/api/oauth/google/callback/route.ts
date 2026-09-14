@@ -1,9 +1,8 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { driveConnections, driveOAuthRequests, sites } from "@/db/schema";
+import { driveConnections, driveOAuthRequests } from "@/db/schema";
 import { sha256 } from "@/lib/encoding";
 import { encryptRefreshToken, exchangeGoogleCode, googleAccountSubject } from "@/lib/google-oauth";
-import { GoogleDriveClient } from "@/lib/google-drive";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -17,18 +16,9 @@ export async function GET(request: Request) {
     if (!oauthRequest) throw new Error("expired state");
     const code = url.searchParams.get("code");
     if (!code) throw new Error("missing code");
-    const [site] = await db.select().from(sites).where(eq(sites.id, oauthRequest.siteId)).limit(1);
-    if (!site) throw new Error("unknown site");
     const tokens = await exchangeGoogleCode(code);
     if (!tokens.refresh_token) throw new Error("Google returned no refresh token");
     const session = { accessToken: tokens.access_token };
-    const drive = new GoogleDriveClient(session);
-    await Promise.all([
-      drive.assertFolder(site.rootFolderId, site.sharedDriveId),
-      drive.assertFolder(site.siteAgreementsFolderId, site.sharedDriveId),
-      drive.assertFolder(site.staffConsentsFolderId, site.sharedDriveId),
-      drive.assertFolder(site.approvedDataFolderId, site.sharedDriveId),
-    ]);
     const accountSubject = await googleAccountSubject(session);
     const encryptedRefreshToken = encryptRefreshToken(tokens.refresh_token);
     const saved = await db.transaction(async (transaction) => {
@@ -37,11 +27,11 @@ export async function GET(request: Request) {
       )).returning({ id: driveOAuthRequests.id });
       if (consumed.length !== 1) return false;
       await transaction.insert(driveConnections).values({
-        siteId: site.id,
+        id: "rootlens",
         encryptedRefreshToken,
         googleAccountSubject: accountSubject,
       }).onConflictDoUpdate({
-        target: driveConnections.siteId,
+        target: driveConnections.id,
         set: {
           encryptedRefreshToken,
           googleAccountSubject: accountSubject,

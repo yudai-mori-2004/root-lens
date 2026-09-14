@@ -41,9 +41,9 @@ export async function POST(request: Request) {
   }
   const [[site], [connection]] = await Promise.all([
     db.select().from(sites).where(eq(sites.id, record.siteId)).limit(1),
-    db.select().from(driveConnections).where(eq(driveConnections.siteId, record.siteId)).limit(1),
+    db.select().from(driveConnections).where(eq(driveConnections.id, "rootlens")).limit(1),
   ]);
-  if (!site || !connection) return Response.json({ error: "site Drive is not connected" }, { status: 409 });
+  if (!site || !connection) return Response.json({ error: "RootLens Drive is not connected" }, { status: 409 });
   const drive = new GoogleDriveClient(await googleSession(connection.encryptedRefreshToken));
   const folderId = record.kind === "site_agreement" ? site.siteAgreementsFolderId : site.staffConsentsFolderId;
   const properties = {

@@ -4,7 +4,7 @@ import {
 import { sql } from "drizzle-orm";
 
 // v0.1.4の撮影APIは clips / upload_units / consent_events / accounts を使う。
-// 現場の署名・承認フローは organizations 以下のテーブルで、協力先所有のDriveにある原本と
+// 現場の署名・承認フローは organizations 以下のテーブルで、RootLens共有ドライブにある原本と
 // RootLensが保持する索引、Desktopの所属、撮影ロットの承認、納品証跡を結び付ける。
 // 銀行口座や署名済み文書の本体はこのDBに保存しない。
 
@@ -193,7 +193,7 @@ export const agreementRecords = pgTable("agreement_records", {
 ]);
 
 export const driveConnections = pgTable("drive_connections", {
-  siteId: text("site_id").primaryKey().references(() => sites.id),
+  id: text("id").primaryKey(),
   encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
   googleAccountSubject: text("google_account_subject").notNull(),
   connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
@@ -201,7 +201,6 @@ export const driveConnections = pgTable("drive_connections", {
 
 export const driveOAuthRequests = pgTable("drive_oauth_requests", {
   id: text("id").primaryKey(),
-  siteId: text("site_id").notNull().references(() => sites.id),
   stateSha256: text("state_sha256").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),

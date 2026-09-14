@@ -2,18 +2,20 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 export type GoogleAccountSession = Readonly<{ accessToken: string }>;
 
-function oauthConfig() {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
-  if (!clientId || !clientSecret || !redirectUri) throw new Error("Google OAuth is not configured");
+function driveOauthConfig() {
+  const clientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_DRIVE_OAUTH_REDIRECT_URI;
+  if (!clientId || !clientSecret || !redirectUri) throw new Error("Google Drive OAuth is not configured");
   return { clientId, clientSecret, redirectUri };
 }
 
-function loginRedirectUri(): string {
-  const value = process.env.GOOGLE_LOGIN_REDIRECT_URI;
-  if (!value) throw new Error("GOOGLE_LOGIN_REDIRECT_URI is not configured");
-  return value;
+function loginOauthConfig() {
+  const clientId = process.env.GOOGLE_LOGIN_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_LOGIN_OAUTH_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_LOGIN_OAUTH_REDIRECT_URI;
+  if (!clientId || !clientSecret || !redirectUri) throw new Error("Google login OAuth is not configured");
+  return { clientId, clientSecret, redirectUri };
 }
 
 function tokenKey(): Buffer {
@@ -24,7 +26,7 @@ function tokenKey(): Buffer {
 }
 
 export function googleAuthorizationUrl(state: string): string {
-  const { clientId, redirectUri } = oauthConfig();
+  const { clientId, redirectUri } = driveOauthConfig();
   const query = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
@@ -38,10 +40,10 @@ export function googleAuthorizationUrl(state: string): string {
 }
 
 export function googleLoginAuthorizationUrl(state: string): string {
-  const { clientId } = oauthConfig();
+  const { clientId, redirectUri } = loginOauthConfig();
   const query = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: loginRedirectUri(),
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: "openid email",
     state,
@@ -62,7 +64,7 @@ async function tokenRequest(parameters: URLSearchParams): Promise<TokenResponse>
 }
 
 export async function exchangeGoogleCode(code: string): Promise<TokenResponse> {
-  const { clientId, clientSecret, redirectUri } = oauthConfig();
+  const { clientId, clientSecret, redirectUri } = driveOauthConfig();
   return tokenRequest(new URLSearchParams({
     code, client_id: clientId, client_secret: clientSecret,
     redirect_uri: redirectUri, grant_type: "authorization_code",
@@ -70,15 +72,15 @@ export async function exchangeGoogleCode(code: string): Promise<TokenResponse> {
 }
 
 export async function exchangeGoogleLoginCode(code: string): Promise<TokenResponse> {
-  const { clientId, clientSecret } = oauthConfig();
+  const { clientId, clientSecret, redirectUri } = loginOauthConfig();
   return tokenRequest(new URLSearchParams({
     code, client_id: clientId, client_secret: clientSecret,
-    redirect_uri: loginRedirectUri(), grant_type: "authorization_code",
+    redirect_uri: redirectUri, grant_type: "authorization_code",
   }));
 }
 
 export async function googleSession(encryptedRefreshToken: string): Promise<GoogleAccountSession> {
-  const { clientId, clientSecret } = oauthConfig();
+  const { clientId, clientSecret } = driveOauthConfig();
   const refreshToken = decryptRefreshToken(encryptedRefreshToken);
   const tokens = await tokenRequest(new URLSearchParams({
     refresh_token: refreshToken, client_id: clientId,

@@ -5,7 +5,7 @@ function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 }
 
-describe("agreement files in site-owned Drive", () => {
+describe("agreement files in the RootLens shared Drive", () => {
   it("reuses the preallocated file after a webhook retry instead of creating a duplicate", async () => {
     const bytes = new TextEncoder().encode("signed pdf");
     const request = vi.fn()
