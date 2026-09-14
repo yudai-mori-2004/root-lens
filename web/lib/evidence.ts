@@ -1,5 +1,6 @@
 import { createPublicKey, verify } from "node:crypto";
 import { GetPublicKeyCommand, KMSClient, SignCommand } from "@aws-sdk/client-kms";
+import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
 import { base64url, canonicalJson, sha256 } from "./encoding";
 
 export type EvidenceFile = Readonly<{ path: string; size: number; sha256: string }>;
@@ -140,7 +141,7 @@ export function createEvidencePayload<TApproval extends Record<string, unknown>>
 
 export async function attestEvidencePayload(
   payload: ReturnType<typeof createEvidencePayload>,
-  client = new KMSClient({}),
+  client = evidenceKmsClient(),
 ): Promise<EvidenceAttestation> {
   const kmsKeyId = process.env.EVIDENCE_KMS_KEY_ID;
   const publicKeyId = process.env.EVIDENCE_PUBLIC_KEY_ID;
@@ -161,7 +162,7 @@ export async function attestEvidencePayload(
   };
 }
 
-export async function evidencePublicKey(client = new KMSClient({})): Promise<string> {
+export async function evidencePublicKey(client = evidenceKmsClient()): Promise<string> {
   const kmsKeyId = process.env.EVIDENCE_KMS_KEY_ID;
   if (!kmsKeyId) throw new Error("Evidence signing key is not configured");
   const result = await client.send(new GetPublicKeyCommand({ KeyId: kmsKeyId }));
@@ -171,6 +172,19 @@ export async function evidencePublicKey(client = new KMSClient({})): Promise<str
   }
   return createPublicKey({ key: Buffer.from(result.PublicKey), format: "der", type: "spki" })
     .export({ format: "pem", type: "spki" }).toString();
+}
+
+function evidenceKmsClient(): KMSClient {
+  const roleArn = process.env.AWS_ROLE_ARN;
+  return new KMSClient({
+    region: process.env.AWS_REGION,
+    ...(roleArn ? {
+      credentials: awsCredentialsProvider({
+        audience: "sts.amazonaws.com",
+        roleArn,
+      }),
+    } : {}),
+  });
 }
 
 export function verifyEvidenceAttestation(evidence: Record<string, unknown>, publicKeyPem: string): boolean {
