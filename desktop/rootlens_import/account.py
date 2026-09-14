@@ -239,12 +239,12 @@ class RootLensGateway:
             raise ImportFailure("Google Driveの録画情報を読み込めませんでした。もう一度接続してください。")
         return rows
 
-    def prepare_upload(self, unit_id, source_manifest_sha256, files, approval_event_id):
+    def prepare_upload(self, unit_id, unit_files_sha256, files, approval_event_id):
         return self._request("POST", "/api/v1/drive-uploads", {
             "unitId": unit_id,
-            "sourceManifestSha256": source_manifest_sha256,
+            "filesSha256": unit_files_sha256,
             "approvalEventId": approval_event_id,
-            "files": [{"name": name, "bytes": item["size"], "sha256": item["sha256"]}
+            "files": [{"path": name, "bytes": item["size"], "sha256": item["sha256"]}
                       for name, item in sorted(files.items())],
         }, "Google Driveへの保存を準備できませんでした。しばらくしてからやり直してください。")
 
@@ -252,14 +252,14 @@ class RootLensGateway:
         return self._request("POST", f"/api/v1/drive-uploads/{attempt_id}/verify", failure_message=
                              "Google Drive上の保存結果を確認できませんでした。もう一度お試しください。")
 
-    def create_approval(self, unit_id, source_manifest_sha256, files):
-        return self._request("POST", "/api/v1/approval-signatures", {
+    def create_approval(self, unit_id, unit_files_sha256, files):
+        return self._request("POST", "/api/v1/approval-requests", {
             "unitId": unit_id,
-            "sourceManifestSha256": source_manifest_sha256,
-            "files": [{"name": name, "bytes": item["size"], "sha256": item["sha256"]}
+            "filesSha256": unit_files_sha256,
+            "files": [{"path": name, "bytes": item["size"], "sha256": item["sha256"]}
                       for name, item in sorted(files.items())],
         }, "事前同意の記録を確認できないため、提供承認を開始できませんでした。管理者に確認してください。")
 
     def approval_status(self, approval_id):
-        return self._request("GET", f"/api/v1/approval-signatures/{approval_id}", failure_message=
+        return self._request("GET", f"/api/v1/approval-requests/{approval_id}", failure_message=
                              "提供承認の状態を確認できませんでした。もう一度お試しください。")

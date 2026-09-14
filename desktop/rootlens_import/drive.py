@@ -39,7 +39,7 @@ class DriveRecording:
     folder_id: str
     name: str
     files: dict[str, dict]
-    source_manifest_sha256: str
+    files_sha256: str
 
 
 class _Retryable(ImportFailure):
@@ -177,16 +177,17 @@ class DriveUploader:
     def _apply_preparation(self, value):
         attempt_id, folder_id, rows = value.get("attemptId"), value.get("folderId"), value.get("files")
         if (not isinstance(attempt_id, str) or not attempt_id or not isinstance(folder_id, str)
-                or not DRIVE_ID.fullmatch(folder_id) or not isinstance(rows, list) or len(rows) != len(FILES)):
+                or not DRIVE_ID.fullmatch(folder_id) or not isinstance(rows, list)
+                or len(rows) != len(self.journal.value["files"])):
             raise ImportFailure("アップロードの準備情報を読み込めませんでした。もう一度アップロードしてください。")
         sessions = {}
         for row in rows:
-            if (not isinstance(row, dict) or row.get("name") not in FILES
-                    or type(row.get("complete")) is not bool or row["name"] in sessions):
+            if (not isinstance(row, dict) or row.get("path") not in self.journal.value["files"]
+                    or type(row.get("complete")) is not bool or row["path"] in sessions):
                 raise ImportFailure("アップロードの準備情報を読み込めませんでした。もう一度アップロードしてください。")
             if not row["complete"]:
                 _session_url(row.get("uploadUrl"))
-            sessions[row["name"]] = row
+            sessions[row["path"]] = row
         self.journal.value["attempt_id"] = attempt_id
         self.journal.value["folder_id"] = folder_id
         for name, row in sessions.items():
@@ -198,7 +199,7 @@ class DriveUploader:
     def _prepare(self, approval_event_id):
         value = self.gateway.prepare_upload(
             self.journal.value["unit_id"],
-            self.journal.value["source_manifest_sha256"],
+            self.journal.value["files_sha256"],
             self.journal.value["files"],
             approval_event_id,
         )
@@ -219,9 +220,9 @@ class DriveUploader:
         for row in rows:
             if (not isinstance(row, dict) or row.get("unitId") not in targets
                     or not isinstance(row.get("folderId"), str)
-                    or not isinstance(row.get("sourceManifestSha256"), str)
-                    or not HASH.fullmatch(row["sourceManifestSha256"])
-                    or not isinstance(row.get("files"), dict) or set(row["files"]) != set(FILES)):
+                    or not isinstance(row.get("filesSha256"), str)
+                    or not HASH.fullmatch(row["filesSha256"])
+                    or not isinstance(row.get("files"), dict) or not row["files"]):
                 raise ImportFailure("Google Driveの録画情報を読み込めませんでした。もう一度接続してください。")
             files = row["files"]
             if any(not isinstance(item, dict) or type(item.get("size")) is not int
@@ -230,7 +231,7 @@ class DriveUploader:
                 raise ImportFailure("Google Driveの録画情報を読み込めませんでした。もう一度接続してください。")
             unit_id = row["unitId"]
             result[unit_id] = DriveRecording(unit_id, row["folderId"], unit_id, files,
-                                              row["sourceManifestSha256"])
+                                              row["filesSha256"])
         return result
 
     def upload_recording(self, path, approval_event_id, on_progress=None, cancel_event=None):

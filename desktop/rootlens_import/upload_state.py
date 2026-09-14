@@ -3,11 +3,11 @@
 import json
 from pathlib import Path
 
-from .core import FILES, HASH, UNIT_ID, ImportFailure, is_link, source_manifest_sha256
+from .core import FILES, HASH, UNIT_ID, ImportFailure, is_link, unit_files_sha256
 from .library import settings_path
 from .site import has_unsafe_link, write_private_json
 
-SCHEMA = "rootlens.drive-upload.v3"
+SCHEMA = "rootlens.drive-upload.v4"
 
 
 def state_directory(profile, base=None):
@@ -24,8 +24,8 @@ def validate_state(value, profile, unit_id=None):
             or not isinstance(value.get("unit_id"), str) or not UNIT_ID.fullmatch(value["unit_id"])
             or unit_id is not None and value["unit_id"] != unit_id
             or type(value.get("completed")) is not bool
-            or not isinstance(value.get("source_manifest_sha256"), str)
-            or not HASH.fullmatch(value["source_manifest_sha256"])
+            or not isinstance(value.get("files_sha256"), str)
+            or not HASH.fullmatch(value["files_sha256"])
             or not isinstance(value.get("files"), dict) or set(value["files"]) != set(FILES)):
         raise ImportFailure("アップロードの履歴を読み込めません。管理者に確認してください。")
     for field in ("attempt_id", "folder_id"):
@@ -39,8 +39,8 @@ def validate_state(value, profile, unit_id=None):
             raise ImportFailure("アップロードの履歴を読み込めません。管理者に確認してください。")
     manifest = {name: {"size": info["size"], "sha256": info["sha256"]}
                 for name, info in value["files"].items()}
-    if source_manifest_sha256(value["unit_id"], manifest) != value["source_manifest_sha256"]:
-        raise ImportFailure("以前アップロードした原本マニフェストを確認できません。管理者に確認してください。")
+    if unit_files_sha256(value["unit_id"], manifest) != value["files_sha256"]:
+        raise ImportFailure("以前アップロードしたファイル一覧を確認できません。管理者に確認してください。")
     return value
 
 
@@ -84,7 +84,7 @@ class UploadJournal:
             "schema": SCHEMA,
             "site_id": profile.site_id,
             "unit_id": unit_id,
-            "source_manifest_sha256": source_manifest_sha256(unit_id, manifest),
+            "files_sha256": unit_files_sha256(unit_id, manifest),
             "attempt_id": None,
             "folder_id": None,
             "completed": False,

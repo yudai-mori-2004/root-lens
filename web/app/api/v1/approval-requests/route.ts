@@ -2,59 +2,59 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { approvalEvents, approvalSignatures } from "@/db/schema";
+import { approvalEvents, approvalRequests } from "@/db/schema";
 import { createConsentSnapshot } from "@/lib/approval";
-import { APPROVAL_STATEMENT_VERSION } from "@/lib/approval-receipt";
+import { APPROVAL_STATEMENT_VERSION } from "@/lib/approval-record";
 import { authenticateDesktop } from "@/lib/desktop-auth";
 import { randomToken } from "@/lib/desktop-auth-values";
-import { validateDesktopManifest } from "@/lib/drive-upload";
+import { validateDesktopUnit } from "@/lib/drive-upload";
 import { sha256 } from "@/lib/encoding";
 
 const bodySchema = z.object({
   unitId: z.string().max(160),
-  sourceManifestSha256: z.string().max(64),
+  filesSha256: z.string().max(64),
   files: z.array(z.object({
-    name: z.string().max(100),
+    path: z.string().max(240),
     bytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     sha256: z.string().max(64),
-  })).length(4),
+  })).min(1).max(1000),
 });
 
 export async function POST(request: Request) {
   const authentication = await authenticateDesktop(request);
   if (!authentication.ok) return authentication.response;
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success || validateDesktopManifest(
-    parsed.data.unitId, parsed.data.sourceManifestSha256, parsed.data.files,
-  )) return Response.json({ error: "invalid source manifest" }, { status: 400 });
+  if (!parsed.success || validateDesktopUnit(
+    parsed.data.unitId, parsed.data.filesSha256, parsed.data.files,
+  )) return Response.json({ error: "invalid unit files" }, { status: 400 });
 
-  const signatures = await db.select({
-    sourceManifestSha256: approvalSignatures.sourceManifestSha256,
+  const requests = await db.select({
+    filesSha256: approvalRequests.filesSha256,
     eventId: approvalEvents.id,
-  }).from(approvalSignatures)
-    .leftJoin(approvalEvents, eq(approvalEvents.signatureId, approvalSignatures.id))
+  }).from(approvalRequests)
+    .leftJoin(approvalEvents, eq(approvalEvents.requestId, approvalRequests.id))
     .where(and(
-      eq(approvalSignatures.siteId, authentication.siteId),
-      eq(approvalSignatures.unitId, parsed.data.unitId),
+      eq(approvalRequests.siteId, authentication.siteId),
+      eq(approvalRequests.unitId, parsed.data.unitId),
     ));
-  if (signatures.some((item) => item.sourceManifestSha256 !== parsed.data.sourceManifestSha256)) {
+  if (requests.some((item) => item.filesSha256 !== parsed.data.filesSha256)) {
     return Response.json({ error: "unit id already belongs to different bytes" }, { status: 409 });
   }
-  const completed = signatures.find((item) => item.eventId);
+  const completed = requests.find((item) => item.eventId);
   if (completed) return Response.json({ status: "complete", approvalEventId: completed.eventId });
 
   try {
     const snapshot = await createConsentSnapshot(authentication.siteId);
     const token = randomToken();
     const id = `approval_${randomUUID()}`;
-    await db.insert(approvalSignatures).values({
+    await db.insert(approvalRequests).values({
       id,
       tokenSha256: sha256(token),
       siteId: authentication.siteId,
       personId: authentication.personId,
       unitId: parsed.data.unitId,
-      sourceManifestSha256: parsed.data.sourceManifestSha256,
-      sourceFiles: [...parsed.data.files].sort((a, b) => a.name.localeCompare(b.name)),
+      filesSha256: parsed.data.filesSha256,
+      files: [...parsed.data.files].sort((a, b) => a.path.localeCompare(b.path)),
       consentSnapshotId: snapshot.id,
       statementVersion: APPROVAL_STATEMENT_VERSION,
       expiresAt: new Date(Date.now() + 10 * 60_000),

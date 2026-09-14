@@ -248,7 +248,7 @@ export const driveUploadAttempts = pgTable("drive_upload_attempts", {
   siteId: text("site_id").notNull().references(() => sites.id),
   personId: text("person_id").notNull().references(() => people.id),
   unitId: text("unit_id").notNull(),
-  sourceManifestSha256: text("source_manifest_sha256").notNull(),
+  filesSha256: text("files_sha256").notNull(),
   approvalEventId: text("approval_event_id").notNull().unique().references(() => approvalEvents.id),
   folderId: text("folder_id").notNull(),
   status: text("status").notNull().default("uploading"),
@@ -275,30 +275,30 @@ export const consentSnapshots = pgTable("consent_snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const approvalSignatures = pgTable("approval_signatures", {
+export const approvalRequests = pgTable("approval_requests", {
   id: text("id").primaryKey(),
   tokenSha256: text("token_sha256").notNull().unique(),
   siteId: text("site_id").notNull().references(() => sites.id),
   personId: text("person_id").notNull().references(() => people.id),
   unitId: text("unit_id").notNull(),
-  sourceManifestSha256: text("source_manifest_sha256").notNull(),
-  sourceFiles: jsonb("source_files").notNull(),
+  filesSha256: text("files_sha256").notNull(),
+  files: jsonb("files").notNull(),
   consentSnapshotId: text("consent_snapshot_id").notNull().references(() => consentSnapshots.id),
   statementVersion: text("statement_version").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   completed: boolean("completed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index("approval_signature_unit_idx").on(table.siteId, table.unitId)]);
+}, (table) => [index("approval_request_unit_idx").on(table.siteId, table.unitId)]);
 
 export const approvalEvents = pgTable("approval_events", {
   id: text("id").primaryKey(),
-  signatureId: text("signature_id").notNull().unique().references(() => approvalSignatures.id),
+  requestId: text("request_id").notNull().unique().references(() => approvalRequests.id),
   siteId: text("site_id").notNull().references(() => sites.id),
   unitId: text("unit_id").notNull(),
-  sourceManifestSha256: text("source_manifest_sha256").notNull(),
+  filesSha256: text("files_sha256").notNull(),
   personId: text("person_id").notNull().references(() => people.id),
   identityId: text("identity_id").notNull().references(() => operatorIdentities.id),
-  approvalPayloadSha256: text("approval_payload_sha256").notNull(),
+  approvalSubjectSha256: text("approval_subject_sha256").notNull(),
   authenticationMethod: text("authentication_method").notNull(),
   receipt: jsonb("receipt").notNull(),
   approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
@@ -309,10 +309,9 @@ export const evidenceBundles = pgTable("evidence_bundles", {
   uploadAttemptId: text("upload_attempt_id").notNull().references(() => driveUploadAttempts.id),
   approvalEventId: text("approval_event_id").notNull().references(() => approvalEvents.id),
   unitId: text("unit_id").notNull(),
-  deliveryManifestSha256: text("delivery_manifest_sha256").notNull(),
+  filesSha256: text("files_sha256").notNull(),
   payloadSha256: text("payload_sha256").notNull(),
   evidence: jsonb("evidence").notNull(),
-  providedAt: timestamp("provided_at", { withTimezone: true }).notNull(),
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("evidence_unit_idx").on(table.unitId),

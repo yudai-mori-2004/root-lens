@@ -1,6 +1,5 @@
 import { canonicalJson, sha256 } from "./encoding";
-
-export type EvidenceFile = Readonly<{ path: string; size: number; sha256: string }>;
+import { sortedUnitFiles, unitFilesSha256, type UnitFile } from "./unit-files";
 
 type AgreementRecord = Readonly<{
   record_id: string;
@@ -10,69 +9,42 @@ type AgreementRecord = Readonly<{
   signed_pdf_sha256: string;
   authentication_method: string;
   signed_at: string;
-  status: string;
 }>;
 
 type EvidenceInput<TApproval extends Record<string, unknown>> = Readonly<{
   evidenceId: string;
   issuedAt: Date;
-  origin: string;
   siteId: string;
   unitId: string;
-  sourceManifestSha256: string;
-  sourceFiles: EvidenceFile[];
-  recordedAt: string;
-  recordingConfig: string;
+  filesSha256: string;
+  files: UnitFile[];
   consentSnapshotId: string;
   consentSnapshotSha256: string;
   agreements: AgreementRecord[];
-  approvalReceipt: TApproval;
-  deliveryFiles: EvidenceFile[];
-  privacyProcessingCompletedAt: string;
-  providedAt: string;
+  approvalRecord: TApproval;
 }>;
 
-type EvidenceChronology = Readonly<{
+export function validEvidenceChronology(input: Readonly<{
   agreementSignedAt: string[];
   snapshotCreatedAt: Date;
   approvalIssuedAt: string;
   approvalExpiresAt: string;
   approvedAt: string;
-  recordedAt: string;
-  privacyProcessingCompletedAt: string;
-  providedAt: string;
   evidenceIssuedAt: Date;
-}>;
-
-export function validEvidenceChronology(input: EvidenceChronology): boolean {
+}>): boolean {
   const snapshotCreatedAt = input.snapshotCreatedAt.getTime();
   const approvalIssuedAt = new Date(input.approvalIssuedAt).getTime();
   const approvalExpiresAt = new Date(input.approvalExpiresAt).getTime();
   const approvedAt = new Date(input.approvedAt).getTime();
-  const recordedAt = new Date(input.recordedAt).getTime();
-  const processedAt = new Date(input.privacyProcessingCompletedAt).getTime();
-  const providedAt = new Date(input.providedAt).getTime();
   const issuedAt = input.evidenceIssuedAt.getTime();
-  const values = [snapshotCreatedAt, approvalIssuedAt, approvalExpiresAt, approvedAt,
-    recordedAt, processedAt, providedAt, issuedAt,
-    ...input.agreementSignedAt.map((value) => new Date(value).getTime())];
-  if (values.some((value) => !Number.isFinite(value))) return false;
-  return input.agreementSignedAt.every((value) => new Date(value).getTime() <= snapshotCreatedAt)
+  const agreements = input.agreementSignedAt.map((value) => new Date(value).getTime());
+  const values = [snapshotCreatedAt, approvalIssuedAt, approvalExpiresAt, approvedAt, issuedAt, ...agreements];
+  return values.every(Number.isFinite)
+    && agreements.every((value) => value <= snapshotCreatedAt)
     && snapshotCreatedAt <= approvalIssuedAt
     && approvalIssuedAt <= approvedAt
     && approvedAt <= approvalExpiresAt
-    && recordedAt <= approvedAt
-    && approvedAt <= processedAt
-    && processedAt + 7 * 24 * 60 * 60_000 <= providedAt
-    && providedAt <= issuedAt;
-}
-
-function sortedFiles(files: EvidenceFile[]): EvidenceFile[] {
-  return [...files].sort((a, b) => a.path.localeCompare(b.path));
-}
-
-export function deliveryManifestSha256(unitId: string, files: EvidenceFile[]): string {
-  return sha256(canonicalJson({ unit_id: unitId, files: sortedFiles(files) }));
+    && approvedAt <= issuedAt;
 }
 
 export function createEvidencePayload<TApproval extends Record<string, unknown>>(input: EvidenceInput<TApproval>) {
@@ -81,51 +53,40 @@ export function createEvidencePayload<TApproval extends Record<string, unknown>>
   if (siteAgreements.length !== 1 || staffConsents.length === 0) {
     throw new Error("Evidence requires one site agreement and at least one staff consent");
   }
-  const siteAgreement = siteAgreements[0];
-  const record = (item: AgreementRecord) => ({
+  if (unitFilesSha256(input.unitId, input.files) !== input.filesSha256) {
+    throw new Error("Evidence files do not match their approved unit");
+  }
+  const agreement = (item: AgreementRecord) => ({
     record_id: item.record_id,
-    record_url: `${input.origin}/verify/${encodeURIComponent(item.record_id)}`,
+    path: `agreements/${item.record_id}.pdf`,
     document_version: item.document_version,
     template_sha256: item.template_sha256,
     signed_pdf_sha256: item.signed_pdf_sha256,
     authentication_method: item.authentication_method,
     signed_at: item.signed_at,
-    status_at_approval: item.status,
   });
   return {
-    schema: "io.rootlens.evidence.v1",
+    schema: "io.rootlens.evidence.v2",
     evidence_id: input.evidenceId,
     issued_at: input.issuedAt.toISOString(),
-    source: {
+    unit: {
       unit_id: input.unitId,
-      source_manifest_sha256: input.sourceManifestSha256,
-      recorded_at: input.recordedAt,
-      recording_config: input.recordingConfig,
       site_id: input.siteId,
-      files: sortedFiles(input.sourceFiles),
+      files_sha256: input.filesSha256,
+      files: sortedUnitFiles(input.files),
     },
     agreements: {
-      site: record(siteAgreement),
-      staff_consent_snapshot: {
+      site: agreement(siteAgreements[0]),
+      staff: {
         snapshot_id: input.consentSnapshotId,
         snapshot_sha256: input.consentSnapshotSha256,
-        records_url: `${input.origin}/verify/${encodeURIComponent(input.consentSnapshotId)}`,
-        record_count: staffConsents.length,
-        records: staffConsents.map(record),
-        status_at_approval: "active",
+        records: staffConsents.map(agreement),
       },
     },
     approval: {
-      ...input.approvalReceipt,
-      receipt_sha256: sha256(canonicalJson(input.approvalReceipt)),
+      ...input.approvalRecord,
+      approval_record_sha256: sha256(canonicalJson(input.approvalRecord)),
     },
-    delivery: {
-      delivery_manifest_sha256: deliveryManifestSha256(input.unitId, input.deliveryFiles),
-      files: sortedFiles(input.deliveryFiles),
-      privacy_processing_completed_at: input.privacyProcessingCompletedAt,
-      provided_at: input.providedAt,
-    },
-    verification: { url: `${input.origin}/verify/${encodeURIComponent(input.evidenceId)}` },
   };
 }
 

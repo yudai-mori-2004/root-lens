@@ -5,7 +5,7 @@ import re
 import tempfile
 import unittest
 
-from rootlens_import.core import FILES, source_manifest_sha256
+from rootlens_import.core import FILES, unit_files_sha256
 from rootlens_import.drive import DriveUploader, completed_unit_ids
 from rootlens_import.site import SiteProfile
 from unit_fixtures import unit_id
@@ -58,7 +58,7 @@ class Gateway:
             url = f"https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id={name}"
             session = self.sessions.setdefault(url, {"size": info["size"], "data": bytearray()})
             complete = len(session["data"]) == session["size"]
-            rows.append({"name": name, "complete": complete, "uploadUrl": None if complete else url})
+            rows.append({"path": name, "complete": complete, "uploadUrl": None if complete else url})
         return {"attemptId": "upload-attempt", "folderId": self.folder_id, "files": rows}
 
     def verify_upload(self, attempt_id):
@@ -72,7 +72,7 @@ class Gateway:
         if not self.manifest or self.manifest[0] not in identities:
             return []
         return [{"unitId": self.manifest[0], "folderId": self.folder_id,
-                 "sourceManifestSha256": self.manifest[1],
+                 "filesSha256": self.manifest[1],
                  "files": {name: {"id": "id-" + name, "size": info["size"], "sha256": info["sha256"]}
                            for name, info in self.manifest[2].items()}}]
 
@@ -103,14 +103,14 @@ class DriveUploadTests(unittest.TestCase):
         self.assertEqual(result.unit_id, self.identity)
         self.assertTrue(all("Authorization" not in headers for headers in self.http.headers))
         manifest = self.gateway.manifest[2]
-        self.assertEqual(self.gateway.manifest[1], source_manifest_sha256(self.identity, manifest))
+        self.assertEqual(self.gateway.manifest[1], unit_files_sha256(self.identity, manifest))
         self.assertEqual(completed_unit_ids(self.profile, self.root / "state"), {self.identity})
 
     def test_remote_observation_contains_the_integrity_record_used_for_device_cleanup(self):
         self.uploader.upload_recording(self.recording, "apv_test")
         recording = self.uploader.current_recordings({self.identity})[self.identity]
         self.assertEqual(recording.folder_id, "drive-folder")
-        self.assertEqual(recording.source_manifest_sha256, self.gateway.manifest[1])
+        self.assertEqual(recording.files_sha256, self.gateway.manifest[1])
         self.assertEqual(set(recording.files), set(FILES))
 
 

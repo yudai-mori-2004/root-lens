@@ -48,7 +48,7 @@ class ApprovalTests(unittest.TestCase):
         recording, files, digest = recording_manifest(self.path)
         self.assertEqual(gateway.created, (recording.unit_id, digest, files))
 
-    def test_changed_file_after_signature_is_rejected(self):
+    def test_changed_file_after_approval_is_rejected(self):
         gateway = Gateway()
         def browser(_url):
             (self.path / "imu.jsonl").write_text('{"changed":true}\n')

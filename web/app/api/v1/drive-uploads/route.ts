@@ -2,47 +2,47 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { approvalEvents, approvalSignatures, driveUploadAttempts, driveUploadFiles } from "@/db/schema";
+import { approvalEvents, approvalRequests, driveUploadAttempts, driveUploadFiles } from "@/db/schema";
 import { authenticateDesktop } from "@/lib/desktop-auth";
 import {
-  driveFileProperties, driveFolderProperties, hasProperties, validateDesktopManifest,
+  driveFileProperties, driveFolderProperties, hasProperties, validateDesktopUnit,
 } from "@/lib/drive-upload";
 import { siteDrive } from "@/lib/site-drive";
 
 const bodySchema = z.object({
   unitId: z.string().max(160),
-  sourceManifestSha256: z.string().max(64),
+  filesSha256: z.string().max(64),
   approvalEventId: z.string().min(5).max(100),
   files: z.array(z.object({
-    name: z.string().max(100),
+    path: z.string().max(240),
     bytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     sha256: z.string().max(64),
-  })).length(4),
+  })).min(1).max(1000),
 });
 
 export async function POST(request: Request) {
   const authentication = await authenticateDesktop(request);
   if (!authentication.ok) return authentication.response;
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success || validateDesktopManifest(
-    parsed.data.unitId, parsed.data.sourceManifestSha256, parsed.data.files,
-  )) return Response.json({ error: "invalid source manifest" }, { status: 400 });
+  if (!parsed.success || validateDesktopUnit(
+    parsed.data.unitId, parsed.data.filesSha256, parsed.data.files,
+  )) return Response.json({ error: "invalid unit files" }, { status: 400 });
   const input = parsed.data;
   const [approval] = await db.select({ id: approvalEvents.id }).from(approvalEvents)
-    .innerJoin(approvalSignatures, eq(approvalSignatures.id, approvalEvents.signatureId))
+    .innerJoin(approvalRequests, eq(approvalRequests.id, approvalEvents.requestId))
     .where(and(
       eq(approvalEvents.id, input.approvalEventId),
       eq(approvalEvents.personId, authentication.personId),
-      eq(approvalSignatures.siteId, authentication.siteId),
-      eq(approvalSignatures.unitId, input.unitId),
-      eq(approvalSignatures.sourceManifestSha256, input.sourceManifestSha256),
+      eq(approvalRequests.siteId, authentication.siteId),
+      eq(approvalRequests.unitId, input.unitId),
+      eq(approvalRequests.filesSha256, input.filesSha256),
     )).limit(1);
   if (!approval) return Response.json({ error: "recording has no matching approval" }, { status: 403 });
   let [attempt] = await db.select().from(driveUploadAttempts).where(and(
     eq(driveUploadAttempts.siteId, authentication.siteId),
     eq(driveUploadAttempts.unitId, input.unitId),
   )).limit(1);
-  if (attempt && attempt.sourceManifestSha256 !== input.sourceManifestSha256) {
+  if (attempt && attempt.filesSha256 !== input.filesSha256) {
     return Response.json({ error: "unit id already belongs to different bytes" }, { status: 409 });
   }
   if (attempt && attempt.approvalEventId !== approval.id) {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const files = await Promise.all(input.files.map(async (file) => ({
       id: `upload_file_${randomUUID()}`,
       attemptId,
-      path: file.name,
+      path: file.path,
       bytes: file.bytes,
       sha256: file.sha256,
       driveFileId: await drive.generateId(),
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         siteId: site.id,
         personId: authentication.personId,
         unitId: input.unitId,
-        sourceManifestSha256: input.sourceManifestSha256,
+        filesSha256: input.filesSha256,
         approvalEventId: approval.id,
         folderId,
       });
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     });
     [attempt] = await db.select().from(driveUploadAttempts).where(eq(driveUploadAttempts.id, attemptId)).limit(1);
   }
-  const folderProperties = driveFolderProperties(site.id, input.unitId, input.sourceManifestSha256);
+  const folderProperties = driveFolderProperties(site.id, input.unitId, input.filesSha256);
   const existingFolder = await drive.fileOrNull(attempt.folderId);
   if (!existingFolder) {
     await drive.createFolder({
@@ -102,10 +102,10 @@ export async function POST(request: Request) {
           || !hasProperties(existing.appProperties, properties)) {
         throw new Error(`Drive file differs from upload record: ${file.path}`);
       }
-      return { name: file.path, complete: true, uploadUrl: null };
+      return { path: file.path, complete: true, uploadUrl: null };
     }
     return {
-      name: file.path,
+      path: file.path,
       complete: false,
       uploadUrl: await drive.startResumableUpload({
         id: file.driveFileId,

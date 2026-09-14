@@ -1,0 +1,17 @@
+{
+  "unitId": "unit_site1_20260913T123456789Z_ABCDEFGH",
+  "files": [
+    {
+      "path": "session.mcap",
+      "bytes": 4,
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "path": "capture/vendor.data",
+      "bytes": 3,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "canonicalJson": "{\"files\":[{\"bytes\":3,\"path\":\"capture/vendor.data\",\"sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},{\"bytes\":4,\"path\":\"session.mcap\",\"sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}],\"unit_id\":\"unit_site1_20260913T123456789Z_ABCDEFGH\"}",
+  "sha256": "2cc893a0c50fc5dfb99fcdfe839169fcfcaadd287edd1c22cec9fb83c7ce50bf"
+}

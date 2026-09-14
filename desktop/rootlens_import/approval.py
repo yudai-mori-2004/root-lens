@@ -4,7 +4,7 @@ from pathlib import Path
 import threading
 import webbrowser
 
-from .core import FILES, ImportFailure, check_cancelled, checksum, source_manifest_sha256
+from .core import FILES, ImportFailure, check_cancelled, checksum, unit_files_sha256
 from .library import read_recording
 
 
@@ -16,7 +16,7 @@ def recording_manifest(path, cancel_event=None):
         name: {"size": (directory / name).stat().st_size, "sha256": checksum(directory / name, cancel)}
         for name in FILES
     }
-    return recording, files, source_manifest_sha256(recording.unit_id, files)
+    return recording, files, unit_files_sha256(recording.unit_id, files)
 
 
 def approve_recording(path, gateway, cancel_event=None, open_browser=webbrowser.open):

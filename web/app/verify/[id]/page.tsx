@@ -46,9 +46,9 @@ function EvidenceView({ row }: { row: typeof evidenceBundles.$inferSelect }) {
       <h1>RootLensデータ証跡</h1>
       <p>RootLensの保存記録と照合済みです。</p>
       <p>撮影単位：{row.unitId}</p>
-      <p>提供日時：{row.providedAt.toISOString()}</p>
+      <p>発行日時：{row.issuedAt.toISOString()}</p>
       <p style={hashStyle}>証跡payload SHA-256：{row.payloadSha256}</p>
-      <p style={hashStyle}>納品manifest SHA-256：{row.deliveryManifestSha256}</p>
+      <p style={hashStyle}>承認対象ファイル一式 SHA-256：{row.filesSha256}</p>
     </main>
   );
 }

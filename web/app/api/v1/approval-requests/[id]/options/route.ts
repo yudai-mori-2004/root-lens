@@ -1,7 +1,7 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db/client";
-import { approvalSignatures, consentSnapshots } from "@/db/schema";
-import { APPROVAL_STATEMENT } from "@/lib/approval-receipt";
+import { approvalRequests, consentSnapshots } from "@/db/schema";
+import { APPROVAL_STATEMENT } from "@/lib/approval-record";
 import { secureEqual } from "@/lib/desktop-auth-values";
 import { sha256 } from "@/lib/encoding";
 import { authenticateOperatorBrowser } from "@/lib/operator-browser";
@@ -11,15 +11,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = await request.json().catch(() => null) as { token?: unknown } | null;
   const token = typeof body?.token === "string" ? body.token : "";
   const [approval] = await db.select({
-    personId: approvalSignatures.personId,
-    unitId: approvalSignatures.unitId,
-    sourceFiles: approvalSignatures.sourceFiles,
-    consentSnapshotId: approvalSignatures.consentSnapshotId,
-    tokenSha256: approvalSignatures.tokenSha256,
+    personId: approvalRequests.personId,
+    unitId: approvalRequests.unitId,
+    files: approvalRequests.files,
+    consentSnapshotId: approvalRequests.consentSnapshotId,
+    tokenSha256: approvalRequests.tokenSha256,
     snapshotRecords: consentSnapshots.records,
-  }).from(approvalSignatures)
-    .innerJoin(consentSnapshots, eq(consentSnapshots.id, approvalSignatures.consentSnapshotId))
-    .where(and(eq(approvalSignatures.id, id), gt(approvalSignatures.expiresAt, new Date()), eq(approvalSignatures.completed, false)))
+  }).from(approvalRequests)
+    .innerJoin(consentSnapshots, eq(consentSnapshots.id, approvalRequests.consentSnapshotId))
+    .where(and(eq(approvalRequests.id, id), gt(approvalRequests.expiresAt, new Date()), eq(approvalRequests.completed, false)))
     .limit(1);
   if (!approval || !secureEqual(sha256(token), approval.tokenSha256)) {
     return Response.json({ error: "approval link is invalid or expired" }, { status: 410 });
@@ -36,12 +36,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   return Response.json({
     statement: APPROVAL_STATEMENT,
     unitId: approval.unitId,
-    files: approval.sourceFiles,
+    files: approval.files,
     consentSnapshot: {
       id: approval.consentSnapshotId,
       siteAgreementCount,
       staffConsentCount,
-      verificationUrl: `/verify/${encodeURIComponent(approval.consentSnapshotId)}`,
     },
   });
 }

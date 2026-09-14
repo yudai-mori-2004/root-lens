@@ -31,7 +31,6 @@ export async function createConsentSnapshot(siteId: string) {
     signed_pdf_sha256: item.signedPdfSha256,
     authentication_method: item.authenticationMethod,
     signed_at: item.signedAt!.toISOString(),
-    status: "active",
   })).sort((a, b) => a.record_id.localeCompare(b.record_id));
   const snapshotSha256 = sha256(canonicalJson(records));
   const id = `csp_${randomUUID()}`;

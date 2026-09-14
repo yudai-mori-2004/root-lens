@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { approvalEvents, approvalSignatures } from "@/db/schema";
+import { approvalEvents, approvalRequests } from "@/db/schema";
 import { authenticateDesktop } from "@/lib/desktop-auth";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -8,17 +8,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!authentication.ok) return authentication.response;
   const { id } = await context.params;
   const [row] = await db.select({
-    id: approvalSignatures.id,
-    completed: approvalSignatures.completed,
-    expiresAt: approvalSignatures.expiresAt,
+    id: approvalRequests.id,
+    completed: approvalRequests.completed,
+    expiresAt: approvalRequests.expiresAt,
     eventId: approvalEvents.id,
     receipt: approvalEvents.receipt,
-  }).from(approvalSignatures)
-    .leftJoin(approvalEvents, eq(approvalEvents.signatureId, approvalSignatures.id))
+  }).from(approvalRequests)
+    .leftJoin(approvalEvents, eq(approvalEvents.requestId, approvalRequests.id))
     .where(and(
-      eq(approvalSignatures.id, id),
-      eq(approvalSignatures.siteId, authentication.siteId),
-      eq(approvalSignatures.personId, authentication.personId),
+      eq(approvalRequests.id, id),
+      eq(approvalRequests.siteId, authentication.siteId),
+      eq(approvalRequests.personId, authentication.personId),
     )).limit(1);
   if (!row) return Response.json({ error: "approval not found" }, { status: 404 });
   if (row.completed && row.eventId) {

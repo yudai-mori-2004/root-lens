@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 
 from rootlens_import import desktop
 from rootlens_import.core import (ClipProgress, FILES, ImportCancelled, ImportFailure,
-                                  source_manifest_sha256)
+                                  unit_files_sha256)
 from rootlens_import.device_sync import DeviceSource, SyncSummary
 from rootlens_import.drive import DriveRecording, UploadProgress, UploadResult
 from rootlens_import.library import read_recording, recordings_directory
@@ -98,7 +98,7 @@ class UploadDesktopTests(unittest.TestCase):
                         for name, item in files.items()}
         self.drive_snapshot[record.unit_id] = DriveRecording(
             record.unit_id, "folder", path.name, files,
-            source_manifest_sha256(record.unit_id, source_files))
+            unit_files_sha256(record.unit_id, source_files))
         return UploadResult(record.unit_id, "folder", sum(info["size"] for info in files.values()))
 
     def new_window(self):

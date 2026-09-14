@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         || folder.appProperties?.rootlens_site !== site.id
         || folder.appProperties?.rootlens_unit_id !== attempt.unitId
         || folder.appProperties?.rootlens_kind !== "recording"
-        || folder.appProperties?.rootlens_source_manifest !== attempt.sourceManifestSha256) continue;
+        || folder.appProperties?.rootlens_files_sha256 !== attempt.filesSha256) continue;
     const checked = await Promise.all(files.map((file) => drive.fileOrNull(file.driveFileId)));
     if (checked.every((saved, index) => saved && !saved.trashed
         && saved.name === files[index].path && saved.parents?.[0] === attempt.folderId
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       recordings.push({
         unitId: attempt.unitId,
         folderId: attempt.folderId,
-        sourceManifestSha256: attempt.sourceManifestSha256,
+        filesSha256: attempt.filesSha256,
         files: Object.fromEntries(files.map((file) => [file.path, {
           id: file.driveFileId,
           size: file.bytes,

@@ -339,18 +339,21 @@ def checksum(path, cancel_event=None):
     return digest.hexdigest()
 
 
-def source_manifest_sha256(unit_id, files):
-    if not UNIT_ID.fullmatch(unit_id) or set(files) != set(FILES):
-        raise ImportFailure("原本マニフェストを作成できません。管理者に確認してください。")
+def unit_files_sha256(unit_id, files):
+    if not UNIT_ID.fullmatch(unit_id) or not files or len(files) > 1000:
+        raise ImportFailure("撮影単位のファイル一覧を作成できません。管理者に確認してください。")
     manifest_files = []
-    for name in sorted(files):
-        item = files[name]
+    for path in sorted(files):
+        item = files[path]
+        if (not isinstance(path, str) or not path or len(path) > 240 or path.startswith(("/", "\\"))
+                or ".." in path.replace("\\", "/").split("/")):
+            raise ImportFailure("撮影単位のファイル一覧を作成できません。管理者に確認してください。")
         if (type(item.get("size")) is not int or item["size"] <= 0
                 or not isinstance(item.get("sha256"), str) or not HASH.fullmatch(item["sha256"])):
-            raise ImportFailure("原本マニフェストを作成できません。管理者に確認してください。")
-        manifest_files.append({"name": name, "bytes": item["size"], "sha256": item["sha256"]})
-    payload = {"schema": "io.rootlens.source-manifest.v1", "unit_id": unit_id, "files": manifest_files}
-    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            raise ImportFailure("撮影単位のファイル一覧を作成できません。管理者に確認してください。")
+        manifest_files.append({"path": path, "bytes": item["size"], "sha256": item["sha256"]})
+    payload = {"unit_id": unit_id, "files": manifest_files}
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 

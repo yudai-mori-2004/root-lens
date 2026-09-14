@@ -18,30 +18,18 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function sortedFiles(files) {
-  return [...files].sort((a, b) => a.path.localeCompare(b.path));
-}
-
-function safeDeliveryPath(root, relativePath) {
-  assert(typeof relativePath === "string" && relativePath.length > 0, "納品ファイルのパスが不正です");
+function safePath(root, relativePath) {
+  assert(typeof relativePath === "string" && relativePath.length > 0, "ファイルのパスが不正です");
   assert(!path.isAbsolute(relativePath) && !relativePath.split(/[\\/]/).includes(".."),
-    `納品ディレクトリ外のパスです: ${relativePath}`);
-  const resolved = path.resolve(root, relativePath);
-  assert(resolved.startsWith(`${path.resolve(root)}${path.sep}`), `納品ディレクトリ外のパスです: ${relativePath}`);
+    `証跡一式の外を参照しています: ${relativePath}`);
+  const resolvedRoot = path.resolve(root);
+  const resolved = path.resolve(resolvedRoot, relativePath);
+  assert(resolved.startsWith(`${resolvedRoot}${path.sep}`), `証跡一式の外を参照しています: ${relativePath}`);
   return resolved;
 }
 
-function sourceManifest(unitId, files) {
+function agreementRecord(value, kind) {
   return {
-    schema: "io.rootlens.source-manifest.v1",
-    unit_id: unitId,
-    files: [...files].sort((a, b) => a.name.localeCompare(b.name))
-      .map(({ name, bytes, sha256: digest }) => ({ name, bytes, sha256: digest })),
-  };
-}
-
-function consentSnapshot(evidence) {
-  const record = (value, kind) => ({
     record_id: value.record_id,
     kind,
     document_version: value.document_version,
@@ -49,83 +37,73 @@ function consentSnapshot(evidence) {
     signed_pdf_sha256: value.signed_pdf_sha256,
     authentication_method: value.authentication_method,
     signed_at: value.signed_at,
-    status: value.status_at_approval,
-  });
-  return [
-    record(evidence.agreements.site, "site_agreement"),
-    ...evidence.agreements.staff_consent_snapshot.records
-      .map((value) => record(value, "staff_consent")),
-  ].sort((a, b) => a.record_id.localeCompare(b.record_id));
+  };
+}
+
+async function verifyFile(root, file, expectedBytes) {
+  const filename = safePath(root, file.path);
+  const info = await stat(filename);
+  assert(info.isFile() && (expectedBytes === undefined || info.size === expectedBytes),
+    `ファイルのサイズが一致しません: ${file.path}`);
+  assert(sha256(await readFile(filename)) === file.sha256, `ファイルが変更されています: ${file.path}`);
 }
 
 async function verifyEvidence(evidencePath) {
   const absoluteEvidencePath = path.resolve(evidencePath);
-  const directory = path.dirname(absoluteEvidencePath);
+  const root = path.dirname(absoluteEvidencePath);
   const evidence = JSON.parse(await readFile(absoluteEvidencePath, "utf8"));
-  assert(evidence.schema === "io.rootlens.evidence.v1", "未対応の証跡形式です");
+  assert(evidence.schema === "io.rootlens.evidence.v2", "未対応の証跡形式です");
 
-  const deliveryFiles = sortedFiles(evidence.delivery.files);
-  assert(new Set(deliveryFiles.map((file) => file.path)).size === deliveryFiles.length,
-    "納品ファイルのパスが重複しています");
-  for (const file of deliveryFiles) {
-    const filename = safeDeliveryPath(directory, file.path);
-    const info = await stat(filename);
-    assert(info.isFile() && info.size === file.size, `納品ファイルのサイズが一致しません: ${file.path}`);
-    assert(sha256(await readFile(filename)) === file.sha256, `納品ファイルが変更されています: ${file.path}`);
+  const files = [...evidence.unit.files].sort((a, b) => a.path.localeCompare(b.path));
+  assert(files.length > 0 && new Set(files.map((file) => file.path)).size === files.length,
+    "承認対象ファイルの一覧が不正です");
+  for (const file of files) await verifyFile(root, file, file.bytes);
+  assert(sha256(canonicalJson({ unit_id: evidence.unit.unit_id, files })) === evidence.unit.files_sha256,
+    "承認対象ファイル一式のSHA-256が一致しません");
+
+  const site = evidence.agreements.site;
+  const staff = evidence.agreements.staff;
+  await verifyFile(root, { path: site.path, sha256: site.signed_pdf_sha256 });
+  for (const record of staff.records) {
+    await verifyFile(root, { path: record.path, sha256: record.signed_pdf_sha256 });
   }
-  assert(sha256(canonicalJson({ unit_id: evidence.source.unit_id, files: deliveryFiles }))
-    === evidence.delivery.delivery_manifest_sha256, "納品manifestのSHA-256が一致しません");
+  const snapshot = [agreementRecord(site, "site_agreement"),
+    ...staff.records.map((record) => agreementRecord(record, "staff_consent"))]
+    .sort((a, b) => a.record_id.localeCompare(b.record_id));
+  assert(sha256(canonicalJson(snapshot)) === staff.snapshot_sha256,
+    "同意記録の集合が変更されています");
 
   const approval = evidence.approval;
-  const receipt = { ...approval };
-  delete receipt.receipt_sha256;
-  assert(sha256(canonicalJson(receipt)) === approval.receipt_sha256, "承認receiptが変更されています");
-  assert(sha256(canonicalJson(approval.signed_payload)) === approval.signed_payload_sha256,
-    "承認payloadが変更されています");
-  assert(approval.signature_method === "sms_authenticated_clickwrap"
-    && approval.signer.authentication_method === "sms_otp"
-    && approval.signer.person_id === approval.signed_payload.person_id,
+  const approvalRecord = { ...approval };
+  delete approvalRecord.approval_record_sha256;
+  assert(sha256(canonicalJson(approvalRecord)) === approval.approval_record_sha256,
+    "承認記録が変更されています");
+  assert(sha256(canonicalJson(approval.approval_subject)) === approval.approval_subject_sha256,
+    "承認対象が変更されています");
+  assert(approval.approval_method === "sms_authenticated_clickwrap"
+    && approval.approver.authentication_method === "sms_otp"
+    && approval.approver.person_id === approval.approval_subject.person_id,
   "SMS認証済みの承認者と承認対象が一致しません");
-
-  const sourceFiles = approval.signed_payload.source_files;
-  assert(approval.signed_payload.unit_id === evidence.source.unit_id
-    && approval.signed_payload.site_id === evidence.source.site_id
-    && approval.signed_payload.source_manifest_sha256 === evidence.source.source_manifest_sha256,
-  "承認対象とraw記録が一致しません");
-  assert(canonicalJson(sourceFiles.map(({ name, bytes, sha256: digest }) => ({
-    path: name, size: bytes, sha256: digest,
-  })).sort((a, b) => a.path.localeCompare(b.path))) === canonicalJson(sortedFiles(evidence.source.files)),
-  "承認対象のrawファイル一覧が一致しません");
-  assert(sha256(JSON.stringify(sourceManifest(evidence.source.unit_id, sourceFiles)))
-    === evidence.source.source_manifest_sha256, "raw manifestのSHA-256が一致しません");
-
-  const snapshot = consentSnapshot(evidence);
-  assert(sha256(canonicalJson(snapshot)) === evidence.agreements.staff_consent_snapshot.snapshot_sha256
-    && evidence.agreements.staff_consent_snapshot.snapshot_sha256
-      === approval.signed_payload.consent_snapshot_sha256
-    && evidence.agreements.staff_consent_snapshot.snapshot_id
-      === approval.signed_payload.consent_snapshot_id,
-  "同意スナップショットと承認対象が一致しません");
-
+  assert(approval.approval_subject.unit_id === evidence.unit.unit_id
+    && approval.approval_subject.site_id === evidence.unit.site_id
+    && approval.approval_subject.files_sha256 === evidence.unit.files_sha256
+    && approval.approval_subject.consent_snapshot_id === staff.snapshot_id
+    && approval.approval_subject.consent_snapshot_sha256 === staff.snapshot_sha256,
+  "承認対象と証跡の内容が一致しません");
   return evidence;
 }
 
-function argumentsFrom(argv) {
-  assert(argv.length === 1, "使い方: npm run verify:evidence -- <納品ディレクトリ|rootlens-evidence.json>");
-  const target = argv[0];
-  const resolved = path.resolve(target);
-  return {
-    evidencePath: path.extname(resolved).toLowerCase() === ".json"
-      ? resolved : path.join(resolved, "rootlens-evidence.json"),
-  };
+function evidencePathFrom(argv) {
+  assert(argv.length === 1, "使い方: npm run verify:evidence -- <証跡ディレクトリ|rootlens-evidence.json>");
+  const target = path.resolve(argv[0]);
+  return path.extname(target).toLowerCase() === ".json" ? target : path.join(target, "rootlens-evidence.json");
 }
 
 try {
-  const options = argumentsFrom(process.argv.slice(2));
-  const evidence = await verifyEvidence(options.evidencePath);
+  const evidence = await verifyEvidence(evidencePathFrom(process.argv.slice(2)));
   console.log(`検証完了: ${evidence.evidence_id}`);
-  console.log(`撮影単位: ${evidence.source.unit_id}`);
-  console.log(`納品ファイル: ${evidence.delivery.files.length}件`);
+  console.log(`撮影単位: ${evidence.unit.unit_id}`);
+  console.log(`承認対象ファイル: ${evidence.unit.files.length}件`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "証跡を検証できませんでした");
   process.exitCode = 1;

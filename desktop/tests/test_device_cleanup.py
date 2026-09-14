@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import unittest
 
 from rootlens_import.core import (FILES, ImportCancelled, ImportFailure,
-                                  source_manifest_sha256, validate_metadata)
+                                  unit_files_sha256, validate_metadata)
 from rootlens_import.device_cleanup import (
     AUXILIARY_FILES, PENDING_NAME, cleanup_recording, discover_pending, _manifest,
 )
@@ -97,9 +97,9 @@ def descriptor_for(path, identity):
                         sha256=hashlib.sha256((path / name).read_bytes()).hexdigest())
              for index, name in enumerate(FILES)}
     source_files = {name: {"size": item["size"], "sha256": item["sha256"]} for name, item in files.items()}
-    from rootlens_import.core import source_manifest_sha256
+    from rootlens_import.core import unit_files_sha256
     return SimpleNamespace(unit_id=identity, folder_id="drive-folder", name=identity, files=files,
-                           source_manifest_sha256=source_manifest_sha256(identity, source_files))
+                           files_sha256=unit_files_sha256(identity, source_files))
 
 
 @unittest.skipIf(os.name == "nt", "Uses a POSIX shell to execute Android command guards on fixture files")
@@ -447,7 +447,7 @@ class CleanupManifestTests(unittest.TestCase):
                         for name, item in files.items()}
         self.recording = SimpleNamespace(unit_id=self.digest, name=self.digest,
                                          folder_id="folder", files=files,
-                                         source_manifest_sha256=source_manifest_sha256(self.digest, source_files))
+                                         files_sha256=unit_files_sha256(self.digest, source_files))
 
     def manifest(self):
         return _manifest(lambda _: self.recording, self.digest, NAME)[1]
@@ -463,12 +463,12 @@ class CleanupManifestTests(unittest.TestCase):
                     self.recording.files[filename][field] = value
                     source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
                                     for name, item in self.recording.files.items()}
-                    self.recording.source_manifest_sha256 = source_manifest_sha256(self.digest, source_files)
+                    self.recording.files_sha256 = unit_files_sha256(self.digest, source_files)
                     self.assertNotEqual(self.manifest(), baseline)
                     self.recording.files[filename][field] = old
                     source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
                                     for name, item in self.recording.files.items()}
-                    self.recording.source_manifest_sha256 = source_manifest_sha256(self.digest, source_files)
+                    self.recording.files_sha256 = unit_files_sha256(self.digest, source_files)
         self.recording.folder_id = "another-folder"
         self.assertNotEqual(self.manifest(), baseline)
         pending = f".rootlens-cleanup-{NAME}-{self.digest}-{baseline}"

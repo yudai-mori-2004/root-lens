@@ -11,7 +11,7 @@ import json
 import re
 import shlex
 
-from .core import CLIP_NAME, FILES, HASH, UNIT_ID, PACKAGES, ImportCancelled, ImportFailure, source_manifest_sha256
+from .core import CLIP_NAME, FILES, HASH, UNIT_ID, PACKAGES, ImportCancelled, ImportFailure, unit_files_sha256
 
 
 AUXILIARY_FILES = (
@@ -146,7 +146,7 @@ def _manifest(drive_reader, unit_id, original_name):
     files = getattr(descriptor, "files", None)
     if (not isinstance(folder_id, str) or not DRIVE_ID.fullmatch(folder_id)
             or getattr(descriptor, "name", None) != unit_id
-            or not isinstance(getattr(descriptor, "source_manifest_sha256", None), str)
+            or not isinstance(getattr(descriptor, "files_sha256", None), str)
             or not isinstance(files, Mapping) or set(files) != set(FILES)):
         raise ImportFailure(DRIVE_CHANGED)
     normalized = {}
@@ -162,9 +162,9 @@ def _manifest(drive_reader, unit_id, original_name):
             raise ImportFailure(DRIVE_CHANGED)
         ids.add(file_id)
         normalized[name] = dict(id=file_id, size=size, sha256=digest)
-    source_files = {name: {"size": item["size"], "sha256": item["sha256"]}
-                    for name, item in normalized.items()}
-    if source_manifest_sha256(unit_id, source_files) != descriptor.source_manifest_sha256:
+    unit_files = {name: {"size": item["size"], "sha256": item["sha256"]}
+                  for name, item in normalized.items()}
+    if unit_files_sha256(unit_id, unit_files) != descriptor.files_sha256:
         raise ImportFailure(DRIVE_CHANGED)
     encoded = json.dumps(dict(folder_id=folder_id, files=normalized), sort_keys=True,
                          separators=(",", ":"), ensure_ascii=True).encode("ascii")
