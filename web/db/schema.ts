@@ -175,7 +175,8 @@ export const agreementRecords = pgTable("agreement_records", {
   kind: text("kind").notNull(),
   documentVersion: text("document_version").notNull(),
   templateSha256: text("template_sha256").notNull(),
-  docusealSubmissionId: bigint("docuseal_submission_id", { mode: "number" }).notNull(),
+  signatureProvider: text("signature_provider").notNull(),
+  providerEnvelopeId: text("provider_envelope_id").notNull(),
   signedPdfFileId: text("signed_pdf_file_id"),
   signedPdfSha256: text("signed_pdf_sha256"),
   certificateFileId: text("certificate_file_id"),
@@ -184,7 +185,7 @@ export const agreementRecords = pgTable("agreement_records", {
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("agreement_docuseal_submission_idx").on(table.docusealSubmissionId),
+  uniqueIndex("agreement_provider_envelope_idx").on(table.signatureProvider, table.providerEnvelopeId),
   index("agreement_site_kind_status_idx").on(table.siteId, table.kind, table.status),
   uniqueIndex("agreement_active_site_idx").on(table.siteId)
     .where(sql`${table.kind} = 'site_agreement' AND ${table.status} = 'active'`),

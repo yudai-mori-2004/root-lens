@@ -22,18 +22,18 @@
 - 現場PCアプリは、招待された現場監督者がGoogleアカウントでRootLensへログインし、OSの資格情報ストアにRootLensセッションを保存する。Google Driveの認証情報はPCへ配布しない。
 - 現場PCアプリは、録画を構成する4ファイルのSHA-256と`source_manifest_sha256`を計算する。RootLensサーバーがRootLens共有ドライブとの接続を使ってファイル単位の再開可能アップロードURLを発行し、PCはそのURLへファイル本体だけを送る。
 - 現場PCアプリは対象データを確定してWebの承認画面を開き、現場監督者のパスキー署名が完了した場合だけアップロードへ進む。承認後にも4ファイルを再読込し、変更があればアップロードしない。
-- Webは現場合意書と撮影参加に関する同意書の署名依頼をDocuSealへ作成し、完了したPDFと署名証明書をRootLens共有ドライブの当該事業所フォルダへ保存する。撮影ロットの承認時には、その時点の有効な記録を同意スナップショットとして固定する。
+- Webは現場合意書と撮影参加に関する同意書の署名依頼をDocumensoへ作成し、完了したPDFと署名証明書をRootLens共有ドライブの当該事業所フォルダへ保存する。撮影ロットの承認時には、その時点の有効な記録を同意スナップショットとして固定する。
 - 納品パイプラインはraw、同意スナップショット、現場監督者の承認receipt、納品ファイルを結ぶ`rootlens-evidence.json`を生成し、KMS鍵で署名する。検証ページとCLIは証跡署名と各ハッシュを検証する。
 
 ## 採用する構成
 
 ### 電子署名サービス
 
-現場合意書と撮影参加に関する同意書の締結には、セルフホストしたDocuSealを使う。DocuSeal本体は `sign.rootlens.io` の独立したサービスとして動かし、RootLensの `web/` はAPIとwebhookを介して文書の作成、署名依頼、完了記録の取り込みを行う。
+現場合意書と撮影参加に関する同意書の締結には、RootLensがセルフホストするDocumenso Community Editionを使う。Documenso本体は `sign.rootlens.io` の独立したサービスとして動かし、RootLensの `web/` はAPIとwebhookを介して文書の作成、署名依頼、完了記録の取り込みを行う。
 
-DocuSealをNext.jsのプロセスへ組み込まない。署名処理、メール送信、バックグラウンド処理を公開サイトから分離する。同じRootLensのドメインと管理下に置くことで、利用者から見た署名導線と運営責任はRootLensに統一する。
+DocumensoをNext.jsのプロセスへ組み込まない。署名処理、メール送信、バックグラウンド処理を公開サイトから分離する。同じRootLensのドメインと管理下に置くことで、利用者から見た署名導線と運営責任はRootLensに統一する。
 
-初期導入ではDocuSeal本体を改変せず、On-Premises版を利用する。DocuSealのオープンソース版はAGPL-3.0であるため、本体を変更する場合は変更部分の公開条件を確認する。本番環境でAPIと埋め込み機能を利用するにはOn-Premises Proの契約が必要になるため、Phase 1で費用と必要なAPIを確認する。コンテナのバージョンを固定し、署名処理に必要なデータベースとSMTPを設定する。署名完了後のPDFと署名証明書はRootLens共有ドライブへ保存し、保存と照合が完了した後は、署名サービス側に文書本体を継続保管しない運用が可能かPhase 1で確認する。
+初期導入ではDocumenso本体を改変せず、AGPL-3.0で公開されているCommunity Editionの公式コンテナを利用する。Community Editionに含まれるEnvelope APIとwebhookを使い、有償ライセンスを前提にしない。コンテナのバージョンを固定し、PostgreSQL、SMTP、署名用X.509証明書、TLS終端、バックアップをRootLensが管理する。署名済みPDFと署名証明書はRootLens共有ドライブへ保存する。Documenso側の原本は、webhookの再処理と監査に必要な期間を定めて保持する。
 
 ### 署名原本の保存先
 
@@ -63,11 +63,11 @@ RootLens Submit/
 
 | 証跡 | 対象 | 取得方法 | 更新単位 |
 | --- | --- | --- | --- |
-| 現場合意 | 協力先とRootLensの継続的な関係 | DocuSealで電子署名 | 合意の締結・改定・終了 |
-| スタッフ同意 | 撮影に参加する個人 | DocuSealで電子署名 | 同意・再同意・撤回 |
+| 現場合意 | 協力先とRootLensの継続的な関係 | Documensoで電子署名 | 合意の締結・改定・終了 |
+| スタッフ同意 | 撮影に参加する個人 | Documensoで電子署名 | 同意・再同意・撤回 |
 | 提供前承認 | 確定した一つの撮影ロット | PCアプリから開始するパスキー電子署名 | 撮影ロットごと |
 
-提供前承認を毎回DocuSealで行わない。提供前承認は契約文書の締結ではなく、すでに合意した手順に従って、特定のデータを提供工程へ進める操作だからである。現場監督者はPCアプリで対象データを確認し、PCアプリから開始されるパスキー認証によって電子署名する。手書きの署名画像は必須にせず、承認者の個人認証、承認意思、対象データ、表示文面、時刻を暗号的に結び付ける。
+提供前承認を毎回Documensoで行わない。提供前承認は契約文書の締結ではなく、すでに合意した手順に従って、特定のデータを提供工程へ進める操作だからである。現場監督者はPCアプリで対象データを確認し、PCアプリから開始されるパスキー認証によって電子署名する。手書きの署名画像は必須にせず、承認者の個人認証、承認意思、対象データ、表示文面、時刻を暗号的に結び付ける。
 
 ### DesktopのログインとDrive操作
 
@@ -103,20 +103,20 @@ RootLensのデータ面には氏名や署名画像を直接入れず、次の不
 
 1. RootLensが協力先、撮影場所、署名権限を持つ担当者を登録する。
 2. 使用する現場合意書の版と原本文書のSHA-256を確定する。
-3. `web/` からDocuSeal APIへ署名用submissionを作成し、担当者へ署名を依頼する。
-4. DocuSealから完了webhookを受け、DocuSeal APIから署名済みPDFと署名証明書を取得する。
+3. `web/` からDocumenso Envelope APIへテンプレートに基づく署名用envelopeを作成し、担当者へ署名を依頼する。
+4. Documensoから完了webhookを受け、Documenso APIから署名済みPDFと署名証明書を取得する。
 5. `agreement_record_id`を発行し、RootLens共有ドライブの当該事業所フォルダに規定のファイル名で保存する。各ファイルには`agreement_record_id`、`site_id`、文書種別、文書版を`appProperties`として付与する。
 6. Driveから各ファイルを再取得してSHA-256を照合した後、RootLensの索引にDriveファイルID、SHA-256、署名完了時刻、状態を記録する。
 
-webhookは完了を知る契機としてのみ使う。受信したリクエストのHMAC署名と時刻を検証し、DocuSeal APIから現在の完了状態と成果物を取り直してからRootLensの記録を確定する。
+webhookは完了を知る契機としてのみ使う。受信した`X-Documenso-Secret`を一定時間比較で検証し、Documenso APIからenvelopeのID、外部ID、完了状態、完了時刻と成果物を取り直してからRootLensの記録を確定する。
 
 ### 2. スタッフ同意
 
 1. 協力先が撮影機材を装着する人と、撮影中に映り込む可能性のあるスタッフをRootLensへ伝える。
 2. RootLensがスタッフごとに `person_id` を発行し、所属する `organization_id` と `site_id` に結び付ける。
-3. RootLensが個人ごとにDocuSealの署名依頼を作成する。同じ署名URLや署名記録を複数人分として共有しない。
+3. RootLensが個人ごとにDocumensoの署名依頼を作成する。同じ署名URLや署名記録を複数人分として共有しない。
 4. 本人が個別に送られた署名URLを開き、撮影参加に関する同意書を確認して署名する。
-5. RootLensは署名完了webhookを受け、DocuSeal APIで完了状態を再確認する。`agreement_record_id`を発行し、署名済みPDFと署名証明書をRootLens共有ドライブの当該事業所フォルダへ保存する。
+5. RootLensは署名完了webhookを受け、Documenso APIで完了状態を再確認する。`agreement_record_id`を発行し、署名済みPDFと署名証明書をRootLens共有ドライブの当該事業所フォルダへ保存する。
 6. Driveから各ファイルを再取得してSHA-256を照合し、RootLensの索引に`agreement_record_id`、`person_id`、`site_id`、文書版、署名時刻、DriveファイルID、SHA-256、状態を記録する。
 7. 撤回時は原記録を上書きせず、撤回イベントを追記する。以降の撮影ロットにも原記録と撤回後の状態を含める。
 
@@ -283,7 +283,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 
 - 氏名、メールアドレス、住所、口座情報
 - 手書き署名画像
-- DocuSealの署名用URL
+- Documensoの署名用URL
 - 署名済みPDFの公開URL
 - PCアプリ又はサービスアカウントの秘密情報
 
@@ -296,7 +296,7 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 | `organizations` | 協力先の不透明IDと状態 |
 | `sites` | 事業所、所属する協力先 |
 | `people` | 署名者・承認者の不透明ID、所属、役割、状態 |
-| `agreement_records` | 文書種別・版・ハッシュ、DriveファイルID、DocuSeal submission ID、完了時刻、状態 |
+| `agreement_records` | 文書種別・版・ハッシュ、DriveファイルID、署名サービス名、Documenso envelope ID、完了時刻、状態 |
 | `approval_signatures` | 有効期限付きの一回限り電子署名セッション |
 | `approval_events` | 撮影ロット、承認者、承認文、認証情報を含むappend-only記録 |
 | `consent_snapshots` | 承認時点で対象となったスタッフ同意記録の集合 |
@@ -316,8 +316,8 @@ Webは、適用する現場合意の `agreement_record_id` と、スタッフ同
 | `POST /api/v1/drive-uploads` | RootLens共有ドライブの事業所フォルダへ送るファイルと再開可能アップロードURLを準備する |
 | `POST /api/v1/drive-uploads/{attempt_id}/verify` | Drive上の保存先、属性、サイズ、SHA-256を検証する |
 | `POST /api/v1/drive-recordings` | 端末削除前に現在のDrive上の録画を再検証する |
-| `POST /api/internal/signing/submissions` | DocuSealへ現場合意・スタッフ同意の署名依頼を作る |
-| `POST /api/webhooks/docuseal` | 署名ライフサイクルの通知を受け、完了状態を照合する |
+| `POST /api/internal/signing/envelopes` | Documensoへ現場合意・スタッフ同意の署名依頼を作る |
+| `POST /api/webhooks/documenso` | 署名ライフサイクルの通知を受け、完了状態を照合する |
 | `POST /api/v1/approval-signatures` | PCアプリが撮影ロットの電子署名セッションを作る |
 | `GET /approve/{approval_id}#token=...` | 現場監督者が内容を確認し、パスキーで電子署名するWeb画面。tokenはサーバーログへ送られないfragmentに置く |
 | `GET /api/v1/approval-signatures/{id}` | PCアプリが署名状態とreceiptを取得する |
@@ -347,14 +347,14 @@ npm run verify:evidence -- /path/to/delivery --public-key /path/to/rootlens-evid
 - Googleログインは承認者のアカウントと事業所所属を確認する。撮影ロットへの明示的な承認操作には、別途登録したパスキーを使う。
 - 共有メールしかない現場では、招待時に本人名と役割を確認し、個人ごとに別のパスキーを登録する。共有パスワードによる承認は認めない。
 - 権限の付与、変更、失効もappend-onlyの管理記録へ残す。
-- DocuSealの署名済み文書と署名証明書は、文書、署名操作、署名者の認証情報、時刻を一体としてRootLens共有ドライブの当該事業所フォルダへ保存する。実際に操作した人の特定は、宛先、認証、操作ログ等を合わせて判断するため、署名証明書だけを本人確認の根拠にしない。
+- Documensoの署名済み文書と署名証明書は、文書、署名操作、署名者の認証情報、時刻を一体としてRootLens共有ドライブの当該事業所フォルダへ保存する。実際に操作した人の特定は、宛先、認証、操作ログ等を合わせて判断するため、署名証明書だけを本人確認の根拠にしない。
 
 ## 失敗時の扱い
 
 - 現場合意が未完了の場合、又は現場監督者が現場合意とスタッフ同意一式を確認できない場合、電子署名セッションを完了できない。
 - パスキー署名の検証に失敗した場合、承認イベントを作らない。
 - 電子署名後にローカルファイルのハッシュが変わった場合、アップロードせず再署名する。
-- webhookのHMAC検証又はDocuSeal APIとの再照合に失敗した場合、合意を完了扱いにしない。
+- webhookの共有secret検証又はDocumenso APIとの再照合に失敗した場合、合意を完了扱いにしない。
 - 署名済みPDFと署名証明書をRootLens共有ドライブの当該事業所フォルダへ保存して再取得・照合できない場合、合意を完了扱いにしない。
 - Driveのフォルダが移動又は再作成された場合、`agreement_record_id`から原本を再発見して索引を更新する。保存済みSHA-256と一致しないファイルへは結び直さない。
 - 原本が完全に削除され復元できない場合、その合意記録を`unavailable`として扱い、新しい提供前承認には使用しない。過去に発行した証跡から記録IDとハッシュは確認できるが、原本文書の復元は保証しない。
@@ -364,7 +364,7 @@ npm run verify:evidence -- /path/to/delivery --public-key /path/to/rootlens-evid
 ## 運用と保存
 
 - RootLens共有ドライブの当該事業所フォルダに置く署名済み文書と署名証明書、RootLensが扱う承認receiptと証跡ファイルは、保存時と通信時に暗号化する。
-- DocuSealの署名文書・署名証明書とRootLensの証跡署名鍵は別の用途として管理する。
+- Documensoの署名文書・署名証明書とRootLensの証跡署名鍵は別の用途として管理する。
 - 署名済み文書の削除制限、保持、バックアップ、復元は、RootLens共有ドライブの管理規則として定める。RootLensは索引から原本の所在とハッシュ一致を定期確認する。
 - 署名文書の版を変えた場合、過去の版とハッシュを保持する。
 - 販売先へ提供する検証画面は、記録の有効性、文書版、時刻、ハッシュ一致だけを表示し、本人情報の表示には追加権限を必要とする。
@@ -374,11 +374,11 @@ npm run verify:evidence -- /path/to/delivery --public-key /path/to/rootlens-evid
 
 ### Phase 1: 署名原本
 
-- DocuSealを固定バージョンで検証環境へセルフホストする。
+- Documensoを固定バージョンで検証環境へセルフホストする。
 - 署名処理に必要なデータベースとSMTPを設定する。
 - 現場合意書と撮影参加に関する同意書をテンプレート化する。
 - RootLens共有ドライブに、協力先ごとの現場合意書、スタッフ同意書、承認済みデータの各フォルダを用意する。
-- APIによるsubmission作成、署名完了webhook、署名済み文書と署名証明書の取得、Driveへの保存、再取得とハッシュ照合を一往復させる。
+- APIによるenvelope作成、署名完了webhook、署名済み文書と署名証明書の取得、Driveへの保存、再取得とハッシュ照合を一往復させる。
 - `agreement_record_id`を含むファイル名と`appProperties`から、移動後の原本を再発見できることを確認する。
 
 ### Phase 2: 現場監督者の承認
@@ -420,16 +420,16 @@ npm run verify:evidence -- /path/to/delivery --public-key /path/to/rootlens-evid
 
 1. 協力先が指定する現場監督者の登録方法と、共有メールしかない現場での本人確認手順。
 2. 現場監督者に現場合意とスタッフ同意一式を表示する方法と、各記録の状態の示し方。
-3. DocuSealのセルフホスト先、メール送信元、On-Premises Proの契約範囲、AGPL-3.0への対応、Drive保存後に文書本体を署名サービスから削除できる範囲。
+3. Documensoのメール送信元、AGPL-3.0の表示とソース案内、Drive保存後に文書本体を署名サービスから削除する時期。
 4. 協力先が共有ドライブを利用できない場合の所有者、削除制限、保持、バックアップと復元手順。
 5. 販売先へ通常表示する証跡項目と、請求時に追加開示する原本・本人情報の範囲。
 6. Nextremerその他の販売経路が求めるファイル名、スキーマ、署名方式との照合。
 
 ## 参考資料
 
-- [DocuSeal On-Premises](https://www.docuseal.com/on-premises)
-- [DocuSeal API Reference](https://www.docuseal.com/docs/api)
-- [DocuSeal Webhooks](https://www.docuseal.com/resources/use-webhooks)
-- [DocuSeal Certificate of Signature](https://www.docuseal.com/faq/what-is-the-certificate-of-signature-audit-log)
+- [Documenso Self-Hosting](https://docs.documenso.com/docs/self-hosting)
+- [Documenso Developer Guide](https://docs.documenso.com/docs/developers)
+- [Documenso Webhooks](https://docs.documenso.com/docs/developers/webhooks/setup)
+- [Documenso Signed Document Download](https://docs.documenso.com/docs/developers/examples/common-workflows#workflow-5-download-signed-documents)
 - [デジタル庁 電子署名](https://www.digital.go.jp/policies/digitalsign)
 - [電子契約サービスに関するQ&A（電子署名法第3条関係）](https://www.digital.go.jp/assets/contents/node/basic_page/field_ref_resources/517ca59b-6ea4-4179-a338-8d1b51a4d40b/4ae659c2/20240109_digitalsign_qa_01.pdf)

@@ -1,0 +1,4 @@
+{$SIGNING_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy documenso:3000
+}

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agreementRecords, people, sites } from "@/db/schema";
-import { DocuSealClient } from "@/lib/docuseal";
+import { DocumensoClient } from "@/lib/documenso";
 import { authenticateInternalRequest } from "@/lib/internal-auth";
 
 const bodySchema = z.object({
@@ -11,12 +11,12 @@ const bodySchema = z.object({
   kind: z.enum(["site_agreement", "staff_consent"]),
   documentVersion: z.string().min(1).max(100),
   templateSha256: z.string().regex(/^[0-9a-f]{64}$/),
-  templateId: z.number().int().positive(),
+  templateEnvelopeId: z.string().min(1),
   personId: z.string().min(1).optional(),
-  submitters: z.array(z.object({
+  signers: z.array(z.object({
+    templateRecipientId: z.number().int().positive(),
     name: z.string().min(1).max(200),
     email: z.string().email(),
-    role: z.string().min(1).max(100),
   })).min(1).max(4),
 });
 
@@ -51,10 +51,11 @@ export async function POST(request: Request) {
     }
   }
   const agreementRecordId = `agr_${randomUUID()}`;
-  const docuseal = new DocuSealClient();
-  const submission = await docuseal.createSubmission(
-    input.templateId,
-    input.submitters.map((signer) => ({ ...signer, externalId: agreementRecordId })),
+  const documenso = new DocumensoClient();
+  const envelope = await documenso.createEnvelope(
+    input.templateEnvelopeId,
+    input.signers,
+    agreementRecordId,
     `${process.env.PUBLIC_WEB_ORIGIN ?? "https://www.rootlens.io"}/signing/complete`,
   );
   await db.insert(agreementRecords).values({
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
     kind: input.kind,
     documentVersion: input.documentVersion,
     templateSha256: input.templateSha256,
-    docusealSubmissionId: submission.submissionId,
+    signatureProvider: "documenso",
+    providerEnvelopeId: envelope.envelopeId,
   });
-  return Response.json({ agreementRecordId, signingUrls: submission.signingUrls }, { status: 201 });
+  return Response.json({ agreementRecordId, signingUrls: envelope.signingUrls }, { status: 201 });
 }
