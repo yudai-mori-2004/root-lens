@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { operatorMemberships, people, sites } from "@/db/schema";
 
@@ -18,7 +18,7 @@ export async function siteOperator(identityId: string, siteId: string) {
       eq(people.siteId, siteId),
       eq(people.status, "active"),
       eq(sites.status, "active"),
+      sql`${people.role} IN ('admin', 'supervisor')`,
     )).limit(1);
-  return row && (row.role === "admin" || row.role === "supervisor")
-    ? { ...row, role: row.role as "admin" | "supervisor" } : null;
+  return row ? { ...row, role: row.role as "admin" | "supervisor" } : null;
 }

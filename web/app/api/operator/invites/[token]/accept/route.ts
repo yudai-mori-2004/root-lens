@@ -25,6 +25,17 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       isNull(operatorInvites.acceptedAt),
     )).limit(1);
   if (!invite) return Response.json({ error: "招待リンクが無効か期限切れです。" }, { status: 410 });
+  const [existingMembership] = await db.select({ personId: people.id })
+    .from(operatorMemberships)
+    .innerJoin(people, eq(people.id, operatorMemberships.personId))
+    .where(and(
+      eq(operatorMemberships.identityId, identityId),
+      eq(people.siteId, invite.siteId),
+      eq(people.status, "active"),
+    )).limit(1);
+  if (existingMembership) {
+    return Response.json({ error: "この電話番号はすでに事業所へ登録されています。" }, { status: 409 });
+  }
   try {
     const phoneLast4 = await operatorPhoneLast4(identityId);
     const { site, drive } = await siteDrive(invite.siteId);
