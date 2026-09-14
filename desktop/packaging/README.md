@@ -172,8 +172,8 @@ Register each field supervisor with a site before using the app. The supervisor 
 and returns to the app through an IPv4 loopback callback. The desktop stores only the opaque
 RootLens session in the operating system credential store.
 
-The site's Google Drive connection is configured separately by a site administrator. Its
-refresh token is encrypted on the RootLens server. The desktop never receives a Google refresh
+RootLens manages each site's destination in the **RootLens Submit** shared Drive. The RootLens
+server accesses it with its dedicated service account. The desktop never receives a Google refresh
 token, service-account key, or Drive folder ID. For an upload, the server issues resumable URLs
 that can accept bytes for the selected files only, then independently verifies the files in Drive.
 

@@ -40,18 +40,19 @@ DocuSealをNext.jsのプロセスへ組み込まない。署名処理、メー�
 `rootlens.io` Workspaceが所有・管理するGoogle共有ドライブを正本の保存先とし、その中に協力先ごとの事業所フォルダを設ける。署名済み文書、署名証明書、承認済み撮影データは事業所フォルダ内で分離して管理する。RootLensサーバー専用のサービスアカウントを共有ドライブのメンバーとして登録し、現場監督者へDriveの認証情報やフォルダIDを配布しない。
 
 ```text
-RootLens/
-  <site_id>/
-    現場合意書/
-      site-agreement__<agreement_record_id>__<document_version>.pdf
-      site-agreement-certificate__<agreement_record_id>.pdf
-    スタッフ同意書/
-      staff-consent__<agreement_record_id>__<document_version>.pdf
-      staff-consent-certificate__<agreement_record_id>.pdf
-    承認済みデータ/
-      <unit_id>/
-        approval-receipt.json
-        ...撮影データ
+RootLens Submit/
+  現場データ収集/
+    <事業所名>/
+      現場合意書/
+        site-agreement__<agreement_record_id>__<document_version>.pdf
+        site-agreement-certificate__<agreement_record_id>.pdf
+      スタッフ同意書/
+        staff-consent__<agreement_record_id>__<document_version>.pdf
+        staff-consent-certificate__<agreement_record_id>.pdf
+      承認済みデータ/
+        <unit_id>/
+          approval-receipt.json
+          ...撮影データ
 ```
 
 `certificate`は電子署名サービスが出力する署名証明書であり、署名操作、署名者、完了時刻等を確認するための付属記録である。独自の`audit.json`は作らない。`record.json`も別ファイルとして置かず、`agreement_record_id`をファイル名とDriveの`appProperties`に記録する。RootLensの索引には、`agreement_record_id`、`site_id`、文書種別、文書版、署名完了時刻、PDFと署名証明書のSHA-256、DriveのファイルID、状態だけを保存する。

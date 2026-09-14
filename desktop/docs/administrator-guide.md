@@ -14,9 +14,10 @@ PCへ配布した秘密鍵を回収・交換する作業はありません。
 
 ## Google Driveへ保存する
 
-`rootlens.io` Workspaceの共有ドライブ内に事業所フォルダを用意します。RootLensサーバーは、
+`rootlens.io` Workspaceの共有ドライブ「RootLens Submit」内の「現場データ収集」に、事業所フォルダを用意します。RootLensサーバーは、
 共有ドライブのメンバーとして登録した専用サービスアカウントを使ってDriveを操作します。Desktopアプリは
-Driveの認証情報を保持せず、RootLens APIを通じて事業所と保存対象を指定します。
+Driveの認証情報を保持せず、RootLens APIを通じて事業所と保存対象を指定します。RootLens APIは、招待済みのGoogleアカウント、
+対象事業所への有効な所属、対象録画への電子署名を照合し、すべて一致した場合にだけアップロード先を発行します。
 
 アップロード時、RootLensサーバーは一つのファイルにだけ使える再開可能アップロードURLを発行します。
 DesktopアプリはそのURLへファイル本体を送り、RootLensサーバーがDrive上の保存先、識別情報、
