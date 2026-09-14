@@ -53,15 +53,27 @@ function documentVersion(value: string): string {
   return `${Number(match[1])}年${Number(match[2])}月${Number(match[3])}日版`;
 }
 
+const PAGE_MARGIN = 70.9;
+const FONT_SIZE = 10.5;
+const LINE_HEIGHT = 18;
+const LINE_GAP = 1.18;
+
+function agreementLine(document: PDFKit.PDFDocument, text: string, options: PDFKit.Mixins.TextOptions = {}) {
+  document.fontSize(FONT_SIZE).fillColor("#000").text(text, {
+    lineGap: LINE_GAP,
+    ...options,
+  });
+}
+
 export async function createAgreementPdf(input: AgreementOriginalInput): Promise<Uint8Array> {
-  const font = await readFile(join(process.cwd(), "assets/fonts/NotoSansCJKjp-Regular.otf"));
+  const font = await readFile(join(process.cwd(), "assets/fonts/YuMincho-Regular.ttf"));
   const template = agreementTemplates[input.kind];
   const document = new PDFDocument({
     size: "A4",
-    margins: { top: 50, right: 54, bottom: 50, left: 54 },
+    margins: { top: PAGE_MARGIN, right: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN },
     info: { Title: template.title, Author: "RootLens", CreationDate: input.acceptedAt, ModDate: input.acceptedAt },
   });
-  document.registerFont("NotoSansJP", font).font("NotoSansJP");
+  document.registerFont("YuMincho", font).font("YuMincho");
   const chunks: Buffer[] = [];
   document.on("data", (chunk: Buffer) => chunks.push(chunk));
   const completed = new Promise<Uint8Array>((resolve, reject) => {
@@ -72,19 +84,24 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   const body = agreementBody(input.kind, template.body, input.siteName);
   for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
-    if (!line || line === "---") { document.moveDown(0.55); continue; }
+    if (!line || line === "---") { document.y += LINE_HEIGHT; continue; }
     if (line.startsWith("# ")) {
-      document.fontSize(18).text(line.slice(2), { align: "center" }).moveDown(0.8);
+      agreementLine(document, line.slice(2), { align: "center" });
     } else if (line.startsWith("## ")) {
-      document.fontSize(12).text(line.slice(3)).moveDown(0.35);
+      agreementLine(document, line.slice(3));
+    } else if (/^\s{2,}\d+\.\s+/.test(rawLine)) {
+      const nested = line.replace(/^(\d+)\.\s+/, "　($1) ");
+      agreementLine(document, nested, { indent: FONT_SIZE });
     } else if (/^[-*]\s+/.test(line)) {
-      document.fontSize(9.5).text(`・${line.replace(/^[-*]\s+/, "")}`, { indent: 12 }).moveDown(0.2);
+      agreementLine(document, `・${line.replace(/^[-*]\s+/, "")}`, { indent: FONT_SIZE });
     } else if (/^\d+\.\s+/.test(line)) {
-      document.fontSize(9.5).text(line, { indent: 8 }).moveDown(0.2);
+      agreementLine(document, line.replace(/^(\d+)\.\s+/, "$1　"), { indent: FONT_SIZE });
     } else if (line.startsWith("|")) {
-      if (!/^\|?[-| :]+\|?$/.test(line)) document.fontSize(8.5).text(line.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).join("　｜　"));
+      if (!/^\|?[-| :]+\|?$/.test(line)) {
+        agreementLine(document, line.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).join("　｜　"));
+      }
     } else {
-      document.fontSize(9.5).text(line, { lineGap: 3 }).moveDown(0.4);
+      agreementLine(document, line, { indent: FONT_SIZE });
     }
   }
 
@@ -94,8 +111,8 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   const titleTop = document.y;
   document.fillColor("#000").strokeColor("#000").lineWidth(0.8);
   document.moveTo(left, titleTop).lineTo(left + pageWidth, titleTop).stroke();
-  document.fontSize(16).text("同意記録", left, titleTop + 11, { width: pageWidth, align: "center" });
-  const tableTop = titleTop + 43;
+  document.fontSize(FONT_SIZE).text("同意記録", left, titleTop + 9, { width: pageWidth, align: "center" });
+  const tableTop = titleTop + 36;
   document.moveTo(left, tableTop).lineTo(left + pageWidth, tableTop).stroke();
   const rows = [
     ["同意者", input.signer.name],
@@ -106,15 +123,15 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     ["書式版", documentVersion(template.version)],
     ["記録ID", input.agreementId],
   ];
-  const labelWidth = 112;
-  const rowHeight = 31;
+  const labelWidth = 105;
+  const rowHeight = 27;
   let rowTop = tableTop;
   for (const [label, value] of rows) {
-    document.fontSize(9.5).fillColor("#000").text(label, left + 9, rowTop + 9, {
+    document.fontSize(FONT_SIZE).fillColor("#000").text(label, left + 8, rowTop + 7, {
       width: labelWidth - 18,
       lineBreak: false,
     });
-    document.text(value, left + labelWidth + 9, rowTop + 9, {
+    document.text(value, left + labelWidth + 8, rowTop + 7, {
       width: pageWidth - labelWidth - 18,
       lineBreak: false,
     });
@@ -124,11 +141,11 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   document.rect(left, tableTop, pageWidth, rows.length * rowHeight).stroke();
   document.moveTo(left + labelWidth, tableTop)
     .lineTo(left + labelWidth, tableTop + rows.length * rowHeight).stroke();
-  document.fontSize(9.5).fillColor("#000").text(
+  document.fontSize(FONT_SIZE).fillColor("#000").text(
     "この記録は、上記の者がSMS認証を経て本文書の全内容を確認し、同意操作を行ったことを、乙がRootLens上で記録したものです。",
     left,
     rowTop + 22,
-    { width: pageWidth, lineGap: 4 },
+    { width: pageWidth, lineGap: LINE_GAP },
   );
 
   document.end();
