@@ -23,6 +23,16 @@ function plainMarkdown(line: string): string {
   return line.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1");
 }
 
+function agreementBody(kind: AgreementKind, body: string, siteName: string): string {
+  const withSiteName = kind === "site_agreement"
+    ? body.replace("［　　　　　　　　　　　　　　］", `［${siteName}］`)
+    : body;
+  if (kind === "site_agreement") return withSiteName.split("\n---\n", 1)[0].trimEnd();
+  return withSiteName
+    .replace(/^- \[ \] /gm, "- ")
+    .replace(/\n\| 項目 \| 記入欄 \|\n\|---\|---\|\n(?:\|.*\|\n){4}/, "\n");
+}
+
 export async function createAgreementPdf(input: AgreementOriginalInput): Promise<Uint8Array> {
   const font = await readFile(join(process.cwd(), "assets/fonts/NotoSansCJKjp-Regular.otf"));
   const template = agreementTemplates[input.kind];
@@ -30,7 +40,6 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     size: "A4",
     margins: { top: 50, right: 54, bottom: 50, left: 54 },
     info: { Title: template.title, Author: "RootLens", CreationDate: input.acceptedAt, ModDate: input.acceptedAt },
-    bufferPages: true,
   });
   document.registerFont("NotoSansJP", font).font("NotoSansJP");
   const chunks: Buffer[] = [];
@@ -40,9 +49,7 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     document.on("error", reject);
   });
 
-  const body = input.kind === "site_agreement"
-    ? template.body.replace("［　　　　　　　　　　　　　　］", `［${input.siteName}］`)
-    : template.body;
+  const body = agreementBody(input.kind, template.body, input.siteName);
   for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
     if (!line || line === "---") { document.moveDown(0.55); continue; }
@@ -62,9 +69,9 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   }
 
   document.addPage();
-  document.fontSize(16).text("電子署名記録").moveDown(1);
+  document.fontSize(16).text("同意記録").moveDown(1);
   const rows = [
-    ["署名者", input.signer.name],
+    ["同意者", input.signer.name],
     ["事業所", input.siteName],
     ["認証方法", "SMSワンタイムパスワード"],
     ["電話番号", `*******${input.signer.phoneLast4}`],
@@ -80,14 +87,6 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   document.fontSize(8).fillColor("#555").moveDown(1)
     .text("この記録は、SMS認証後に表示された文書を確認し、同意操作が行われたことをRootLensが記録したものです。");
 
-  const pages = document.bufferedPageRange();
-  for (let index = 0; index < pages.count; index += 1) {
-    document.switchToPage(index);
-    document.fontSize(7).fillColor("#777").text(`${index + 1} / ${pages.count}`, 0, 806, {
-      align: "center",
-      lineBreak: false,
-    });
-  }
   document.end();
   return completed;
 }
