@@ -1,6 +1,6 @@
 # RootLens Desktop
 
-スマートグラスに残る録画をUSB経由で確認し、現場監督者が承認した録画を事業所のGoogle Driveへ保存します。
+スマートグラスに残る録画をUSB経由で確認し、現場監督者が承認した録画を、RootLensが管理する共有ドライブ内の当該事業所用保存先へ送ります。
 
 現場での操作は[アップロード手順](docs/field-guide.md)、導入は[PCの初回設定](docs/initial-setup.md)、
 権限とDriveの管理は[管理者向け案内](docs/administrator-guide.md)を参照してください。
@@ -29,7 +29,7 @@ macOS KeychainまたはWindows Credential Managerへ保存します。
 ```
 
 Desktopアプリは各ファイルのサイズとSHA-256から`source_manifest_sha256`を作ります。RootLens APIは、
-ログインした利用者の事業所所属を確認し、事業所に接続済みのDriveへ、一つのファイルにだけ使える
+ログインした利用者の現場監督者権限と事業所所属を確認し、RootLens Submit内の当該事業所用保存先へ、一つのファイルにだけ使える
 再開可能アップロードURLを発行します。DesktopアプリはそのURLへファイル本体だけを送ります。
 
 RootLensサーバーは、Drive上の保存先、`site_id`、`unit_id`、`source_manifest_sha256`、各ファイルの

@@ -42,5 +42,10 @@ export async function desktopSites(identityId: string) {
     .from(operatorMemberships)
     .innerJoin(people, eq(people.id, operatorMemberships.personId))
     .innerJoin(sites, eq(sites.id, people.siteId))
-    .where(and(eq(operatorMemberships.identityId, identityId), eq(people.status, "active"), eq(sites.status, "active")));
+    .where(and(
+      eq(operatorMemberships.identityId, identityId),
+      eq(people.role, "supervisor"),
+      eq(people.status, "active"),
+      eq(sites.status, "active"),
+    ));
 }

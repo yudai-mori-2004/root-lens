@@ -8,7 +8,7 @@ v0.1.4は、撮影データの収集、現場での確認、提出、加工、�
 撮影端末
   → 現場確認
   → iPhoneはWeb API経由でR2へ提出
-  → MentraはPCアプリ経由で事業所Driveへ提出
+  → MentraはPCアプリ経由でRootLens Submit内の事業所用保存先へ提出
   → source manifestを検証して加工
   → delivery manifestとともに販売先へ手渡し
 ```
