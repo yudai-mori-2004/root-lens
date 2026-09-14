@@ -22,7 +22,7 @@ export async function createConsentSnapshot(siteId: string) {
     documentVersion: agreementRecords.documentVersion,
     templateSha256: agreementRecords.templateSha256,
     signedPdfSha256: agreementRecords.signedPdfSha256,
-    certificateSha256: agreementRecords.certificateSha256,
+    authenticationMethod: agreementRecords.authenticationMethod,
     signedAt: agreementRecords.signedAt,
   }).from(agreementRecords).where(and(
     eq(agreementRecords.siteId, siteId),
@@ -31,7 +31,7 @@ export async function createConsentSnapshot(siteId: string) {
   const siteAgreements = agreements.filter((item) => item.kind === "site_agreement");
   const staffConsents = agreements.filter((item) => item.kind === "staff_consent");
   if (siteAgreements.length !== 1 || staffConsents.length === 0
-      || agreements.some((item) => !item.signedPdfSha256 || !item.certificateSha256 || !item.signedAt)) {
+      || agreements.some((item) => !item.signedPdfSha256 || !item.signedAt)) {
     throw new Error("Active agreements are incomplete");
   }
   const records = agreements.map((item) => ({
@@ -40,7 +40,7 @@ export async function createConsentSnapshot(siteId: string) {
     document_version: item.documentVersion,
     template_sha256: item.templateSha256,
     signed_pdf_sha256: item.signedPdfSha256,
-    certificate_sha256: item.certificateSha256,
+    authentication_method: item.authenticationMethod,
     signed_at: item.signedAt!.toISOString(),
     status: "active",
   })).sort((a, b) => a.record_id.localeCompare(b.record_id));

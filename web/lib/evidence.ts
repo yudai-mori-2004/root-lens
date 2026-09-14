@@ -1,7 +1,4 @@
-import { createPublicKey, verify } from "node:crypto";
-import { GetPublicKeyCommand, KMSClient, SignCommand } from "@aws-sdk/client-kms";
-import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
-import { base64url, canonicalJson, sha256 } from "./encoding";
+import { canonicalJson, sha256 } from "./encoding";
 
 export type EvidenceFile = Readonly<{ path: string; size: number; sha256: string }>;
 
@@ -11,7 +8,7 @@ type AgreementRecord = Readonly<{
   document_version: string;
   template_sha256: string;
   signed_pdf_sha256: string;
-  certificate_sha256: string;
+  authentication_method: string;
   signed_at: string;
   status: string;
 }>;
@@ -33,13 +30,6 @@ type EvidenceInput<TApproval extends Record<string, unknown>> = Readonly<{
   deliveryFiles: EvidenceFile[];
   privacyProcessingCompletedAt: string;
   providedAt: string;
-}>;
-
-export type EvidenceAttestation = Readonly<{
-  algorithm: "ECDSA_P256_SHA256";
-  key_id: string;
-  payload_sha256: string;
-  signature: string;
 }>;
 
 type EvidenceChronology = Readonly<{
@@ -98,7 +88,7 @@ export function createEvidencePayload<TApproval extends Record<string, unknown>>
     document_version: item.document_version,
     template_sha256: item.template_sha256,
     signed_pdf_sha256: item.signed_pdf_sha256,
-    signature_certificate_sha256: item.certificate_sha256,
+    authentication_method: item.authentication_method,
     signed_at: item.signed_at,
     status_at_approval: item.status,
   });
@@ -139,65 +129,6 @@ export function createEvidencePayload<TApproval extends Record<string, unknown>>
   };
 }
 
-export async function attestEvidencePayload(
-  payload: ReturnType<typeof createEvidencePayload>,
-  client = evidenceKmsClient(),
-): Promise<EvidenceAttestation> {
-  const kmsKeyId = process.env.EVIDENCE_KMS_KEY_ID;
-  const publicKeyId = process.env.EVIDENCE_PUBLIC_KEY_ID;
-  if (!kmsKeyId || !publicKeyId) throw new Error("Evidence signing key is not configured");
-  const payloadSha256 = sha256(canonicalJson(payload));
-  const result = await client.send(new SignCommand({
-    KeyId: kmsKeyId,
-    Message: Buffer.from(payloadSha256, "hex"),
-    MessageType: "DIGEST",
-    SigningAlgorithm: "ECDSA_SHA_256",
-  }));
-  if (!result.Signature?.length) throw new Error("KMS did not return an evidence signature");
-  return {
-    algorithm: "ECDSA_P256_SHA256",
-    key_id: publicKeyId,
-    payload_sha256: payloadSha256,
-    signature: base64url(result.Signature),
-  };
-}
-
-export async function evidencePublicKey(client = evidenceKmsClient()): Promise<string> {
-  const kmsKeyId = process.env.EVIDENCE_KMS_KEY_ID;
-  if (!kmsKeyId) throw new Error("Evidence signing key is not configured");
-  const result = await client.send(new GetPublicKeyCommand({ KeyId: kmsKeyId }));
-  if (!result.PublicKey?.length || result.KeyUsage !== "SIGN_VERIFY" || result.KeySpec !== "ECC_NIST_P256"
-      || !result.SigningAlgorithms?.includes("ECDSA_SHA_256")) {
-    throw new Error("Evidence KMS key is incompatible");
-  }
-  return createPublicKey({ key: Buffer.from(result.PublicKey), format: "der", type: "spki" })
-    .export({ format: "pem", type: "spki" }).toString();
-}
-
-function evidenceKmsClient(): KMSClient {
-  const roleArn = process.env.AWS_ROLE_ARN;
-  return new KMSClient({
-    region: process.env.AWS_REGION,
-    ...(roleArn ? {
-      credentials: awsCredentialsProvider({
-        audience: "sts.amazonaws.com",
-        roleArn,
-      }),
-    } : {}),
-  });
-}
-
-export function verifyEvidenceAttestation(evidence: Record<string, unknown>, publicKeyPem: string): boolean {
-  const attestation = evidence.attestation as Partial<EvidenceAttestation> | undefined;
-  if (!attestation || attestation.algorithm !== "ECDSA_P256_SHA256"
-      || typeof attestation.payload_sha256 !== "string" || typeof attestation.signature !== "string") return false;
-  const payload = { ...evidence };
-  delete payload.attestation;
-  const canonical = canonicalJson(payload);
-  if (sha256(canonical) !== attestation.payload_sha256) return false;
-  try {
-    return verify("sha256", Buffer.from(canonical), publicKeyPem, Buffer.from(attestation.signature, "base64url"));
-  } catch {
-    return false;
-  }
+export function evidencePayloadSha256(evidence: Record<string, unknown>): string {
+  return sha256(canonicalJson(evidence));
 }

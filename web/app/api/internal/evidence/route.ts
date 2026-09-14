@@ -9,7 +9,7 @@ import {
   driveUploadFiles,
 } from "@/db/schema";
 import { canonicalJson, sha256 } from "@/lib/encoding";
-import { attestEvidencePayload, createEvidencePayload, validEvidenceChronology } from "@/lib/evidence";
+import { createEvidencePayload, evidencePayloadSha256, validEvidenceChronology } from "@/lib/evidence";
 import { authenticateInternalRequest } from "@/lib/internal-auth";
 import { APPROVAL_STATEMENT, APPROVAL_STATEMENT_VERSION } from "@/lib/approval-receipt";
 import { webauthnConfig } from "@/lib/approval";
@@ -37,7 +37,7 @@ const agreementSchema = z.object({
   document_version: z.string(),
   template_sha256: hash,
   signed_pdf_sha256: hash,
-  certificate_sha256: hash,
+  authentication_method: z.literal("sms_otp"),
   signed_at: z.string().datetime({ offset: true }),
   status: z.string(),
 });
@@ -208,18 +208,14 @@ export async function POST(request: Request) {
     privacyProcessingCompletedAt: input.privacyProcessingCompletedAt,
     providedAt: input.providedAt,
   });
-  const attestation = await attestEvidencePayload(payload);
-  const evidence = { ...payload, attestation };
+  const evidence = payload;
   await db.insert(evidenceBundles).values({
     id: evidenceId,
     uploadAttemptId: record.attemptId,
     approvalEventId: record.approvalEventId,
     unitId: record.unitId,
     deliveryManifestSha256: payload.delivery.delivery_manifest_sha256,
-    payloadSha256: attestation.payload_sha256,
-    algorithm: attestation.algorithm,
-    keyId: attestation.key_id,
-    signature: attestation.signature,
+    payloadSha256: evidencePayloadSha256(evidence),
     evidence,
     providedAt: new Date(input.providedAt),
     issuedAt,

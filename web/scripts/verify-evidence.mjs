@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createHash, verify as verifySignature } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
@@ -48,7 +48,7 @@ function consentSnapshot(evidence) {
     document_version: value.document_version,
     template_sha256: value.template_sha256,
     signed_pdf_sha256: value.signed_pdf_sha256,
-    certificate_sha256: value.signature_certificate_sha256,
+    authentication_method: value.authentication_method,
     signed_at: value.signed_at,
     status: value.status_at_approval,
   });
@@ -59,34 +59,11 @@ function consentSnapshot(evidence) {
   ].sort((a, b) => a.record_id.localeCompare(b.record_id));
 }
 
-async function publicKeyFor(evidence, suppliedPath) {
-  if (suppliedPath) return readFile(suppliedPath, "utf8");
-  const verificationUrl = new URL(evidence.verification.url);
-  const keyUrl = new URL(`/api/v1/evidence-keys/${encodeURIComponent(evidence.attestation.key_id)}`,
-    verificationUrl.origin);
-  const response = await fetch(keyUrl, { redirect: "error" });
-  assert(response.ok, `検証用公開鍵を取得できませんでした (${response.status})`);
-  const body = await response.json();
-  assert(body.id === evidence.attestation.key_id && body.algorithm === "ECDSA_P256_SHA256"
-    && typeof body.publicKey === "string", "検証用公開鍵の応答が証跡と一致しません");
-  return body.publicKey;
-}
-
-async function verifyEvidence(evidencePath, suppliedPublicKeyPath) {
+async function verifyEvidence(evidencePath) {
   const absoluteEvidencePath = path.resolve(evidencePath);
   const directory = path.dirname(absoluteEvidencePath);
   const evidence = JSON.parse(await readFile(absoluteEvidencePath, "utf8"));
   assert(evidence.schema === "io.rootlens.evidence.v1", "未対応の証跡形式です");
-  assert(evidence.attestation?.algorithm === "ECDSA_P256_SHA256", "未対応の証跡署名です");
-
-  const payload = { ...evidence };
-  delete payload.attestation;
-  const canonicalPayload = canonicalJson(payload);
-  assert(sha256(canonicalPayload) === evidence.attestation.payload_sha256,
-    "証跡payloadのSHA-256が一致しません");
-  const publicKey = await publicKeyFor(evidence, suppliedPublicKeyPath);
-  assert(verifySignature("sha256", Buffer.from(canonicalPayload), publicKey,
-    Buffer.from(evidence.attestation.signature, "base64url")), "RootLensの証跡署名を検証できません");
 
   const deliveryFiles = sortedFiles(evidence.delivery.files);
   assert(new Set(deliveryFiles.map((file) => file.path)).size === deliveryFiles.length,
@@ -150,30 +127,18 @@ async function verifyEvidence(evidencePath, suppliedPublicKeyPath) {
 }
 
 function argumentsFrom(argv) {
-  let target;
-  let publicKey;
-  for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === "--public-key") {
-      publicKey = argv[index + 1];
-      index += 1;
-    } else if (!target) {
-      target = argv[index];
-    } else {
-      throw new Error(`不明な引数です: ${argv[index]}`);
-    }
-  }
-  assert(target, "使い方: npm run verify:evidence -- <納品ディレクトリ|rootlens-evidence.json> [--public-key 公開鍵.pem]");
+  assert(argv.length === 1, "使い方: npm run verify:evidence -- <納品ディレクトリ|rootlens-evidence.json>");
+  const target = argv[0];
   const resolved = path.resolve(target);
   return {
     evidencePath: path.extname(resolved).toLowerCase() === ".json"
       ? resolved : path.join(resolved, "rootlens-evidence.json"),
-    publicKeyPath: publicKey ? path.resolve(publicKey) : undefined,
   };
 }
 
 try {
   const options = argumentsFrom(process.argv.slice(2));
-  const evidence = await verifyEvidence(options.evidencePath, options.publicKeyPath);
+  const evidence = await verifyEvidence(options.evidencePath);
   console.log(`検証完了: ${evidence.evidence_id}`);
   console.log(`撮影単位: ${evidence.source.unit_id}`);
   console.log(`納品ファイル: ${evidence.delivery.files.length}件`);

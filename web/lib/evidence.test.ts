@@ -1,10 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { generateKeyPairSync, sign } from "node:crypto";
+import { describe, expect, it } from "vitest";
 import {
-  attestEvidencePayload, createEvidencePayload, deliveryManifestSha256,
-  validEvidenceChronology, verifyEvidenceAttestation,
+  createEvidencePayload, deliveryManifestSha256, evidencePayloadSha256, validEvidenceChronology,
 } from "./evidence";
-import { canonicalJson, sha256 } from "./encoding";
 
 const agreement = (kind: "site_agreement" | "staff_consent", id: string) => ({
   record_id: id,
@@ -12,7 +9,7 @@ const agreement = (kind: "site_agreement" | "staff_consent", id: string) => ({
   document_version: `${kind}-v1`,
   template_sha256: "1".repeat(64),
   signed_pdf_sha256: "2".repeat(64),
-  certificate_sha256: "3".repeat(64),
+  authentication_method: "sms_otp",
   signed_at: "2026-09-13T00:00:00.000Z",
   status: "active",
 });
@@ -78,42 +75,8 @@ describe("delivery evidence", () => {
     expect(JSON.stringify(value)).not.toContain("email");
   });
 
-  it("signs the canonical payload digest with the non-exportable KMS key", async () => {
-    vi.stubEnv("EVIDENCE_KMS_KEY_ID", "arn:aws:kms:ap-northeast-1:123:key/test");
-    vi.stubEnv("EVIDENCE_PUBLIC_KEY_ID", "rootlens-evidence-2026-01");
-    const send = vi.fn().mockResolvedValue({ Signature: Uint8Array.of(1, 2, 3) });
-    const attestation = await attestEvidencePayload(payload(), { send } as never);
-    expect(attestation).toMatchObject({
-      algorithm: "ECDSA_P256_SHA256",
-      key_id: "rootlens-evidence-2026-01",
-      signature: "AQID",
-    });
-    expect(send).toHaveBeenCalledOnce();
-    vi.unstubAllEnvs();
-  });
-
-  it("verifies the published evidence signature and rejects changed delivery bytes", () => {
-    const keys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-    const value = payload();
-    const canonical = canonicalJson(value);
-    const evidence = {
-      ...value,
-      attestation: {
-        algorithm: "ECDSA_P256_SHA256" as const,
-        key_id: "test",
-        payload_sha256: sha256(canonical),
-        signature: sign("sha256", Buffer.from(canonical), keys.privateKey).toString("base64url"),
-      },
-    };
-    const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
-    expect(verifyEvidenceAttestation(evidence, publicKey)).toBe(true);
-    const changed = {
-      ...evidence,
-      delivery: {
-        ...evidence.delivery,
-        files: evidence.delivery.files.map((file, index) => index === 0 ? { ...file, size: file.size + 1 } : file),
-      },
-    };
-    expect(verifyEvidenceAttestation(changed, publicKey)).toBe(false);
+  it("produces a stable DB comparison hash", () => {
+    expect(evidencePayloadSha256(payload())).toMatch(/^[0-9a-f]{64}$/);
+    expect(evidencePayloadSha256(payload())).toBe(evidencePayloadSha256(payload()));
   });
 });

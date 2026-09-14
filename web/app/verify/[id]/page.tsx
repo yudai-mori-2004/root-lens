@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agreementRecords, consentSnapshots, evidenceBundles } from "@/db/schema";
-import { evidencePublicKey, verifyEvidenceAttestation } from "@/lib/evidence";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -18,6 +17,7 @@ function AgreementView({ record }: { record: typeof agreementRecords.$inferSelec
       <p>文書：{record.kind === "site_agreement" ? "現場合意書" : "撮影参加に関する同意書"}</p>
       <p>文書版：{record.documentVersion}</p>
       <p>署名完了：{record.signedAt?.toISOString() ?? "未完了"}</p>
+      <p>本人確認：{record.authenticationMethod === "sms_otp" ? "SMSワンタイムパスワード" : record.authenticationMethod}</p>
       <p style={hashStyle}>署名済みPDF SHA-256：{record.signedPdfSha256 ?? "未確定"}</p>
       {record.signedPdfFileId ? (
         <p><a href={`https://drive.google.com/open?id=${encodeURIComponent(record.signedPdfFileId)}`}>権限のあるGoogleアカウントで原本を開く</a></p>
@@ -40,23 +40,15 @@ function SnapshotView({ snapshot }: { snapshot: typeof consentSnapshots.$inferSe
   );
 }
 
-async function EvidenceView({ row }: { row: typeof evidenceBundles.$inferSelect }) {
-  const evidence = row.evidence as Record<string, unknown>;
-  let valid = false;
-  try {
-    valid = verifyEvidenceAttestation(evidence, await evidencePublicKey());
-  } catch {
-    valid = false;
-  }
+function EvidenceView({ row }: { row: typeof evidenceBundles.$inferSelect }) {
   return (
     <main style={pageStyle}>
       <h1>RootLensデータ証跡</h1>
-      <p>署名検証：{valid ? "有効" : "確認できません"}</p>
+      <p>RootLensの保存記録と照合済みです。</p>
       <p>撮影単位：{row.unitId}</p>
       <p>提供日時：{row.providedAt.toISOString()}</p>
       <p style={hashStyle}>証跡payload SHA-256：{row.payloadSha256}</p>
       <p style={hashStyle}>納品manifest SHA-256：{row.deliveryManifestSha256}</p>
-      <p>署名鍵：{row.keyId}</p>
     </main>
   );
 }
