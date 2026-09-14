@@ -33,6 +33,26 @@ function agreementBody(kind: AgreementKind, body: string, siteName: string): str
     .replace(/\n\| 項目 \| 記入欄 \|\n\|---\|---\|\n(?:\|.*\|\n){4}/, "\n");
 }
 
+function japaneseDateTime(value: Date): string {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}年${part("month")}月${part("day")}日 ${part("hour")}:${part("minute")}（日本時間）`;
+}
+
+function documentVersion(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return `${value}版`;
+  return `${Number(match[1])}年${Number(match[2])}月${Number(match[3])}日版`;
+}
+
 export async function createAgreementPdf(input: AgreementOriginalInput): Promise<Uint8Array> {
   const font = await readFile(join(process.cwd(), "assets/fonts/NotoSansCJKjp-Regular.otf"));
   const template = agreementTemplates[input.kind];
@@ -73,19 +93,18 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   const rows = [
     ["同意者", input.signer.name],
     ["事業所", input.siteName],
-    ["認証方法", "SMSワンタイムパスワード"],
+    ["認証方法", "SMS認証"],
     ["電話番号", `*******${input.signer.phoneLast4}`],
-    ["同意日時", input.acceptedAt.toISOString()],
-    ["同意文言", input.acceptedStatement],
-    ["文書版", template.version],
-    ["合意記録ID", input.agreementId],
+    ["同意日時", japaneseDateTime(input.acceptedAt)],
+    ["書式版", documentVersion(template.version)],
+    ["記録ID", input.agreementId],
   ];
   for (const [label, value] of rows) {
     document.fontSize(9).fillColor("#555").text(label);
     document.fontSize(10).fillColor("#111").text(value).moveDown(0.65);
   }
   document.fontSize(8).fillColor("#555").moveDown(1)
-    .text("この記録は、SMS認証後に表示された文書を確認し、同意操作が行われたことをRootLensが記録したものです。");
+    .text("この記録は、上記の者がSMS認証を経て本文書の全内容を確認し、同意操作を行ったことをRootLensが記録したものです。");
 
   document.end();
   return completed;
