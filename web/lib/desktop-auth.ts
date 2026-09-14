@@ -24,12 +24,15 @@ export async function authenticateDesktop(request: Request): Promise<DesktopAuth
   }).from(desktopSessions)
     .innerJoin(operatorMemberships, eq(operatorMemberships.identityId, desktopSessions.identityId))
     .innerJoin(people, eq(people.id, operatorMemberships.personId))
+    .innerJoin(sites, eq(sites.id, people.siteId))
     .where(and(
       eq(desktopSessions.tokenSha256, sha256(token)),
       gt(desktopSessions.expiresAt, new Date()),
       isNull(desktopSessions.revokedAt),
       eq(people.siteId, siteId),
+      eq(people.role, "supervisor"),
       eq(people.status, "active"),
+      eq(sites.status, "active"),
     )).limit(1);
   return rows[0] ? { ok: true, ...rows[0] } : { ok: false, response: unauthorized() };
 }
