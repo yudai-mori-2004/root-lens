@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { verifyAuthenticationResponse } from "@simplewebauthn/server";
-import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -12,7 +10,6 @@ import { canonicalJson, sha256 } from "@/lib/encoding";
 import { createEvidencePayload, evidencePayloadSha256, validEvidenceChronology } from "@/lib/evidence";
 import { authenticateInternalRequest } from "@/lib/internal-auth";
 import { APPROVAL_STATEMENT, APPROVAL_STATEMENT_VERSION } from "@/lib/approval-receipt";
-import { webauthnConfig } from "@/lib/approval";
 import { sourceManifestSha256 } from "@/lib/source-manifest";
 import { verifyStoredDriveUpload } from "@/lib/drive-upload";
 import { siteDrive } from "@/lib/site-drive";
@@ -60,17 +57,11 @@ const approvalReceiptSchema = z.object({
     expires_at: z.string().datetime({ offset: true }),
   }),
   signed_payload_sha256: hash,
-  signature_method: z.literal("webauthn"),
-  webauthn: z.object({
-    credential_id: z.string(),
-    credential_public_key: z.string().min(1),
-    credential_counter_before: z.number().int().nonnegative(),
-    credential_counter_after: z.number().int().nonnegative(),
-    rp_id: z.string(),
-    origin: z.string().url(),
-    challenge: z.string(),
-    assertion: z.unknown(),
-    assertion_sha256: hash,
+  signature_method: z.literal("sms_authenticated_clickwrap"),
+  signer: z.object({
+    identity_id: z.string(),
+    person_id: z.string(),
+    authentication_method: z.literal("sms_otp"),
   }),
   approved_at: z.string().datetime({ offset: true }),
 });
@@ -95,9 +86,9 @@ export async function POST(request: Request) {
     approvalSignatureId: approvalSignatures.id,
     approvalReceipt: approvalEvents.receipt,
     approvalPersonId: approvalEvents.personId,
-    approvalCredentialId: approvalEvents.credentialId,
-    approvalSignedPayloadSha256: approvalEvents.signedPayloadSha256,
-    approvalAssertionSha256: approvalEvents.assertionSha256,
+    approvalIdentityId: approvalEvents.identityId,
+    approvalPayloadSha256: approvalEvents.approvalPayloadSha256,
+    approvalAuthenticationMethod: approvalEvents.authenticationMethod,
     approvalApprovedAt: approvalEvents.approvedAt,
     sourceFiles: approvalSignatures.sourceFiles,
     consentSnapshotId: consentSnapshots.id,
@@ -121,7 +112,6 @@ export async function POST(request: Request) {
   const sourceFiles = z.array(sourceFileSchema).safeParse(record.sourceFiles);
   const approvalReceipt = approvalReceiptSchema.safeParse(record.approvalReceipt);
   const signedPayload = approvalReceipt.success ? approvalReceipt.data.signed_payload : null;
-  const webauthn = approvalReceipt.success ? approvalReceipt.data.webauthn : null;
   if (!agreements.success || !sourceFiles.success || !approvalReceipt.success
       || sha256(canonicalJson(agreements.data)) !== record.consentSnapshotSha256
       || approvalReceipt.data.event_id !== record.approvalEventId
@@ -134,36 +124,13 @@ export async function POST(request: Request) {
       || sourceManifestSha256(record.unitId, sourceFiles.data) !== record.sourceManifestSha256
       || signedPayload!.consent_snapshot_id !== record.consentSnapshotId
       || signedPayload!.consent_snapshot_sha256 !== record.consentSnapshotSha256
-      || approvalReceipt.data.signed_payload_sha256 !== record.approvalSignedPayloadSha256
+      || approvalReceipt.data.signed_payload_sha256 !== record.approvalPayloadSha256
       || sha256(canonicalJson(signedPayload)) !== approvalReceipt.data.signed_payload_sha256
-      || webauthn!.credential_id !== record.approvalCredentialId
-      || webauthn!.challenge !== Buffer.from(approvalReceipt.data.signed_payload_sha256, "hex").toString("base64url")
-      || sha256(canonicalJson(webauthn!.assertion)) !== webauthn!.assertion_sha256
-      || webauthn!.assertion_sha256 !== record.approvalAssertionSha256
+      || approvalReceipt.data.signer.identity_id !== record.approvalIdentityId
+      || approvalReceipt.data.signer.person_id !== record.approvalPersonId
+      || approvalReceipt.data.signer.authentication_method !== record.approvalAuthenticationMethod
       || approvalReceipt.data.approved_at !== record.approvalApprovedAt.toISOString()) {
     return Response.json({ error: "stored approval evidence is inconsistent" }, { status: 409 });
-  }
-
-  try {
-    const { origin, rpID } = webauthnConfig();
-    if (webauthn!.origin !== origin || webauthn!.rp_id !== rpID) throw new Error("WebAuthn scope changed");
-    const verified = await verifyAuthenticationResponse({
-      response: webauthn!.assertion as AuthenticationResponseJSON,
-      expectedChallenge: webauthn!.challenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
-      requireUserVerification: true,
-      credential: {
-        id: webauthn!.credential_id,
-        publicKey: Buffer.from(webauthn!.credential_public_key, "base64url"),
-        counter: webauthn!.credential_counter_before,
-      },
-    });
-    if (!verified.verified || verified.authenticationInfo.newCounter !== webauthn!.credential_counter_after) {
-      throw new Error("WebAuthn assertion differs from its receipt");
-    }
-  } catch {
-    return Response.json({ error: "stored approval signature is invalid" }, { status: 409 });
   }
 
   try {

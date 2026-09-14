@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  approvalChallengeSha256, approvalWebAuthnChallenge, createApprovalChallenge, createApprovalReceipt,
+  approvalChallengeSha256, createApprovalChallenge, createApprovalReceipt,
 } from "./approval-receipt";
 
 const challengeInput = {
@@ -20,19 +20,14 @@ function receipt(input = challengeInput) {
   return createApprovalReceipt({
     eventId: "apv_test",
     signedPayload: createApprovalChallenge(input),
-    credentialId: "credential_test",
-    credentialPublicKey: "public-key",
-    credentialCounterBefore: 3,
-    credentialCounterAfter: 4,
-    rpId: "rootlens.io",
-    origin: "https://www.rootlens.io",
-    assertion: { id: "assertion" },
+    identityId: "identity_test",
+    personId: "person_test",
     approvedAt: new Date("2026-09-14T00:01:00.000Z"),
   });
 }
 
 describe("approval receipt", () => {
-  it("binds the approver, statement, raw manifest, consent snapshot and WebAuthn operation", () => {
+  it("binds the SMS-authenticated approver, statement, raw manifest and consent snapshot", () => {
     const value = receipt();
     expect(value).toMatchObject({
       signed_payload: {
@@ -42,20 +37,17 @@ describe("approval receipt", () => {
         source_manifest_sha256: challengeInput.sourceManifestSha256,
         consent_snapshot_sha256: challengeInput.consentSnapshotSha256,
       },
-      signature_method: "webauthn",
-      webauthn: {
-        credential_counter_before: 3,
-        credential_counter_after: 4,
-        rp_id: "rootlens.io",
-        origin: "https://www.rootlens.io",
-        assertion: { id: "assertion" },
+      signature_method: "sms_authenticated_clickwrap",
+      signer: {
+        identity_id: "identity_test",
+        person_id: "person_test",
+        authentication_method: "sms_otp",
       },
     });
     expect(value.signed_payload.statement_version).toBe("lot-approval-ja-1");
-    expect(value.webauthn.challenge).toBe(approvalWebAuthnChallenge(value.signed_payload));
   });
 
-  it("derives the WebAuthn challenge from the exact source and consent set", () => {
+  it("derives the approval payload hash from the exact source and consent set", () => {
     const payload = createApprovalChallenge(challengeInput);
     expect(receipt().signed_payload_sha256).toBe(approvalChallengeSha256(payload));
     expect(approvalChallengeSha256(createApprovalChallenge({

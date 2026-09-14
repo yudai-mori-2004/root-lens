@@ -163,6 +163,7 @@ export const people = pgTable("people", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull().references(() => organizations.id),
   siteId: text("site_id").notNull().references(() => sites.id),
+  name: text("name").notNull(),
   role: text("role").notNull(),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -198,11 +199,11 @@ export const agreementRecords = pgTable("agreement_records", {
 export const operatorInvites = pgTable("operator_invites", {
   id: text("id").primaryKey(),
   personId: text("person_id").notNull().references(() => people.id),
-  emailSha256: text("email_sha256").notNull(),
+  tokenSha256: text("token_sha256").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index("operator_invites_email_idx").on(table.emailSha256)]);
+}, (table) => [index("operator_invites_person_idx").on(table.personId)]);
 
 export const operatorIdentities = pgTable("operator_identities", {
   id: text("id").primaryKey(),
@@ -274,25 +275,6 @@ export const driveUploadFiles = pgTable("drive_upload_files", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("drive_upload_file_path_idx").on(table.attemptId, table.path)]);
 
-export const passkeyCredentials = pgTable("passkey_credentials", {
-  id: text("id").primaryKey(),
-  personId: text("person_id").notNull().references(() => people.id),
-  publicKey: text("public_key").notNull(),
-  counter: bigint("counter", { mode: "number" }).notNull().default(0),
-  transports: jsonb("transports").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index("passkey_person_idx").on(table.personId)]);
-
-export const passkeyRegistrations = pgTable("passkey_registrations", {
-  id: text("id").primaryKey(),
-  tokenSha256: text("token_sha256").notNull().unique(),
-  personId: text("person_id").notNull().references(() => people.id),
-  challenge: text("challenge"),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  completed: boolean("completed").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const consentSnapshots = pgTable("consent_snapshots", {
   id: text("id").primaryKey(),
   siteId: text("site_id").notNull().references(() => sites.id),
@@ -311,7 +293,6 @@ export const approvalSignatures = pgTable("approval_signatures", {
   sourceFiles: jsonb("source_files").notNull(),
   consentSnapshotId: text("consent_snapshot_id").notNull().references(() => consentSnapshots.id),
   statementVersion: text("statement_version").notNull(),
-  challenge: text("challenge"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   completed: boolean("completed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -324,9 +305,9 @@ export const approvalEvents = pgTable("approval_events", {
   unitId: text("unit_id").notNull(),
   sourceManifestSha256: text("source_manifest_sha256").notNull(),
   personId: text("person_id").notNull().references(() => people.id),
-  credentialId: text("credential_id").notNull().references(() => passkeyCredentials.id),
-  signedPayloadSha256: text("signed_payload_sha256").notNull(),
-  assertionSha256: text("assertion_sha256").notNull(),
+  identityId: text("identity_id").notNull().references(() => operatorIdentities.id),
+  approvalPayloadSha256: text("approval_payload_sha256").notNull(),
+  authenticationMethod: text("authentication_method").notNull(),
   receipt: jsonb("receipt").notNull(),
   approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("approval_event_site_unit_idx").on(table.siteId, table.unitId)]);

@@ -40,7 +40,10 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     document.on("error", reject);
   });
 
-  for (const rawLine of template.body.split("\n")) {
+  const body = input.kind === "site_agreement"
+    ? template.body.replace("［　　　　　　　　　　　　　　］", `［${input.siteName}］`)
+    : template.body;
+  for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
     if (!line || line === "---") { document.moveDown(0.55); continue; }
     if (line.startsWith("# ")) {

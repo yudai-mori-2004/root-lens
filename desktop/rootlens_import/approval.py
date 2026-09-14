@@ -1,4 +1,4 @@
-"""Bind an explicit passkey approval to the recording selected in Desktop."""
+"""Bind an explicit SMS-authenticated approval to the recording selected in Desktop."""
 
 from pathlib import Path
 import threading

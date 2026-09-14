@@ -3,7 +3,6 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 
 function canonicalJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -83,10 +82,10 @@ async function verifyEvidence(evidencePath) {
   assert(sha256(canonicalJson(receipt)) === approval.receipt_sha256, "承認receiptが変更されています");
   assert(sha256(canonicalJson(approval.signed_payload)) === approval.signed_payload_sha256,
     "承認payloadが変更されています");
-  assert(Buffer.from(approval.signed_payload_sha256, "hex").toString("base64url")
-    === approval.webauthn.challenge, "承認payloadとWebAuthn challengeが一致しません");
-  assert(sha256(canonicalJson(approval.webauthn.assertion)) === approval.webauthn.assertion_sha256,
-    "WebAuthn assertionが変更されています");
+  assert(approval.signature_method === "sms_authenticated_clickwrap"
+    && approval.signer.authentication_method === "sms_otp"
+    && approval.signer.person_id === approval.signed_payload.person_id,
+  "SMS認証済みの承認者と承認対象が一致しません");
 
   const sourceFiles = approval.signed_payload.source_files;
   assert(approval.signed_payload.unit_id === evidence.source.unit_id
@@ -108,21 +107,6 @@ async function verifyEvidence(evidencePath) {
       === approval.signed_payload.consent_snapshot_id,
   "同意スナップショットと承認対象が一致しません");
 
-  const webauthn = await verifyAuthenticationResponse({
-    response: approval.webauthn.assertion,
-    expectedChallenge: approval.webauthn.challenge,
-    expectedOrigin: approval.webauthn.origin,
-    expectedRPID: approval.webauthn.rp_id,
-    requireUserVerification: true,
-    credential: {
-      id: approval.webauthn.credential_id,
-      publicKey: Buffer.from(approval.webauthn.credential_public_key, "base64url"),
-      counter: approval.webauthn.credential_counter_before,
-    },
-  });
-  assert(webauthn.verified
-    && webauthn.authenticationInfo.newCounter === approval.webauthn.credential_counter_after,
-  "現場監督者のパスキー署名を検証できません");
   return evidence;
 }
 

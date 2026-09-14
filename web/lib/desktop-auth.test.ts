@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeChallenge, emailSha256, validateCodeChallenge, validateLoopbackRedirect } from "./desktop-auth-values";
+import { codeChallenge, validateCodeChallenge, validateLoopbackRedirect } from "./desktop-auth-values";
 
 describe("desktop login boundaries", () => {
   it("binds the authorization code to the desktop PKCE verifier", () => {
@@ -17,10 +17,5 @@ describe("desktop login boundaries", () => {
       "http://127.0.0.1:43119/other",
       "http://127.0.0.1:43119/callback?code=stolen",
     ]) expect(() => validateLoopbackRedirect(value)).toThrow();
-  });
-
-  it("matches an invited email without storing its spelling", () => {
-    expect(emailSha256(" Supervisor@Example.com ")).toBe(emailSha256("supervisor@example.com"));
-    expect(emailSha256("supervisor@example.com")).toMatch(/^[0-9a-f]{64}$/);
   });
 });

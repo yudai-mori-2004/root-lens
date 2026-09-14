@@ -1,5 +1,5 @@
 import { GoogleAuth } from "google-auth-library";
-import type { GoogleAccountSession } from "./google-oauth";
+import type { GoogleAccountSession } from "./google-drive";
 
 let auth: GoogleAuth | undefined;
 

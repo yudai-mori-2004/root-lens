@@ -4,17 +4,6 @@ import { db } from "@/db/client";
 import { agreementRecords, consentSnapshots } from "@/db/schema";
 import { canonicalJson, sha256 } from "./encoding";
 
-export function webauthnConfig() {
-  const origin = process.env.WEBAUTHN_ORIGIN || "https://www.rootlens.io";
-  const rpID = process.env.WEBAUTHN_RP_ID || "rootlens.io";
-  const parsed = new URL(origin);
-  const validProduction = parsed.protocol === "https:" && (parsed.hostname === rpID || parsed.hostname.endsWith(`.${rpID}`));
-  const validDevelopment = process.env.NODE_ENV !== "production" && parsed.protocol === "http:"
-    && ["localhost", "127.0.0.1"].includes(parsed.hostname) && rpID === parsed.hostname;
-  if (!validProduction && !validDevelopment) throw new Error("Invalid WebAuthn origin or RP ID");
-  return { origin, rpID };
-}
-
 export async function createConsentSnapshot(siteId: string) {
   const agreements = await db.select({
     id: agreementRecords.id,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sha256 } from "./encoding";
-import type { GoogleAccountSession } from "./google-oauth";
+export type GoogleAccountSession = Readonly<{ accessToken: string }>;
 
 const API = "https://www.googleapis.com/drive/v3";
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
@@ -16,6 +16,8 @@ type DriveFile = {
   size?: string;
   sha256Checksum?: string;
 };
+
+type SharedDrive = { id: string; name: string };
 
 export class GoogleDriveClient {
   constructor(
@@ -60,6 +62,31 @@ export class GoogleDriveClient {
       throw new Error("Drive returned no file id");
     }
     return value.ids[0];
+  }
+
+  async sharedDriveNamed(name: string): Promise<SharedDrive> {
+    const query = new URLSearchParams({ q: `name = '${name.replaceAll("'", "\\'")}'`, pageSize: "10" });
+    const value = await this.send(`${API}/drives?${query}`).then((response) => response.json()) as { drives?: SharedDrive[] };
+    const matches = (value.drives ?? []).filter((drive) => drive.name === name);
+    if (matches.length !== 1) throw new Error(`Expected exactly one shared drive named ${name}`);
+    return matches[0];
+  }
+
+  async folderNamed(name: string, parentId: string, driveId: string): Promise<DriveFile> {
+    const escapedName = name.replaceAll("'", "\\'");
+    const query = new URLSearchParams({
+      q: `'${parentId}' in parents and name = '${escapedName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      corpora: "drive",
+      driveId,
+      includeItemsFromAllDrives: "true",
+      supportsAllDrives: "true",
+      pageSize: "10",
+      fields: "files(id,name,mimeType,parents,driveId,trashed,appProperties)",
+    });
+    const value = await this.send(`${API}/files?${query}`).then((response) => response.json()) as { files?: DriveFile[] };
+    const matches = (value.files ?? []).filter((file) => file.name === name && file.parents?.[0] === parentId);
+    if (matches.length !== 1) throw new Error(`Expected exactly one folder named ${name}`);
+    return matches[0];
   }
 
   async createFolder(input: {

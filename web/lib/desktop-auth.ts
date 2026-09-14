@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { desktopSessions, operatorMemberships, people, sites } from "@/db/schema";
 import { sha256 } from "./encoding";
@@ -30,7 +30,7 @@ export async function authenticateDesktop(request: Request): Promise<DesktopAuth
       gt(desktopSessions.expiresAt, new Date()),
       isNull(desktopSessions.revokedAt),
       eq(people.siteId, siteId),
-      eq(people.role, "supervisor"),
+      sql`${people.role} IN ('admin', 'supervisor')`,
       eq(people.status, "active"),
       eq(sites.status, "active"),
     )).limit(1);
@@ -44,7 +44,7 @@ export async function desktopSites(identityId: string) {
     .innerJoin(sites, eq(sites.id, people.siteId))
     .where(and(
       eq(operatorMemberships.identityId, identityId),
-      eq(people.role, "supervisor"),
+      sql`${people.role} IN ('admin', 'supervisor')`,
       eq(people.status, "active"),
       eq(sites.status, "active"),
     ));

@@ -300,10 +300,10 @@ class ImportWindow(QMainWindow):
         layout.setSpacing(16)
         current = QLabel(f"現在の事業所：{self.profile.site_name if self.profile else '未設定'}")
         layout.addWidget(current)
-        explanation = QLabel("招待されたGoogleアカウントでログインしてください。ブラウザで認証した後、このアプリへ戻ります。")
+        explanation = QLabel("ブラウザでSMSログインした後、このアプリへ戻ります。")
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
-        login = QPushButton("Googleでログイン")
+        login = QPushButton("SMSでログイン")
         login.clicked.connect(lambda: (dialog.accept(), self.start_login()))
         layout.addWidget(login)
         if self.profile:
@@ -318,7 +318,7 @@ class ImportWindow(QMainWindow):
         self.busy = True
         self.job_kind = "login"
         self.cancel_event.clear()
-        self.status_label.setText("ブラウザでGoogleアカウントへログインしてください…")
+        self.status_label.setText("ブラウザでRootLensへログインしてください…")
         self.progress.setVisible(True)
         self._update_controls()
 
@@ -365,7 +365,7 @@ class ImportWindow(QMainWindow):
             self.all_records = []
             self.refresh_recordings(rescan=False)
             self.site_label.setText("事業所：未設定")
-            self.status_label.setText("ログアウトしました。「設定」からGoogleアカウントへログインしてください。")
+            self.status_label.setText("ログアウトしました。「設定」からRootLensへログインしてください。")
         except ImportFailure as error:
             self.status_label.setText(str(error))
         self._update_controls()

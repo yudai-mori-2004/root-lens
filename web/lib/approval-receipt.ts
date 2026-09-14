@@ -1,4 +1,4 @@
-import { base64url, canonicalJson, sha256 } from "./encoding";
+import { canonicalJson, sha256 } from "./encoding";
 
 export const APPROVAL_STATEMENT = "この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。";
 export const APPROVAL_STATEMENT_VERSION = "lot-approval-ja-1";
@@ -19,13 +19,8 @@ type ApprovalChallengeInput = {
 type ApprovalReceiptInput = {
   eventId: string;
   signedPayload: ReturnType<typeof createApprovalChallenge>;
-  credentialId: string;
-  credentialPublicKey: string;
-  credentialCounterBefore: number;
-  credentialCounterAfter: number;
-  rpId: string;
-  origin: string;
-  assertion: unknown;
+  identityId: string;
+  personId: string;
   approvedAt: Date;
 };
 
@@ -51,10 +46,6 @@ export function approvalChallengeSha256(payload: ReturnType<typeof createApprova
   return sha256(canonicalJson(payload));
 }
 
-export function approvalWebAuthnChallenge(payload: ReturnType<typeof createApprovalChallenge>): string {
-  return base64url(Buffer.from(approvalChallengeSha256(payload), "hex"));
-}
-
 export function createApprovalReceipt(input: ApprovalReceiptInput) {
   const signedPayloadSha256 = approvalChallengeSha256(input.signedPayload);
   return {
@@ -62,17 +53,11 @@ export function createApprovalReceipt(input: ApprovalReceiptInput) {
     event_id: input.eventId,
     signed_payload: input.signedPayload,
     signed_payload_sha256: signedPayloadSha256,
-    signature_method: "webauthn",
-    webauthn: {
-      credential_id: input.credentialId,
-      credential_public_key: input.credentialPublicKey,
-      credential_counter_before: input.credentialCounterBefore,
-      credential_counter_after: input.credentialCounterAfter,
-      rp_id: input.rpId,
-      origin: input.origin,
-      challenge: base64url(Buffer.from(signedPayloadSha256, "hex")),
-      assertion: input.assertion,
-      assertion_sha256: sha256(canonicalJson(input.assertion)),
+    signature_method: "sms_authenticated_clickwrap",
+    signer: {
+      identity_id: input.identityId,
+      person_id: input.personId,
+      authentication_method: "sms_otp",
     },
     approved_at: input.approvedAt.toISOString(),
   };

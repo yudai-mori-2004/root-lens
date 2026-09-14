@@ -67,7 +67,7 @@ def _response_json(response):
 def _sites(value):
     rows = value.get("sites")
     if not isinstance(rows, list) or not rows:
-        raise ImportFailure("このGoogleアカウントに利用可能な事業所がありません。管理者に招待を確認してください。")
+        raise ImportFailure("このアカウントに利用可能な事業所がありません。管理画面を確認してください。")
     result = []
     for row in rows:
         if (not isinstance(row, dict) or not isinstance(row.get("id"), str)
@@ -156,7 +156,7 @@ class RootLensAccount:
             })
             authorization_url = value.get("authorizationUrl")
             if status != 201 or not isinstance(authorization_url, str):
-                raise ImportFailure("Googleログインを開始できませんでした。しばらくしてからやり直してください。")
+                raise ImportFailure("ログインを開始できませんでした。しばらくしてからやり直してください。")
             if not open_browser(authorization_url):
                 raise ImportFailure("ブラウザを開けませんでした。既定のブラウザを確認してください。")
             while server.callback_result is None:
@@ -164,13 +164,13 @@ class RootLensAccount:
                 server.handle_request()
             callback = server.callback_result
             if callback["state"] != client_state or not callback["code"]:
-                raise ImportFailure("Googleログインの応答を確認できませんでした。最初からやり直してください。")
+                raise ImportFailure("ログインの応答を確認できませんでした。最初からやり直してください。")
             status, value = self._request("POST", "/api/v1/desktop-auth/token", json_body={
                 "code": callback["code"], "codeVerifier": verifier,
             })
             token = value.get("sessionToken")
             if status != 200 or not isinstance(token, str) or len(token) < 32:
-                raise ImportFailure("Googleログインを完了できませんでした。招待されたアカウントを選んでください。")
+                raise ImportFailure("ログインを完了できませんでした。ブラウザからやり直してください。")
             sites = _sites(value)
             self.store.save(token)
             return {"token": token, "sites": sites}
@@ -188,7 +188,7 @@ class RootLensAccount:
     def gateway(self, profile):
         token = self.store.load()
         if not token:
-            raise ImportFailure("Googleアカウントへログインしてください。")
+            raise ImportFailure("RootLensへログインしてください。")
         return RootLensGateway(self, token, profile.site_id)
 
 

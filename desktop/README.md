@@ -12,7 +12,7 @@
 3. 映像と音声を確認し、提供を認める録画をアップロードする。
 4. RootLensサーバーがDrive上の4ファイルを照合した後、端末上の録画を削除する。
 
-Googleログインは、利用者本人と所属事業所を確認するために使います。DesktopアプリはGoogle Driveの
+SMSログインは、利用者本人と所属事業所を確認するために使います。DesktopアプリはGoogle Driveの
 認証情報やフォルダIDを保持しません。ログイン後に発行されたRootLensセッションだけを
 macOS KeychainまたはWindows Credential Managerへ保存します。
 
@@ -40,7 +40,7 @@ RootLensサーバーは、Drive上の保存先、`site_id`、`unit_id`、`source
 
 | モジュール | 責務 |
 | --- | --- |
-| `rootlens_import/account.py` | ブラウザでのGoogleログイン、RootLensセッション、事業所API |
+| `rootlens_import/account.py` | ブラウザでのSMSログイン、RootLensセッション、事業所API |
 | `rootlens_import/site.py` | ログイン後に選択した事業所のローカル保存 |
 | `rootlens_import/core.py` | USB接続、4ファイルの取り込みと照合、中断処理 |
 | `rootlens_import/device_sync.py` | 端末を起点としたDrive照合、取り込み、削除の連携 |
