@@ -89,7 +89,14 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   }
 
   document.addPage();
-  document.fontSize(16).text("同意記録").moveDown(1);
+  const pageWidth = document.page.width - document.page.margins.left - document.page.margins.right;
+  const left = document.page.margins.left;
+  const titleTop = document.y;
+  document.fillColor("#000").strokeColor("#000").lineWidth(0.8);
+  document.moveTo(left, titleTop).lineTo(left + pageWidth, titleTop).stroke();
+  document.fontSize(16).text("同意記録", left, titleTop + 11, { width: pageWidth, align: "center" });
+  const tableTop = titleTop + 43;
+  document.moveTo(left, tableTop).lineTo(left + pageWidth, tableTop).stroke();
   const rows = [
     ["同意者", input.signer.name],
     ["事業所", input.siteName],
@@ -99,12 +106,30 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     ["書式版", documentVersion(template.version)],
     ["記録ID", input.agreementId],
   ];
+  const labelWidth = 112;
+  const rowHeight = 31;
+  let rowTop = tableTop;
   for (const [label, value] of rows) {
-    document.fontSize(9).fillColor("#555").text(label);
-    document.fontSize(10).fillColor("#111").text(value).moveDown(0.65);
+    document.fontSize(9.5).fillColor("#000").text(label, left + 9, rowTop + 9, {
+      width: labelWidth - 18,
+      lineBreak: false,
+    });
+    document.text(value, left + labelWidth + 9, rowTop + 9, {
+      width: pageWidth - labelWidth - 18,
+      lineBreak: false,
+    });
+    rowTop += rowHeight;
+    document.moveTo(left, rowTop).lineTo(left + pageWidth, rowTop).stroke();
   }
-  document.fontSize(8).fillColor("#555").moveDown(1)
-    .text("この記録は、上記の者がSMS認証を経て本文書の全内容を確認し、同意操作を行ったことをRootLensが記録したものです。");
+  document.rect(left, tableTop, pageWidth, rows.length * rowHeight).stroke();
+  document.moveTo(left + labelWidth, tableTop)
+    .lineTo(left + labelWidth, tableTop + rows.length * rowHeight).stroke();
+  document.fontSize(9.5).fillColor("#000").text(
+    "この記録は、上記の者がSMS認証を経て本文書の全内容を確認し、同意操作を行ったことを、乙がRootLens上で記録したものです。",
+    left,
+    rowTop + 22,
+    { width: pageWidth, lineGap: 4 },
+  );
 
   document.end();
   return completed;
