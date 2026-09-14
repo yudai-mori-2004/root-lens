@@ -12,13 +12,13 @@ const hashStyle = { overflowWrap: "anywhere" as const, fontFamily: "ui-monospace
 function AgreementView({ record }: { record: typeof agreementRecords.$inferSelect }) {
   return (
     <main style={pageStyle}>
-      <h1>署名記録</h1>
+      <h1>同意記録</h1>
       <p>状態：{record.status}</p>
       <p>文書：{record.kind === "site_agreement" ? "現場合意書" : "撮影参加に関する同意書"}</p>
       <p>文書版：{record.documentVersion}</p>
-      <p>署名完了：{record.signedAt?.toISOString() ?? "未完了"}</p>
+      <p>同意日時：{record.signedAt?.toISOString() ?? "未完了"}</p>
       <p>本人確認：{record.authenticationMethod === "sms_otp" ? "SMSワンタイムパスワード" : record.authenticationMethod}</p>
-      <p style={hashStyle}>署名済みPDF SHA-256：{record.signedPdfSha256 ?? "未確定"}</p>
+      <p style={hashStyle}>同意記録PDF SHA-256：{record.signedPdfSha256 ?? "未確定"}</p>
       {record.signedPdfFileId ? (
         <p><a href={`https://drive.google.com/open?id=${encodeURIComponent(record.signedPdfFileId)}`}>権限のあるGoogleアカウントで原本を開く</a></p>
       ) : null}
