@@ -83,7 +83,10 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   const pages = document.bufferedPageRange();
   for (let index = 0; index < pages.count; index += 1) {
     document.switchToPage(index);
-    document.fontSize(7).fillColor("#777").text(`${index + 1} / ${pages.count}`, 0, 806, { align: "center" });
+    document.fontSize(7).fillColor("#777").text(`${index + 1} / ${pages.count}`, 0, 806, {
+      align: "center",
+      lineBreak: false,
+    });
   }
   document.end();
   return completed;

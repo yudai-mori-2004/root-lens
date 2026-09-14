@@ -4,7 +4,7 @@ import {
 import { sql } from "drizzle-orm";
 
 // v0.1.4の撮影APIは clips / upload_units / consent_events / accounts を使う。
-// 現場の署名・承認フローは organizations 以下のテーブルで、RootLens共有ドライブにある原本と
+// 現場の同意・承認フローは sites 以下のテーブルで、RootLens共有ドライブにある原本と
 // RootLensが保持する索引、Desktopの所属、撮影ロットの承認、納品証跡を結び付ける。
 // 銀行口座や署名済み文書の本体はこのDBに保存しない。
 
@@ -140,15 +140,8 @@ export const consentEvents = pgTable(
 export type ConsentEvent = typeof consentEvents.$inferSelect;
 export type NewConsentEvent = typeof consentEvents.$inferInsert;
 
-export const organizations = pgTable("organizations", {
-  id: text("id").primaryKey(),
-  status: text("status").notNull().default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const sites = pgTable("sites", {
   id: text("id").primaryKey(),
-  organizationId: text("organization_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   sharedDriveId: text("shared_drive_id").notNull(),
   rootFolderId: text("root_folder_id").notNull(),
@@ -161,7 +154,6 @@ export const sites = pgTable("sites", {
 
 export const people = pgTable("people", {
   id: text("id").primaryKey(),
-  organizationId: text("organization_id").notNull().references(() => organizations.id),
   siteId: text("site_id").notNull().references(() => sites.id),
   name: text("name").notNull(),
   role: text("role").notNull(),

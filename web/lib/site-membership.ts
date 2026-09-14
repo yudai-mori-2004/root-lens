@@ -9,7 +9,6 @@ export async function siteOperator(identityId: string, siteId: string) {
     personId: people.id,
     role: people.role,
     siteName: sites.name,
-    organizationId: sites.organizationId,
   }).from(operatorMemberships)
     .innerJoin(people, eq(people.id, operatorMemberships.personId))
     .innerJoin(sites, eq(sites.id, people.siteId))

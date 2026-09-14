@@ -18,6 +18,7 @@ describe("agreement original", () => {
     });
     expect(Buffer.from(pdf.subarray(0, 5)).toString("ascii")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(10_000);
+    expect(Buffer.from(pdf).toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(3);
     expect(sha256(pdf)).toMatch(/^[0-9a-f]{64}$/);
     expect(agreementTemplates.staff_consent.sha256).toMatch(/^[0-9a-f]{64}$/);
     if (process.env.WRITE_AGREEMENT_SAMPLE) {

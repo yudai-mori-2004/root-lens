@@ -22,7 +22,6 @@ export async function POST(request: Request, context: { params: Promise<{ siteId
   await db.transaction(async (transaction) => {
     await transaction.insert(people).values({
       id: personId,
-      organizationId: operator.organizationId,
       siteId,
       name: parsed.data.name,
       role: "staff",

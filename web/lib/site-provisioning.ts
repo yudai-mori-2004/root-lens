@@ -6,7 +6,6 @@ const SHARED_DRIVE_NAME = "RootLens Submit";
 const COLLECTION_FOLDER_NAME = "現場データ収集";
 
 export type ProvisionedSite = Readonly<{
-  organizationId: string;
   siteId: string;
   sharedDriveId: string;
   rootFolderId: string;
@@ -21,7 +20,6 @@ export async function provisionSiteDrive(siteName: string): Promise<ProvisionedS
   const sharedDrive = await drive.sharedDriveNamed(SHARED_DRIVE_NAME);
   const collection = await drive.folderNamed(COLLECTION_FOLDER_NAME, sharedDrive.id, sharedDrive.id);
   const siteId = `site_${randomUUID()}`;
-  const organizationId = `org_${randomUUID()}`;
   const rootFolderId = await drive.generateId();
   await drive.createFolder({
     id: rootFolderId,
@@ -40,7 +38,6 @@ export async function provisionSiteDrive(siteName: string): Promise<ProvisionedS
     return id;
   };
   return {
-    organizationId,
     siteId,
     sharedDriveId: sharedDrive.id,
     rootFolderId,

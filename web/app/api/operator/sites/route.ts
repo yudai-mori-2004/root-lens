@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { agreementRecords, operatorMemberships, organizations, people, sites } from "@/db/schema";
+import { agreementRecords, operatorMemberships, people, sites } from "@/db/schema";
 import { storeAgreementOriginal } from "@/lib/agreement-service";
 import { operatorPhoneLast4 } from "@/lib/operator-identity";
 import { authenticateOperator } from "@/lib/operator-browser";
@@ -56,10 +56,8 @@ export async function POST(request: Request) {
       signerName: parsed.data.signerName, phoneLast4, acceptedAt,
     });
     await db.transaction(async (transaction) => {
-      await transaction.insert(organizations).values({ id: provisioned.organizationId });
       await transaction.insert(sites).values({
         id: provisioned.siteId,
-        organizationId: provisioned.organizationId,
         name: parsed.data.siteName,
         sharedDriveId: provisioned.sharedDriveId,
         rootFolderId: provisioned.rootFolderId,
@@ -68,7 +66,7 @@ export async function POST(request: Request) {
         approvedDataFolderId: provisioned.approvedDataFolderId,
       });
       await transaction.insert(people).values({
-        id: personId, organizationId: provisioned.organizationId, siteId: provisioned.siteId,
+        id: personId, siteId: provisioned.siteId,
         name: parsed.data.signerName, role: "supervisor",
       });
       await transaction.insert(operatorMemberships).values({ identityId, personId });
