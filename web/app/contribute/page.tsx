@@ -8,7 +8,7 @@ import { publicLocale, publicPages } from "../../content/publicPages";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = publicLocale(await getLocale());
   const copy = publicPages[locale].contribute;
-  return { title: copy.title, description: copy.lead };
+  return { title: copy.title, description: copy.lead, alternates: { canonical: "/contribute" } };
 }
 
 export default async function ContributePage() {

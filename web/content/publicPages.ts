@@ -7,6 +7,8 @@ export function publicLocale(locale: string): PublicLocale {
 export const publicPages = {
   ja: {
     home: {
+      metaTitle: "RootLens｜フィジカルAI・ロボティクス向け現場作業データ",
+      metaDescription: "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。",
       title: ["現場の手作業を撮影し、", "ロボット開発に活かし、", "現場に収益を還す。"],
       intro: [
         "RootLensは、日本を拠点に、あらゆる業種の現場とフィジカルAI業界をつなぐプロジェクトです。",
@@ -172,6 +174,8 @@ export const publicPages = {
   },
   en: {
     home: {
+      metaTitle: "RootLens | Workplace data for physical AI and robotics",
+      metaDescription: "RootLens records hands-on work from a first-person perspective in Japanese workplaces, then delivers the data for physical AI and robotics research after workplace consent and approval.",
       title: ["We record hands-on work,", "put it to use in robotics development,", "and return revenue to workplaces."],
       intro: [
         "RootLens is a Japan-based project connecting workplaces across industries with the physical AI sector.",

@@ -10,7 +10,7 @@ import { buildSamplePipelines, DRIVE_SAMPLES_URL } from "../../lib/samplePipelin
 export async function generateMetadata(): Promise<Metadata> {
   const locale = publicLocale(await getLocale());
   const copy = publicPages[locale].buy;
-  return { title: copy.label, description: copy.overview[0] };
+  return { title: copy.title, description: copy.overview[0], alternates: { canonical: "/buy" } };
 }
 
 export default async function BuyPage() {

@@ -7,7 +7,7 @@ import { publicLocale, publicPages } from "../../content/publicPages";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = publicLocale(await getLocale());
   const copy = publicPages[locale].policy;
-  return { title: copy.label, description: copy.summary };
+  return { title: copy.label, description: copy.summary, alternates: { canonical: "/data-policy" } };
 }
 
 export default async function DataPolicyPage() {

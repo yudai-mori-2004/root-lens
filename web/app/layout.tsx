@@ -38,11 +38,23 @@ const courierPrime = Courier_Prime({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://rootlens.io"),
   title: {
-    default: "RootLens",
+    default: "フィジカルAI・ロボティクス向け現場作業データ | RootLens",
     template: "%s | RootLens",
   },
-  description: "First-person footage of real work, collected with consent and delivered as embodied-AI training data.",
+  description: "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。",
+  applicationName: "RootLens",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
+  },
 };
 
 export default async function RootLayout({
@@ -51,10 +63,22 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getLocale();
+  const siteDescription = locale === "ja"
+    ? "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。"
+    : "RootLens records hands-on work from a first-person perspective in Japanese workplaces, then delivers the data for physical AI and robotics research after workplace consent and approval.";
+  const structuredData = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "RootLens",
+    description: siteDescription,
+    url: "https://rootlens.io/",
+    inLanguage: locale,
+  });
 
   return (
     <html lang={locale}>
       <body className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable} ${bizUdMincho.variable} ${courierPrime.variable}`}>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />
         {/* messages を渡さないと useTranslations() をクライアントで使う画面が全部
             キーを素で出す (=/sample の 4 パネルビューアで起きた実障害)。
             getMessages() は現在 locale の messages/*.json 全体を返す。 全部渡しても
