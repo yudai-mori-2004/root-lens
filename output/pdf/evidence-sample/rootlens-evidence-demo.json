@@ -1,0 +1,70 @@
+{
+  "schema": "io.rootlens.evidence.v2",
+  "evidence_id": "evd_demo_20260910",
+  "issued_at": "2026-09-10T09:04:00.000Z",
+  "unit": {
+    "unit_id": "unit_demo_20260910T134055000Z_ABCDEFGH",
+    "site_id": "site_demo",
+    "files_sha256": "6d39882d6020ebf5c0ab71d4a403a4891dc77fceec6b83b869e8bdb7cb746390",
+    "files": [
+      {
+        "path": "files/example.unitdata",
+        "bytes": 30,
+        "sha256": "1081a1f7fc4134a9d19b55c14e024cc197550d34546fdae790f890e5248ce213"
+      }
+    ]
+  },
+  "agreements": {
+    "site": {
+      "record_id": "agr_site_demo_20260901",
+      "path": "agreements/agr_site_demo_20260901.pdf",
+      "document_version": "2026年9月14日版",
+      "template_sha256": "51007928526a4aec296971b1ac46bcc44d2410f3d2124d1b197a2fd44a3b97f9",
+      "signed_pdf_sha256": "90e42171777a09c2e261eba9fa5236c5ff1a65f994a72fc29bb8091ee4bb5dd2",
+      "authentication_method": "sms_otp",
+      "signed_at": "2026-09-01T01:15:20.000Z"
+    },
+    "staff": {
+      "snapshot_id": "csp_demo_20260910",
+      "snapshot_sha256": "e1fdbcc37d81cb9100d437a5043cfe9599cca7e623408b7e99a06eb3d7c496c8",
+      "records": [
+        {
+          "record_id": "agr_staff_demo_20260902",
+          "path": "agreements/agr_staff_demo_20260902.pdf",
+          "document_version": "2026年9月14日版",
+          "template_sha256": "964a49e5fb120b438259108ef4e1c43fcd86b6894cd82c6e8b5f9416e315fa05",
+          "signed_pdf_sha256": "48300ccbeb02fd20d86a865958d9ad6bddb51f0bb90f8d47152dafc0d94dd579",
+          "authentication_method": "sms_otp",
+          "signed_at": "2026-09-02T08:42:11.000Z"
+        }
+      ]
+    }
+  },
+  "approval": {
+    "schema": "io.rootlens.approval-record.v1",
+    "approval_id": "apv_demo_20260910",
+    "approval_subject": {
+      "schema": "io.rootlens.approval-subject.v1",
+      "approval_request_id": "approval_demo_20260910",
+      "person_id": "person_supervisor_demo",
+      "site_id": "site_demo",
+      "unit_id": "unit_demo_20260910T134055000Z_ABCDEFGH",
+      "files_sha256": "6d39882d6020ebf5c0ab71d4a403a4891dc77fceec6b83b869e8bdb7cb746390",
+      "consent_snapshot_id": "csp_demo_20260910",
+      "consent_snapshot_sha256": "e1fdbcc37d81cb9100d437a5043cfe9599cca7e623408b7e99a06eb3d7c496c8",
+      "statement": "この撮影データの内容を確認し、現場合意書および撮影参加に関する同意の取得状況に基づき、販売先への提供を承認します。",
+      "statement_version": "unit-approval-ja-1",
+      "issued_at": "2026-09-10T09:01:00.000Z",
+      "expires_at": "2026-09-10T09:11:00.000Z"
+    },
+    "approval_subject_sha256": "f3d5c11fae63e205d0dc8b456cceef24fd31421ac8abeba8ef1d1bd3ac278381",
+    "approval_method": "sms_authenticated_clickwrap",
+    "approver": {
+      "identity_id": "identity_sms_demo",
+      "person_id": "person_supervisor_demo",
+      "authentication_method": "sms_otp"
+    },
+    "approved_at": "2026-09-10T09:03:12.000Z",
+    "approval_record_sha256": "c506f3e4e75c72525a170f923a7466239ebcd150a40f956be59b1327cc384532"
+  }
+}

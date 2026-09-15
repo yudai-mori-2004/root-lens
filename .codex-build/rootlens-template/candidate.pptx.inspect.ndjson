@@ -1,0 +1,71 @@
+{"kind":"deck","id":"pr/y233yo","name":"Deck"}
+{"kind":"layout","layoutId":"b78f3cd8-f605-48e9-80f2-0e5bd217cda4","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"b5bc8d24-c876-4887-810f-f82db4da470b","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/9pycf8","slide":1,"title":"DESIGN A  TECHNICAL MEMORANDUM","textShapes":6}
+{"kind":"shape","id":"sh/f6h83q94","slide":1,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/g7q9cvqp","slide":1,"text":"DESIGN A  TECHNICAL MEMORANDUM","textPreview":"DESIGN A  TECHNICAL MEMORANDUM","textChars":30,"textLines":1,"bbox":[70,62,330,26]}
+{"kind":"textbox","id":"sh/h8jq50ra","slide":1,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[70,132,430,60]}
+{"kind":"textbox","id":"sh/29srel8f","slide":1,"text":"現場データ収集から始める\nフィジカルAI企業","textPreview":"現場データ収集から始める | フィジカルAI企業","textChars":22,"textLines":2,"bbox":[70,255,920,180]}
+{"kind":"shape","id":"sh/3a187q90","slide":1,"bbox":[70,510,1140,1]}
+{"kind":"textbox","id":"sh/4ba9gvql","slide":1,"text":"会社紹介資料","textPreview":"会社紹介資料","textChars":6,"textLines":1,"bbox":[70,538,250,32]}
+{"kind":"textbox","id":"sh/pwjq90r6","slide":1,"text":"2026.09","textPreview":"2026.09","textChars":7,"textLines":1,"bbox":[1060,538,150,32]}
+{"kind":"textbox","id":"sh/qxsri58r","slide":1,"text":"A","textPreview":"A","textChars":1,"textLines":1,"bbox":[1130,612,80,54]}
+{"kind":"notes","id":"nt/9pycf8","slide":1,"text":""}
+{"kind":"slide","id":"sl/jf9uuv","slide":2,"title":"ROOTLENS  /  THINKING","textShapes":9}
+{"kind":"shape","id":"sh/9sbedsjq","slide":2,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/mpkv2xkf","slide":2,"text":"ROOTLENS  /  THINKING","textPreview":"ROOTLENS  /  THINKING","textChars":21,"textLines":1,"bbox":[70,45,330,26]}
+{"kind":"textbox","id":"sh/7qtwbi10","slide":2,"text":"なぜ現場データ収集から始めるのか","textPreview":"なぜ現場データ収集から始めるのか","textChars":16,"textLines":1,"bbox":[70,88,1080,70]}
+{"kind":"shape","id":"sh/0nid0n29","slide":2,"bbox":[70,167,1140,1]}
+{"kind":"textbox","id":"sh/lobu9s3u","slide":2,"text":"現場統合","textPreview":"現場統合","textChars":4,"textLines":1,"bbox":[70,213,280,40]}
+{"kind":"textbox","id":"sh/yl0vydk3","slide":2,"text":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。","textPreview":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。","textChars":34,"textLines":1,"bbox":[70,263,455,110]}
+{"kind":"textbox","id":"sh/zm9c7ilo","slide":2,"text":"現場データ収集","textPreview":"現場データ収集","textChars":7,"textLines":1,"bbox":[650,213,300,40]}
+{"kind":"textbox","id":"sh/czidw32d","slide":2,"text":"現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textPreview":"現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textChars":39,"textLines":1,"bbox":[650,263,485,110]}
+{"kind":"shape","id":"sh/dkru583i","slide":2,"bbox":[70,416,1140,1]}
+{"kind":"textbox","id":"sh/5kjy1gfa","slide":2,"text":"現在考えていること","textPreview":"現在考えていること","textChars":9,"textLines":1,"bbox":[70,451,300,36]}
+{"kind":"textbox","id":"sh/4jahsbyp","slide":2,"text":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textPreview":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textChars":45,"textLines":1,"bbox":[70,505,1040,105]}
+{"kind":"textbox","id":"sh/3i1gz6x4","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1130,650,80,24]}
+{"kind":"notes","id":"nt/jf9uuv","slide":2,"text":""}
+{"kind":"slide","id":"sl/boeh8m","slide":3,"title":"DESIGN B  FIELD RECORD","textShapes":5}
+{"kind":"textbox","id":"sh/6xsjid0j","slide":3,"text":"DESIGN B  FIELD RECORD","textPreview":"DESIGN B  FIELD RECORD","textChars":22,"textLines":1,"bbox":[64,57,330,26]}
+{"kind":"textbox","id":"sh/7ilkryh4","slide":3,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[64,118,400,62]}
+{"kind":"textbox","id":"sh/gnu1oni1","slide":3,"text":"現場データ収集から始める\nフィジカルAI企業","textPreview":"現場データ収集から始める | フィジカルAI企業","textChars":22,"textLines":2,"bbox":[64,245,620,190]}
+{"kind":"shape","id":"sh/1o32xszm","slide":3,"bbox":[64,517,620,2]}
+{"kind":"textbox","id":"sh/ulcjmd0v","slide":3,"text":"現場で作り、現場で確かめたことから話す","textPreview":"現場で作り、現場で確かめたことから話す","textChars":19,"textLines":1,"bbox":[64,545,610,45]}
+{"kind":"textbox","id":"sh/fmlkvihg","slide":3,"text":"試作撮影デバイス","textPreview":"試作撮影デバイス","textChars":8,"textLines":1,"bbox":[972,665,250,24]}
+{"kind":"image","id":"im/gzm98vu1","slide":3,"name":"","alt":"RootLensの試作撮影デバイス","bbox":[760,0,520,720]}
+{"kind":"notes","id":"nt/boeh8m","slide":3,"text":""}
+{"kind":"slide","id":"sl/ujgn14","slide":4,"title":"ROOTLENS  /  FIELD NOTE 01","textShapes":8}
+{"kind":"textbox","id":"sh/juhk3e1w","slide":4,"text":"ROOTLENS  /  FIELD NOTE 01","textPreview":"ROOTLENS  /  FIELD NOTE 01","textChars":26,"textLines":1,"bbox":[64,44,330,26]}
+{"kind":"textbox","id":"sh/kvq1cj2h","slide":4,"text":"なぜ現場データ収集から始めるのか","textPreview":"なぜ現場データ収集から始めるのか","textChars":16,"textLines":1,"bbox":[64,91,1090,68]}
+{"kind":"shape","id":"sh/5wz25ojm","slide":4,"bbox":[64,172,1152,1]}
+{"kind":"textbox","id":"sh/6x8jetk7","slide":4,"text":"事実","textPreview":"事実","textChars":2,"textLines":1,"bbox":[64,215,120,32]}
+{"kind":"textbox","id":"sh/7y1k7y1s","slide":4,"text":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。\n\n現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textPreview":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。 |  | 現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textChars":75,"textLines":3,"bbox":[64,263,710,205]}
+{"kind":"textbox","id":"sh/sza1gj2d","slide":4,"text":"現在の考え","textPreview":"現在の考え","textChars":5,"textLines":1,"bbox":[838,215,220,32]}
+{"kind":"textbox","id":"sh/t0j29ojy","slide":4,"text":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textPreview":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textChars":45,"textLines":1,"bbox":[838,263,330,240]}
+{"kind":"shape","id":"sh/m1oj2pk3","slide":4,"bbox":[64,578,1152,1]}
+{"kind":"textbox","id":"sh/n2x0vulo","slide":4,"text":"事実と考えを分け、どちらも同じ強さで飾らず置く","textPreview":"事実と考えを分け、どちらも同じ強さで飾らず置く","textChars":23,"textLines":1,"bbox":[64,605,720,34]}
+{"kind":"textbox","id":"sh/7udwzy5k","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1135,648,80,24]}
+{"kind":"notes","id":"nt/ujgn14","slide":4,"text":""}
+{"kind":"slide","id":"sl/80h70c","slide":5,"title":"DESIGN C  MONOCHROME","textShapes":5}
+{"kind":"textbox","id":"sh/q5wz6dw7","slide":5,"text":"DESIGN C  MONOCHROME","textPreview":"DESIGN C  MONOCHROME","textChars":20,"textLines":1,"bbox":[64,60,330,26]}
+{"kind":"textbox","id":"sh/d8nyhsvy","slide":5,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[64,125,430,60]}
+{"kind":"textbox","id":"sh/s7eh8ned","slide":5,"text":"現場データ収集から始める\nフィジカルAI企業","textPreview":"現場データ収集から始める | フィジカルAI企業","textChars":22,"textLines":2,"bbox":[64,250,1070,190]}
+{"kind":"shape","id":"sh/32lgbixg","slide":5,"bbox":[64,517,1152,1]}
+{"kind":"textbox","id":"sh/ihcz2dwv","slide":5,"text":"Company overview","textPreview":"Company overview","textChars":16,"textLines":1,"bbox":[64,546,300,32]}
+{"kind":"textbox","id":"sh/543ydsfm","slide":5,"text":"2026.09","textPreview":"2026.09","textChars":7,"textLines":1,"bbox":[1050,546,165,32]}
+{"kind":"notes","id":"nt/80h70c","slide":5,"text":""}
+{"kind":"slide","id":"sl/28188n","slide":6,"title":"ROOTLENS","textShapes":9}
+{"kind":"shape","id":"sh/l8fipcjq","slide":6,"bbox":[0,0,1280,48]}
+{"kind":"textbox","id":"sh/y5ojux0f","slide":6,"text":"ROOTLENS","textPreview":"ROOTLENS","textChars":8,"textLines":1,"bbox":[64,14,220,22]}
+{"kind":"textbox","id":"sh/z6x0n210","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1130,14,86,22]}
+{"kind":"textbox","id":"sh/8vq107ih","slide":6,"text":"なぜ現場データ収集から始めるのか","textPreview":"なぜ現場データ収集から始めるのか","textChars":16,"textLines":1,"bbox":[64,95,1080,70]}
+{"kind":"shape","id":"sh/9wz2tcj2","slide":6,"bbox":[64,180,1152,3]}
+{"kind":"textbox","id":"sh/m9ojyx0b","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[64,226,70,35]}
+{"kind":"textbox","id":"sh/nah0r21w","slide":6,"text":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。","textPreview":"現場統合では、業種やタスクごとにロボットの動作を作り込む必要がある。","textChars":34,"textLines":1,"bbox":[150,226,990,75]}
+{"kind":"shape","id":"sh/ozm1onid","slide":6,"bbox":[64,325,1152,1]}
+{"kind":"textbox","id":"sh/p0vih8jy","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[64,366,70,35]}
+{"kind":"textbox","id":"sh/54baxob2","slide":6,"text":"現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textPreview":"現場データ収集は、人間の作業を撮影することで、現在の技術でも複数業種へ入れる。","textChars":39,"textLines":1,"bbox":[150,366,990,75]}
+{"kind":"shape","id":"sh/4329ojah","slide":6,"bbox":[64,465,1152,1]}
+{"kind":"textbox","id":"sh/32t8vetw","slide":6,"text":"考え","textPreview":"考え","textChars":2,"textLines":1,"bbox":[64,514,70,35]}
+{"kind":"textbox","id":"sh/i1krm9sb","slide":6,"text":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textPreview":"撮影を通じて、将来ロボットが導入される現場との関係と、既存ワークフローのデータが蓄積する。","textChars":45,"textLines":1,"bbox":[150,514,990,100]}
+{"kind":"notes","id":"nt/28188n","slide":6,"text":""}
