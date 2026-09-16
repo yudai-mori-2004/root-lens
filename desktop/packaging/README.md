@@ -172,6 +172,8 @@ upload the installers to `RootLens Submit/アプリ配布`, copy them to every f
 `RootLens Submit/現場データ収集`, and move older installers to Drive trash after verifying the
 copies' checksums. New sites receive the current pair from `アプリ配布` when created. The
 service account credential remains on the maintainer machine; CI does not receive Drive access.
+Run the same command with `--verify` to check that the central folder and every site each have
+exactly one matching installer per platform, with the uploaded bytes' Drive checksum.
 
 ## Release acceptance
 

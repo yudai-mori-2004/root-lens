@@ -8,10 +8,12 @@ import { GoogleAuth } from "google-auth-library";
 const args = process.argv.slice(2);
 const value = (flag) => args[args.indexOf(flag) + 1];
 const apply = args.includes("--apply");
+const verify = args.includes("--verify");
 const macPath = value("--mac");
 const windowsPath = value("--windows");
-if (!macPath || !windowsPath || args.some((arg) => arg.startsWith("--") && !["--mac", "--windows", "--apply"].includes(arg))) {
-  throw new Error("Usage: node scripts/sync-desktop-installers.mjs --mac PATH.dmg --windows PATH.exe [--apply]");
+if (!macPath || !windowsPath || (apply && verify)
+    || args.some((arg) => arg.startsWith("--") && !["--mac", "--windows", "--apply", "--verify"].includes(arg))) {
+  throw new Error("Usage: node scripts/sync-desktop-installers.mjs --mac PATH.dmg --windows PATH.exe [--apply|--verify]");
 }
 
 const installers = await Promise.all([macPath, windowsPath].map(async (path) => {
@@ -107,6 +109,24 @@ if (!distribution && apply) {
   })).json();
 }
 console.log(`RootLens Submit: ${sites.map((site) => site.name).join(", ")}`);
+if (verify) {
+  if (!distribution) throw new Error("The central app distribution folder is missing");
+  for (const folder of [distribution, ...sites]) {
+    const files = await listFiles(folder.id, driveId);
+    for (const installer of installers) {
+      const platform = installer.name.includes("-macOS-") ? "macOS" : "Windows";
+      const candidates = files.filter((file) => platform === "macOS"
+        ? /^RootLens-Import-\d+\.\d+\.\d+-macOS-(arm64|x86_64|universal2)\.dmg$/.test(file.name)
+        : /^RootLens-Import-Setup-\d+\.\d+\.\d+-windows-x64\.exe$/.test(file.name));
+      if (candidates.length !== 1 || candidates[0].name !== installer.name
+          || candidates[0].md5Checksum !== installer.md5) {
+        throw new Error(`${folder.name}: ${platform} installer is missing, stale, or duplicated`);
+      }
+      console.log(`${folder.name}: ${installer.name} verified`);
+    }
+  }
+  process.exit(0);
+}
 if (!apply) {
   console.log(`Dry run: ${installers.map((file) => `${file.name} (${file.size} bytes)`).join(", ")}`);
   process.exit(0);
