@@ -33,12 +33,13 @@ PySide6 and the Qt modules used by this app are loaded as separate LGPL librarie
 their LGPL license texts, upstream source locations, and Qt's module-specific third-party
 attributions in the runtime notices directory. The FFmpeg backend also needs its LGPL
 2.1-or-later and component notices. See [Qt's licensing and attribution index](https://doc.qt.io/qt-6/licenses-used-in-qt.html).
-Only Qt Widgets and Multimedia are used; the build excludes Tk and Qt WebEngine.
+The app uses Qt Widgets, Multimedia and WebEngine. The runtime notices must include
+WebEngine's Chromium third-party attributions; Tk remains excluded.
 
 ## Application identity
 
 The app, installer and shortcuts display **RootLens**. The executable name, Mac bundle
-filename and Windows installation directory remain **RootLens Import**. Login and recording copies are no longer retained between launches. The Windows installer replaces the old
+filename and Windows installation directory remain **RootLens Import**. Login persists until it expires or the user logs out; recording copies do not persist between launches. The Windows installer replaces the old
 RootLens Import shortcuts with RootLens shortcuts.
 
 `rootlens_import/assets/rootlens.png` is an exact copy of the existing `mobile/assets/icon.png`.
@@ -186,9 +187,10 @@ Keep unverified platform artifacts out of the site's production app folder.
 ## Site access
 
 Register each field supervisor with a site before using the app. The supervisor opens
-**SMSでログイン** in the desktop settings, completes SMS verification in the system browser,
-and returns to the app through an IPv4 loopback callback. The desktop stores only the opaque
-RootLens session in memory for the running application only. A new launch requires SMS verification.
+**SMSでログイン** in the desktop settings, completes SMS verification in the app's browser,
+and returns to the app through an IPv4 loopback callback. The desktop stores the opaque
+RootLens session in the user's application-data directory and checks it with the server on each launch.
+The app's browser keeps its RootLens cookie in the same directory. Expiry or explicit logout requires SMS verification.
 
 RootLens manages each site's destination in the **RootLens Submit** shared Drive. The RootLens
 server accesses it with its dedicated service account. The desktop never receives a Google refresh
@@ -205,6 +207,9 @@ valid decoded video frame and audio buffer. It exits 0 on success or 1 on a code
 or 15-second timeout. Use a synthetic H.264/AAC clip to confirm that the frozen bundle
 includes the Qt Multimedia backend and codecs. The check does not connect a device,
 change site settings, or upload data.
+
+`--check-browser` opens a temporary in-app browser profile and checks that the frozen
+Qt WebEngine can render a page and close cleanly. It does not use the user's login session.
 
 On Windows, a windowed PyInstaller executable has no standard output streams. Prefix any
 diagnostic with `--diagnostic-output <new-log-file>` to write UTF-8 output reliably, for example:

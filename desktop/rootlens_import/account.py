@@ -1,14 +1,18 @@
-"""Browser login; desktop credentials live only for the running app session."""
+"""Browser login and a renewable desktop session."""
 
 from base64 import urlsafe_b64encode
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
 import os
+from pathlib import Path
 import secrets
+import tempfile
 import threading
 from urllib.parse import parse_qs, urlsplit
 
 from .core import ImportFailure, check_cancelled
+from .library import settings_path
 
 DEFAULT_API_ORIGIN = "https://www.rootlens.io"
 
@@ -19,19 +23,39 @@ def _valid_token(token):
 
 
 class SessionStore:
-    def __init__(self):
-        self.token = None
+    def __init__(self, path=None):
+        self.path = Path(path) if path is not None else settings_path().with_name("session.token")
 
     def load(self):
-        return self.token
+        if self.path.is_symlink():
+            self.clear()
+            return None
+        try:
+            token = self.path.read_text(encoding="ascii")
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            raise ImportFailure("ログイン情報を読み込めませんでした。保存先を確認してください。") from error
+        if not _valid_token(token):
+            self.clear()
+            return None
+        return token
 
     def save(self, token):
         if not _valid_token(token):
             raise ImportFailure("ログイン情報を確認できませんでした。設定からもう一度ログインしてください。")
-        self.token = token
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, name = tempfile.mkstemp(prefix="session-", dir=self.path.parent)
+        temporary = Path(name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="ascii") as output:
+                output.write(token)
+            os.replace(temporary, self.path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def clear(self):
-        self.token = None
+        self.path.unlink(missing_ok=True)
 
 
 def _api_origin(value=None):
@@ -100,7 +124,6 @@ class RootLensAccount:
         self.store = store or SessionStore()
 
     def close(self):
-        self.store.clear()
         self.session.close()
 
     def _request(self, method, path, *, token=None, json_body=None):
@@ -149,7 +172,7 @@ class RootLensAccount:
             if status != 201 or not isinstance(authorization_url, str):
                 raise ImportFailure("ログインを開始できませんでした。しばらくしてからやり直してください。")
             if not open_browser(authorization_url):
-                raise ImportFailure("ブラウザを開けませんでした。既定のブラウザを確認してください。")
+                raise ImportFailure("アプリ内のログイン画面を開けませんでした。もう一度お試しください。")
             while server.callback_result is None:
                 check_cancelled(cancel)
                 server.handle_request()

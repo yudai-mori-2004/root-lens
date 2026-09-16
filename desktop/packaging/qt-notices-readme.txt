@@ -6,4 +6,5 @@ Qt/PySide6 source: https://download.qt.io/official_releases/QtForPython/pyside6/
 Qt modules source: https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/
 FFmpeg source: https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz
 You may replace or modify these LGPL libraries under their license terms; distribution signing can require re-signing the modified bundle.
-This notice collection covers the QtCore, QtGui, QtWidgets, QtNetwork, QtOpenGL, QtDBus and QtMultimedia modules; some documented optional components may not be present in this platform build.
+This notice collection covers the QtCore, QtGui, QtWidgets, QtNetwork, QtOpenGL, QtDBus, QtMultimedia and QtWebEngine modules; some documented optional components may not be present in this platform build.
+QtWebEngine incorporates Chromium. Its third-party attribution pages and licensing index are included in this directory; see qtwebengine-licensing.html.

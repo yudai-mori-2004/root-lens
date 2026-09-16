@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import threading
-import webbrowser
 
 from .core import FILES, ImportFailure, check_cancelled, checksum, unit_files_sha256
 from .library import read_recording
@@ -19,7 +18,7 @@ def recording_manifest(path, cancel_event=None):
     return recording, files, unit_files_sha256(recording.unit_id, files)
 
 
-def approve_recording(path, gateway, cancel_event=None, open_browser=webbrowser.open):
+def approve_recording(path, gateway, *, open_browser, cancel_event=None):
     cancel = cancel_event or threading.Event()
     recording, files, digest = recording_manifest(path, cancel)
     approval = gateway.create_approval(recording.unit_id, digest, files)
@@ -29,7 +28,7 @@ def approve_recording(path, gateway, cancel_event=None, open_browser=webbrowser.
     if not isinstance(approval_id, str) or not isinstance(approval_url, str):
         raise ImportFailure("承認手続きを開始できませんでした。管理者に確認してください。")
     if not open_browser(approval_url):
-        raise ImportFailure("承認画面を開けませんでした。既定のブラウザを確認してください。")
+        raise ImportFailure("承認画面を開けませんでした。もう一度お試しください。")
     while True:
         check_cancelled(cancel)
         status = gateway.approval_status(approval_id)

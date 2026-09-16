@@ -60,24 +60,27 @@ class Session:
 
 
 class AccountTests(unittest.TestCase):
-    def test_session_store_lives_only_in_memory(self):
+    def test_session_survives_app_close_until_logout(self):
         with tempfile.TemporaryDirectory() as temporary:
-            path = Path(temporary) / "session.json"
-            store = SessionStore()
+            path = Path(temporary) / "session.token"
+            store = SessionStore(path)
             token = "s" * 43
             self.assertIsNone(store.load())
             store.save(token)
             self.assertEqual(store.load(), token)
-            self.assertFalse(path.exists())
-            self.assertIsNone(SessionStore().load())
-            store.clear()
-            self.assertIsNone(store.load())
+            self.assertEqual(SessionStore(path).load(), token)
+            account = RootLensAccount("http://127.0.0.1:3000", session=Session(), store=store)
+            account.close()
+            self.assertEqual(SessionStore(path).load(), token)
+            account = RootLensAccount("http://127.0.0.1:3000", session=Session(), store=SessionStore(path))
+            account.logout()
+            self.assertIsNone(SessionStore(path).load())
 
     def test_legacy_session_file_is_not_read(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "session.json"
             path.write_text('{"schema":"rootlens.desktop-session.v1","token":"' + "s" * 43 + '"}')
-            self.assertIsNone(SessionStore().load())
+            self.assertIsNone(SessionStore(path.with_name("session.token")).load())
 
     def test_browser_login_returns_to_loopback_and_saves_only_rootlens_session(self):
         session, store = Session(), Store()

@@ -22,7 +22,7 @@ analysis = Analysis(
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "_tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets"],
+    excludes=["tkinter", "_tkinter"],
     noarchive=False,
 )
 archive = PYZ(analysis.pure)

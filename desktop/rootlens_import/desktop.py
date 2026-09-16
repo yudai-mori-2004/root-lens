@@ -5,7 +5,6 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
-import webbrowser
 
 from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
@@ -18,7 +17,7 @@ from PySide6.QtWidgets import (
 from .core import ClipProgress, ImportCancelled, ImportFailure
 from .device_sync import sync_recordings, cleanup_uploaded_recording, remove_uploaded_local_copy
 from .branding import APP_NAME, app_icon
-from .account import RootLensAccount
+from .account import RootLensAccount, SessionStore
 from .approval import approve_recording
 from .drive import DriveUploader, UploadProgress, UploadResult
 from .library import read_recording, recordings_directory, settings_path
@@ -79,6 +78,8 @@ class ImportSignals(QObject):
     upload_progress = Signal(object)
     upload_done = Signal(object, str, bool, str)
     login_done = Signal(object, str)
+    browser_requested = Signal(str, object, object)
+    approval_done = Signal()
 
 
 class ImportWindow(QMainWindow):
@@ -93,9 +94,10 @@ class ImportWindow(QMainWindow):
         self.cleaner = cleaner or cleanup_uploaded_recording
         self.uploader_factory = uploader_factory or DriveUploader
         self.drive_reader = drive_reader or read_drive_recordings
-        self.account = account or RootLensAccount()
+        self.account = account or RootLensAccount(store=SessionStore(self.profile_path.with_name("session.token")))
         self.gateway_factory = gateway_factory or self.account.gateway
         self.approver = approver or approve_recording
+        self.browser = None
         self.profile = None
         self.recordings_root = None
         self.records = []
@@ -116,6 +118,7 @@ class ImportWindow(QMainWindow):
         self.cancel_event = threading.Event()
         self.worker = None
         self.upload_running = False
+        self.approval_pending = False
         self.upload_cancel_event = threading.Event()
         self.upload_worker = None
         self._library_dirty = False
@@ -133,38 +136,44 @@ class ImportWindow(QMainWindow):
         self.signals.upload_progress.connect(self._upload_progress, queued)
         self.signals.upload_done.connect(self._upload_finished, queued)
         self.signals.login_done.connect(self._login_finished, queued)
+        self.signals.browser_requested.connect(self._show_browser, queued)
+        self.signals.approval_done.connect(self._approval_complete, queued)
         self._build()
         self.status_label.setText("「設定」からSMSでログインしてください。")
+        if profile_path is None and data_root is None:
+            QTimer.singleShot(0, self.restore_session)
 
     def _build(self):
         self.setWindowTitle(APP_NAME)
-        self.resize(1160, 760)
-        self.setMinimumSize(900, 620)
+        self.resize(1240, 800)
+        self.setMinimumSize(920, 640)
         self.setStyleSheet("""
-            QMainWindow, QDialog { background: #f4f5f1; }
-            QWidget { color: #1e3028; font-size: 13px; }
-            QLabel#title { font-size: 23px; font-weight: 600; }
-            QLabel#muted, QLabel#status { color: #5b6a61; }
-            QLabel#recordingTitle { font-size: 18px; font-weight: 600; }
-            QPushButton { background: #fff; border: 1px solid #c9d0c8; border-radius: 6px; padding: 9px 15px; }
-            QPushButton:hover { background: #eaf0e8; }
-            QPushButton:disabled { color: #8a958d; background: #ecefe9; }
-            QPushButton#connect, QPushButton#upload { background: #28523e; color: #fff; border-color: #28523e; font-weight: 600; }
-            QPushButton#connect:disabled, QPushButton#upload:disabled { background: #96a69b; border-color: #96a69b; }
-            QTreeWidget { background: #fff; border: 1px solid #d6ddd4; border-radius: 6px; outline: 0; }
-            QTreeWidget::item { height: 54px; padding: 4px 8px; border-bottom: 1px solid #edf0e9; }
-            QTreeWidget::item:selected { color: #173b28; background: #dcebdd; }
-            QHeaderView::section { background: #f4f5f1; border: 0; padding: 9px 8px; color: #5b6a61; }
-            QSlider::groove:horizontal { height: 5px; background: #d2dacf; border-radius: 2px; }
-            QSlider::sub-page:horizontal { background: #396348; border-radius: 2px; }
-            QSlider::handle:horizontal { width: 13px; margin: -4px 0; border-radius: 6px; background: #28523e; }
-            QProgressBar { max-height: 4px; border: 0; background: #e4e9df; }
-            QProgressBar::chunk { background: #487c56; }
+            QMainWindow, QDialog, QWidget { background: #ffffff; color: #111111; font-size: 14px; }
+            QLabel#title { font-size: 23px; font-weight: 700; }
+            QLabel#muted, QLabel#status { color: #505050; }
+            QLabel#recordingTitle { font-size: 20px; font-weight: 700; }
+            QLabel#count { font-size: 17px; font-weight: 700; }
+            QPushButton { background: #ffffff; border: 1px solid #777777; border-radius: 0;
+                          padding: 8px 13px; min-height: 23px; }
+            QPushButton:hover { background: #eeeeeb; }
+            QPushButton:focus { border: 2px solid #111111; }
+            QPushButton:disabled { color: #777777; background: #f5f5f3; border-color: #c9c9c5; }
+            QPushButton#upload { background: #dce9b9; color: #111111; border-color: #111111; font-weight: 700; }
+            QPushButton#upload:hover { background: #c9dea0; }
+            QPushButton#upload:disabled { background: #f5f5f3; color: #777777; border-color: #c9c9c5; }
+            QTreeWidget { background: #f5f5f3; border: 0; outline: 0; }
+            QTreeWidget::item { height: 63px; padding: 4px 6px; border-bottom: 1px solid #e3e3e0; }
+            QTreeWidget::item:selected { color: #111111; background: #f8e8b7; }
+            QSlider::groove:horizontal { height: 4px; background: #deded9; }
+            QSlider::sub-page:horizontal { background: #557b3d; }
+            QSlider::handle:horizontal { width: 13px; margin: -5px 0; background: #557b3d; }
+            QProgressBar { max-height: 4px; border: 0; background: #eeeeeb; }
+            QProgressBar::chunk { background: #a8c968; }
         """)
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 22, 24, 22)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 18, 24, 18)
+        layout.setSpacing(12)
         header = QHBoxLayout()
         title = QLabel(APP_NAME)
         title.setObjectName("title")
@@ -174,7 +183,6 @@ class ImportWindow(QMainWindow):
         header.addWidget(self.site_label)
         header.addStretch()
         self.connect_button = QPushButton("接続")
-        self.connect_button.setObjectName("connect")
         self.connect_button.setMinimumWidth(110)
         self.connect_button.clicked.connect(self.start_import)
         header.addWidget(self.connect_button)
@@ -193,14 +201,17 @@ class ImportWindow(QMainWindow):
         layout.addWidget(self.progress)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         left = QWidget()
+        left.setStyleSheet("background: #f5f5f3;")
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(10, 16, 10, 0)
+        left_layout.setSpacing(8)
         self.count_label = QLabel("内容確認・アップロード待ち 0 件")
+        self.count_label.setObjectName("count")
+        self.count_label.setWordWrap(True)
         left_layout.addWidget(self.count_label)
         self.recording_list = QTreeWidget()
         self.recording_list.setColumnCount(2)
-        self.recording_list.setHeaderLabels(("撮影日時・長さ", "状態"))
+        self.recording_list.setHeaderHidden(True)
         self.recording_list.setRootIsDecorated(False)
         self.recording_list.setUniformRowHeights(True)
         self.recording_list.setIndentation(0)
@@ -212,13 +223,13 @@ class ImportWindow(QMainWindow):
         splitter.addWidget(left)
         right = QWidget()
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(18, 0, 0, 0)
-        right_layout.setSpacing(14)
+        right_layout.setContentsMargins(20, 10, 0, 0)
+        right_layout.setSpacing(12)
+        video_header = QHBoxLayout()
         self.recording_title = QLabel("録画を選んでください")
         self.recording_title.setObjectName("recordingTitle")
-        right_layout.addWidget(self.recording_title)
-        self.preview = VideoPreview()
-        right_layout.addWidget(self.preview, 1)
+        video_header.addWidget(self.recording_title)
+        video_header.addStretch()
         navigation = QHBoxLayout()
         self.previous_button = QPushButton("前の録画")
         self.previous_button.clicked.connect(lambda: self.select_relative(-1))
@@ -226,12 +237,14 @@ class ImportWindow(QMainWindow):
         self.next_button.clicked.connect(lambda: self.select_relative(1))
         navigation.addWidget(self.previous_button)
         navigation.addWidget(self.next_button)
-        navigation.addStretch()
         self.position_label = QLabel("—")
         self.position_label.setObjectName("muted")
         navigation.addWidget(self.position_label)
-        right_layout.addLayout(navigation)
-        instruction = QLabel("内容を確認し、この録画の提供を承認する場合は「アップロード」を押してください。Google Driveの「承認済みデータ」に保存されます。")
+        video_header.addLayout(navigation)
+        right_layout.addLayout(video_header)
+        self.preview = VideoPreview()
+        right_layout.addWidget(self.preview, 1)
+        instruction = QLabel("映像と音声を確認した後、提供する録画の承認に進んでください。")
         instruction.setWordWrap(True)
         instruction.setObjectName("muted")
         right_layout.addWidget(instruction)
@@ -246,24 +259,30 @@ class ImportWindow(QMainWindow):
         self.upload_progress_bar.setVisible(False)
         right_layout.addWidget(self.upload_progress_bar)
         actions = QHBoxLayout()
-        self.upload_button = QPushButton("アップロード")
+        self.upload_button = QPushButton("承認へ進む")
         self.upload_button.setObjectName("upload")
         self.upload_button.clicked.connect(self.start_upload)
         self.cancel_upload_button = QPushButton("キャンセル")
         self.cancel_upload_button.clicked.connect(self.cancel_upload)
         self.cancel_upload_button.setVisible(False)
+        self.approval_browser_button = QPushButton("承認画面を表示")
+        self.approval_browser_button.clicked.connect(self.show_approval_browser)
+        self.approval_browser_button.setVisible(False)
         self.folder_button = QPushButton("録画フォルダを表示")
         self.folder_button.clicked.connect(self.show_recording_folder)
         self.drive_button = QPushButton("Driveを開く")
         self.drive_button.clicked.connect(self.open_drive)
-        actions.addWidget(self.upload_button)
         actions.addWidget(self.cancel_upload_button)
-        actions.addStretch()
+        actions.addWidget(self.approval_browser_button)
         actions.addWidget(self.folder_button)
         actions.addWidget(self.drive_button)
+        actions.addStretch()
+        actions.addWidget(self.upload_button)
         right_layout.addLayout(actions)
         splitter.addWidget(right)
-        splitter.setSizes([350, 730])
+        left.setMinimumWidth(210)
+        right.setMinimumWidth(630)
+        splitter.setSizes([240, 960])
         splitter.setChildrenCollapsible(False)
         layout.addWidget(splitter, 1)
         self.setCentralWidget(page)
@@ -307,7 +326,7 @@ class ImportWindow(QMainWindow):
         layout.setSpacing(16)
         current = QLabel(f"現在の事業所：{self.profile.site_name if self.profile else '未設定'}")
         layout.addWidget(current)
-        explanation = QLabel("ブラウザでSMSログインした後、このアプリへ戻ります。")
+        explanation = QLabel("RootLensのログイン画面がアプリ内に開きます。")
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
         login = QPushButton("SMSでログイン")
@@ -325,27 +344,104 @@ class ImportWindow(QMainWindow):
         self.busy = True
         self.job_kind = "login"
         self.cancel_event.clear()
-        self.status_label.setText("ブラウザでRootLensへログインしてください…")
+        self.status_label.setText("RootLensへのログイン画面を開いています…")
         self.progress.setVisible(True)
         self._update_controls()
 
         def run():
             try:
-                result = self.account.login(webbrowser.open, self.cancel_event)
+                result = self.account.login(self._open_browser, self.cancel_event)
                 self.signals.login_done.emit(result, "")
             except Exception as error:
                 self.signals.login_done.emit(None, str(error))
         self.worker = threading.Thread(target=run, name="rootlens-login", daemon=True)
         self.worker.start()
 
+    def restore_session(self):
+        if self.busy or self.closing:
+            return
+        try:
+            if not self.account.store.load():
+                return
+        except ImportFailure as error:
+            self.status_label.setText(str(error))
+            return
+        self.busy = True
+        self.job_kind = "restore"
+        self.status_label.setText("前回のログインを確認しています…")
+        self.progress.setVisible(True)
+        self._update_controls()
+
+        def run():
+            try:
+                self.signals.login_done.emit(self.account.current(), "")
+            except ImportFailure as error:
+                self.signals.login_done.emit(None, str(error))
+        self.worker = threading.Thread(target=run, name="rootlens-restore-session", daemon=True)
+        self.worker.start()
+
+    def _open_browser(self, url):
+        completed = threading.Event()
+        result = {}
+        self.signals.browser_requested.emit(url, completed, result)
+        while not completed.wait(0.1):
+            if self.closing:
+                return False
+        return result.get("opened", False)
+
+    @Slot(str, object, object)
+    def _show_browser(self, url, completed, result):
+        try:
+            if self.closing:
+                result["opened"] = False
+                return
+            if self.browser is None:
+                from .browser import RootLensBrowser
+                self.browser = RootLensBrowser(self.account.api_origin,
+                                               self.profile_path.with_name("browser"), self)
+                self.browser.rejected.connect(self._browser_rejected)
+            result["opened"] = self.browser.open_url(url)
+            self._update_controls()
+        except Exception:
+            result["opened"] = False
+        finally:
+            completed.set()
+
+    def _browser_rejected(self):
+        if self.job_kind == "login":
+            self.cancel_event.set()
+        elif self.approval_pending:
+            self.status_label.setText("承認画面を閉じました。続けるには「承認画面を表示」を押してください。")
+            self._update_controls()
+
+    def show_approval_browser(self):
+        if self.approval_pending and self.browser is not None:
+            self.browser.show()
+            self.browser.raise_()
+            self.browser.activateWindow()
+            self._update_controls()
+
+    @Slot()
+    def _approval_complete(self):
+        self.approval_pending = False
+        if self.browser is not None:
+            self.browser.dismiss()
+        self._update_controls()
+
     @Slot(object, str)
     def _login_finished(self, result, error):
+        if self.browser is not None:
+            self.browser.dismiss()
         self.busy = False
         self.job_kind = None
         self.worker = None
         self.progress.setVisible(False)
         if error:
             self.status_label.setText(error)
+            self._update_controls()
+            return
+        if result is None:
+            self.status_label.setText("「設定」からSMSでログインしてください。")
             self._update_controls()
             return
         sites = result["sites"]
@@ -363,26 +459,32 @@ class ImportWindow(QMainWindow):
         self.set_profile(profile)
 
     def logout(self):
+        error = ""
         try:
             self.account.logout()
-            self.preview.clear()
-            if self.workspace is not None:
-                self.data_root = self.workspace.reset()
-            self.profile = None
-            self.recordings_root = None
-            self.records = []
-            self.all_records = []
-            self.progress_states.clear()
-            self.device_sources.clear()
-            self.uploaded_unit_ids.clear()
-            self.recording_names.clear()
-            self.blocked_names.clear()
-            self.upload_states.clear()
-            self.refresh_recordings(rescan=False)
-            self.site_label.setText("事業所：未設定")
-            self.status_label.setText("ログアウトしました。「設定」からRootLensへログインしてください。")
-        except ImportFailure as error:
-            self.status_label.setText(str(error))
+        except ImportFailure as failure:
+            error = str(failure)
+        if self.browser is None:
+            from .browser import forget_browser_session
+            forget_browser_session(self.profile_path.with_name("browser"))
+        else:
+            self.browser.clear_session()
+        self.preview.clear()
+        if self.workspace is not None:
+            self.data_root = self.workspace.reset()
+        self.profile = None
+        self.recordings_root = None
+        self.records = []
+        self.all_records = []
+        self.progress_states.clear()
+        self.device_sources.clear()
+        self.uploaded_unit_ids.clear()
+        self.recording_names.clear()
+        self.blocked_names.clear()
+        self.upload_states.clear()
+        self.refresh_recordings(rescan=False)
+        self.site_label.setText("事業所：未設定")
+        self.status_label.setText(error or "ログアウトしました。「設定」からRootLensへログインしてください。")
         self._update_controls()
 
     def selected_recording(self):
@@ -419,14 +521,15 @@ class ImportWindow(QMainWindow):
             ready_names.add(remote_name)
             progress = self.progress_states.get(remote_name)
             state = PROGRESS_LABELS.get(progress.state, "端末の確認待ち") if progress else "端末の確認待ち"
-            item = QTreeWidgetItem([f"{record.created_text}\n{record.duration_text}", state])
+            display_time = record.created_text[5:16] if len(record.created_text) >= 16 else record.created_text
+            item = QTreeWidgetItem([f"{display_time}\n{record.duration_text}", state])
             item.setData(0, Qt.ItemDataRole.UserRole, str(record.path))
-            item.setToolTip(0, record.path.name)
+            item.setToolTip(0, record.created_text)
             if remote_name in self.blocked_names:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                 item.setText(1, "取り込みエラー")
             if progress and progress.state == "ready":
-                item.setToolTip(1, "PCに取り込み済み。内容を確認し、問題なければ「アップロード」を押してください。")
+                item.setToolTip(1, "内容を確認し、問題なければ「承認へ進む」を押してください。")
             if progress and progress.error:
                 item.setToolTip(1, progress.error)
             if record.unit_id in self.upload_states and remote_name not in self.blocked_names:
@@ -447,7 +550,7 @@ class ImportWindow(QMainWindow):
         self.recording_list.setCurrentItem(selected_item)
         self.recording_list.verticalScrollBar().setValue(scroll_value)
         self.recording_list.blockSignals(False)
-        self.count_label.setText(f"内容確認・アップロード待ち {len(self.records)} 件" if self.drive_synced else "録画一覧")
+        self.count_label.setText(f"録画 {self.recording_list.topLevelItemCount()} 件" if self.drive_synced else "録画一覧")
         self._selection_changed()
 
     def _selection_changed(self, *_):
@@ -494,6 +597,8 @@ class ImportWindow(QMainWindow):
                                      ("" if self.profile else "「設定」からSMSでログインしてください。"))
         self.cancel_upload_button.setVisible(self.upload_running)
         self.cancel_upload_button.setEnabled(self.upload_running and not self.upload_cancel_event.is_set())
+        self.approval_browser_button.setVisible(
+            self.approval_pending and self.browser is not None and not self.browser.isVisible())
         allowed = [i for i, item in enumerate(self.records)
                    if self._recording_name(item) not in self.blocked_names]
         self.previous_button.setEnabled(index >= 0 and any(i < index for i in allowed))
@@ -637,6 +742,7 @@ class ImportWindow(QMainWindow):
             self.status_label.setText(str(error))
             return
         self.upload_running = True
+        self.approval_pending = True
         if not self.busy:
             self.busy = True
             self.job_kind = "upload"
@@ -644,11 +750,11 @@ class ImportWindow(QMainWindow):
         self.upload_saved = False
         self.upload_cancel_event.clear()
         self.upload_states[record.unit_id] = "承認待ち"
-        self.upload_status_label.setText(f"{record.created_text} — ブラウザで提供を承認してください。")
+        self.upload_status_label.setText(f"{record.created_text} — アプリ内で提供を承認してください。")
         self.upload_status_label.setVisible(True)
         self.upload_progress_bar.setRange(0, 0)
         self.upload_progress_bar.setVisible(True)
-        self.status_label.setText("ブラウザで、この録画の提供を承認してください。")
+        self.status_label.setText("この録画の提供を承認してください。")
         self._update_controls()
         self.refresh_recordings(rescan=False)
         profile = self.profile
@@ -660,8 +766,9 @@ class ImportWindow(QMainWindow):
             try:
                 gateway = self.gateway_factory(profile)
                 approval_event_id = self.approver(
-                    record.path, gateway, cancel_event=self.upload_cancel_event, open_browser=webbrowser.open,
+                    record.path, gateway, cancel_event=self.upload_cancel_event, open_browser=self._open_browser,
                 )
+                self.signals.approval_done.emit()
                 uploader = self.uploader_factory(profile, gateway=gateway,
                                                 state_dir=self.data_root / "uploads")
                 result = uploader.upload_recording(record.path, approval_event_id,
@@ -685,7 +792,7 @@ class ImportWindow(QMainWindow):
                 error = str(failure)
             except Exception:
                 # Unexpected HTTP/library errors can contain request headers or credential details.
-                error = "アップロードできませんでした。インターネット接続を確認し、もう一度「アップロード」を押してください。"
+                error = "アップロードできませんでした。インターネット接続を確認し、もう一度「承認へ進む」を押してください。"
             finally:
                 if uploader is not None:
                     try:
@@ -729,6 +836,9 @@ class ImportWindow(QMainWindow):
 
     @Slot(object, str, bool, str)
     def _upload_finished(self, result, error, cancelled, cleanup_error=""):
+        self.approval_pending = False
+        if self.browser is not None:
+            self.browser.dismiss()
         record = self.upload_record
         self.upload_running = False
         self.upload_worker = None
@@ -768,10 +878,10 @@ class ImportWindow(QMainWindow):
             text = cleanup_error or f"{record.created_text} のアップロードが完了しました。"
         elif cancelled:
             self.upload_states[record.unit_id] = "中止・再開できます"
-            text = "アップロードを中止しました。同じ録画を選んで「アップロード」を押すと再開できます。"
+            text = "アップロードを中止しました。同じ録画を選んで「承認へ進む」を押すと再開できます。"
         else:
             self.upload_states[record.unit_id] = "再度アップロードできます"
-            text = error or self.completion_error or "アップロードの完了を確認できませんでした。もう一度「アップロード」を押してください。"
+            text = error or self.completion_error or "アップロードの完了を確認できませんでした。もう一度「承認へ進む」を押してください。"
         self.status_label.setText(text)
         self.upload_status_label.setText(text)
         self.upload_status_label.setVisible(True)
@@ -804,6 +914,9 @@ class ImportWindow(QMainWindow):
             return
         self.preview.clear()
         self._refresh_timer.stop()
+        if self.browser is not None:
+            self.browser.shutdown()
+            self.browser = None
         self.account.close()
         if self.workspace is not None:
             self.workspace.close()

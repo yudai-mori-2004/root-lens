@@ -1,4 +1,4 @@
-"""A PC restart must leave no authoritative recording cache or login token."""
+"""A PC restart discards recording copies and retains only the login session."""
 
 from pathlib import Path
 import tempfile
@@ -27,11 +27,14 @@ class WorkspaceTests(unittest.TestCase):
             self.assertNotEqual(first_run, second.path)
             second.close()
 
-    def test_login_token_does_not_survive_a_new_store(self):
-        first = SessionStore()
-        first.save("s" * 43)
-        self.assertIsNone(SessionStore().load())
-        first.clear()
+    def test_login_token_survives_a_new_store(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "session.token"
+            first = SessionStore(path)
+            first.save("s" * 43)
+            self.assertEqual(SessionStore(path).load(), "s" * 43)
+            first.clear()
+            self.assertIsNone(SessionStore(path).load())
 
     def test_default_cache_resolves_a_symlinked_system_temp_directory(self):
         with tempfile.TemporaryDirectory() as temporary:

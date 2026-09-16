@@ -98,6 +98,21 @@ class DesktopTests(unittest.TestCase):
         self.window.start_import()
         self.importer.assert_not_called()
 
+    def test_saved_login_restores_site_without_reloading_local_recordings(self):
+        account = Mock()
+        account.api_origin = "https://www.rootlens.io"
+        account.store.load.return_value = "s" * 43
+        account.current.return_value = {
+            "token": "s" * 43,
+            "sites": [{"id": self.profile.site_id, "name": self.profile.site_name}],
+        }
+        self.window.account = account
+        self.window.restore_session()
+        wait_for(lambda: self.window.profile is not None)
+        self.assertEqual(self.window.profile.site_id, self.profile.site_id)
+        self.assertEqual(self.window.records, [])
+        self.importer.assert_not_called()
+
     def test_logout_removes_the_previous_sites_recordings_from_the_window(self):
         self.populate()
         self.assertEqual(len(self.window.records), 2)
@@ -359,7 +374,7 @@ class DesktopTests(unittest.TestCase):
         self.window._clip_progress(ClipProgress('rec-20260911T000001.000Z', None, 'drive_saved'))
         self.window._flush_progress()
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
-        self.assertEqual(self.window.count_label.text(), '内容確認・アップロード待ち 0 件')
+        self.assertEqual(self.window.count_label.text(), '録画 0 件')
 
 
 if __name__ == '__main__':

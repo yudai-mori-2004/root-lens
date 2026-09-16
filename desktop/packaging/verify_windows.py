@@ -128,6 +128,7 @@ def main(arguments=None):
                     raise RuntimeError("A site profile or recording was included in the bundle.")
             for label, flags in (("bundle-runtime", ["--check-runtime"]),
                                  ("bundle-media", ["--check-media", sample]),
+                                 ("bundle-browser", ["--check-browser"]),
                                  ("bundle-cli", ["--cli", "--help"])):
                 evidence["checks"][label] = diagnostic(executable, label, flags, output, environment)
             evidence["checks"]["bundle-gui"] = launch_gui(executable, environment, output, "bundle-gui")
@@ -145,6 +146,7 @@ def main(arguments=None):
             evidence["checks"]["installed-icon"] = verify_executable_icon(installed_executable, output, "installed")
             for label, flags in (("installed-runtime", ["--check-runtime"]),
                                  ("installed-media", ["--check-media", sample]),
+                                 ("installed-browser", ["--check-browser"]),
                                  ("installed-cli", ["--cli", "--help"])):
                 evidence["checks"][label] = diagnostic(installed_executable, label, flags, output, environment)
             evidence["checks"]["installed-gui"] = launch_gui(installed_executable, environment, output, "installed-gui")

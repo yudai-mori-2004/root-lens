@@ -197,6 +197,21 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertIn("承認されませんでした", self.window.status_label.text())
         self.assertEqual([record.path for record in self.window.records], self.clips)
 
+    def test_closing_approval_screen_does_not_cancel_a_completed_approval(self):
+        browser = Mock()
+        browser.isVisible.return_value = False
+        self.window.browser = browser
+        self.window.upload_running = True
+        self.window.approval_pending = True
+        self.window._browser_rejected()
+        self.assertFalse(self.window.upload_cancel_event.is_set())
+        self.assertFalse(self.window.approval_browser_button.isHidden())
+        self.window.show_approval_browser()
+        browser.show.assert_called_once()
+        self.window._approval_complete()
+        browser.dismiss.assert_called_once()
+        self.window.upload_running = False
+
     def test_progress_does_not_hide_recording_before_verified_upload_result(self):
         self.begin_held_upload()
         digest = self.records[0].unit_id
@@ -231,7 +246,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.upload_button.isEnabled())
         self.assertFalse(self.clips[0].exists())
         self.assertIn("アップロードが完了", self.window.status_label.text())
-        self.assertEqual(self.window.count_label.text(), "内容確認・アップロード待ち 0 件")
+        self.assertEqual(self.window.count_label.text(), "録画 0 件")
 
     def test_restart_does_not_rebuild_pending_list_from_local_copies(self):
         self.uploader.upload_recording.side_effect = self.uploaded_to_drive
@@ -248,7 +263,7 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
-        self.assertEqual(self.window.count_label.text(), "内容確認・アップロード待ち 1 件")
+        self.assertEqual(self.window.count_label.text(), "録画 1 件")
         self.assertNotIn('drive_recordings', self.importer.call_args.kwargs)
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
@@ -262,7 +277,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
-        self.assertEqual(self.window.count_label.text(), '内容確認・アップロード待ち 1 件')
+        self.assertEqual(self.window.count_label.text(), '録画 1 件')
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
 
@@ -389,7 +404,7 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual(len(self.window.records), 2)
         self.assertIn("中止", self.window.status_label.text())
-        self.assertEqual(self.window.upload_button.text(), "アップロード")
+        self.assertEqual(self.window.upload_button.text(), "承認へ進む")
         self.assertTrue(self.window.upload_button.isEnabled())
         self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
         self.uploader.upload_recording.side_effect = ImportFailure("通信が途切れました")

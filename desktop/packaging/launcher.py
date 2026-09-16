@@ -36,5 +36,8 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["--check-runtime"]:
         from runtime_check import main
         sys.exit(main(sys.argv[2:]))
+    if sys.argv[1:2] == ["--check-browser"]:
+        from browser_check import main
+        sys.exit(main(sys.argv[2:]))
     from rootlens_import.desktop import main
     sys.exit(main())
