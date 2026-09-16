@@ -113,6 +113,10 @@ def main(arguments=None):
     evidence = {"platform": "Windows x64", "installer": installer.name,
                 "installer_bytes": installer.stat().st_size, "installer_sha256": sha256(installer), "checks": {}}
     environment = dict(os.environ)
+    # GitHub's virtual display has no usable GPU video surfaces; exercise the
+    # packaged FFmpeg decoder on its software path instead.
+    environment["QT_FFMPEG_DECODING_HW_DEVICE_TYPES"] = ","
+    environment["QT_DISABLE_HW_TEXTURES_CONVERSION"] = "1"
     # Prevent developer installations on PATH from hiding a missing bundled runtime.
     environment["PATH"] = os.pathsep.join([os.path.join(os.environ["SystemRoot"], "System32"),
                                            os.environ["SystemRoot"]])
