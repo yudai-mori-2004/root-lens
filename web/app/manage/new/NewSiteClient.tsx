@@ -78,7 +78,7 @@ export default function NewSiteClient({ agreement }: { agreement: string }) {
       <Link className={styles.button} href={`/manage/${createdSiteId}`}>事業所ページを開く</Link>
     </div> : <form onSubmit={register}>
       <div className={styles.field}><label htmlFor="siteName">店舗・事業所名</label><input id="siteName" value={siteName} disabled={phase === "saving"} onChange={(event) => { setSiteName(event.target.value); setSiteAgreed(false); }} /></div>
-      <div className={styles.field}><label htmlFor="signerName">氏名</label><input id="signerName" value={signerName} disabled={phase === "saving"} onChange={(event) => { setSignerName(event.target.value); setSiteAgreed(false); }} /></div>
+      <div className={styles.field}><label htmlFor="signerName">現場監督者氏名</label><input id="signerName" value={signerName} disabled={phase === "saving"} onChange={(event) => { setSignerName(event.target.value); setSiteAgreed(false); }} /></div>
       <AgreementDocument body={agreementBodyForSite(agreement, siteName.trim() || "店舗・事業所名")} />
       <label className={styles.check}><input type="checkbox" checked={siteAgreed} disabled={phase === "saving"} onChange={(event) => setSiteAgreed(event.target.checked)} /><span>事業所を代表して現場合意書の全内容に合意します。</span></label>
       {phase === "saving" && <p className={styles.registrationProgress} role="status"><LoaderCircle size={20} aria-hidden="true" />事業所と同意記録を保存しています。完了後、事業所ページへ進みます。</p>}
