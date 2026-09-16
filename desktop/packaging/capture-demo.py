@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QApplication
 from rootlens_import.desktop import ImportWindow
 from rootlens_import.core import ClipProgress, FILES, ImportCancelled
 from rootlens_import.drive import UploadProgress, UploadResult
+from rootlens_import.device_sync import DeviceSource
 from rootlens_import.library import recordings_directory
 from rootlens_import.site import SiteProfile
 from rootlens_import.branding import APP_NAME, app_icon
@@ -134,7 +135,10 @@ def main(arguments=None):
             window.set_profile(SiteProfile(args.site_id, args.site_name))
             window._drive_checked({}, "")
             for index, clip in enumerate(sorted(root.iterdir())):
-                window._clip_progress(ClipProgress(f"rec-20260911T0{index}0000.000Z", clip, "ready"))
+                name = f"rec-20260911T0{index}0000.000Z"
+                window._clip_progress(ClipProgress(name, clip, "ready"))
+                window._source_available(DeviceSource(None, "demonstration-device", "/demonstration", name,
+                                                      clip.name, data / "demonstration-lock"))
             window._flush_progress()
             window.status_label.setText("操作説明用サンプル：実際の撮影データではありません。")
             window.select_relative(1)
@@ -148,6 +152,7 @@ def main(arguments=None):
             wait_for(lambda: len(frames) > 10 and any(audio))
             window.preview.toggle_playback()
             snapshot(f"03-{args.site_id}-review")
+            uploaded_unit_id = window.selected_recording().unit_id
             window.start_upload()
             wait_for(lambda: "42%" in window.status_label.text() and not window._refresh_timer.isActive())
             snapshot("04-upload-progress")
@@ -160,7 +165,8 @@ def main(arguments=None):
             snapshot("05-upload-complete")
             assert len(window.records) == 2 and window.recording_list.topLevelItemCount() == 2
             manifest.update(decoded_video_frames=len(frames), valid_audio_buffers=sum(bool(size) for size in audio),
-                            all_original_files_retained=all(len(list(clip.iterdir())) == 4 for clip in root.iterdir()))
+                            uploaded_local_copy_removed=not (root / uploaded_unit_id).exists(),
+                            pending_local_copies_retained=all(len(list(clip.iterdir())) == 4 for clip in root.iterdir()))
             (output / "capture-manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         finally:
             release.set()
