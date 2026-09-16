@@ -13,6 +13,7 @@ export default async function SiteLayout({
   const navItems = [
     { href: "/contribute", label: ja ? "撮影に協力" : "Contribute" },
     { href: "/buy", label: ja ? "データの購入" : "Buy data" },
+    { href: "/manage", label: ja ? "事業所管理" : "Manage sites" },
     { href: "/data-policy", label: ja ? "データポリシー" : "Data policy" },
   ];
   const secondaryNavItems = [
