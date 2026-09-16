@@ -1,6 +1,7 @@
 """Decode synthetic video and audio through the embedded player."""
 
 from pathlib import Path
+import os
 import shutil
 import tempfile
 import unittest
@@ -34,6 +35,8 @@ class PreviewTests(unittest.TestCase):
         self.preview.deleteLater()
         QApplication.processEvents()
 
+    @unittest.skipIf(os.name == 'nt' and os.environ.get('CI') == 'true',
+                     'The installed Windows app is tested with --check-media in acceptance.')
     def test_embedded_player_decodes_video_frames_and_audio_buffers(self):
         video_frames, audio_buffers = [], []
         self.preview.video.videoSink().videoFrameChanged.connect(lambda frame: video_frames.append(frame.isValid()))
