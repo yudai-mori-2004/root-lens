@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import SiteHeader from "@/components/shared/SiteHeader";
 import styles from "../manage/operator.module.css";
 
 export default function LoginClient() {
@@ -22,7 +22,7 @@ export default function LoginClient() {
     return true;
   }
   return <div className={styles.shell}>
-    <header className={styles.header}><Link className={styles.brand} href="/">RootLens</Link></header>
+    <SiteHeader />
     <main className={`${styles.main} ${styles.narrow}`}>
       <h1 className={styles.title}>SMSでログイン</h1>
       <p className={styles.lead}>携帯電話に届く6桁の確認コードを使います。</p>

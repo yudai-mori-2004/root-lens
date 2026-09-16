@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import SiteHeader from "@/components/shared/SiteHeader";
 import styles from "../operator.module.css";
 
 export default function NewSiteClient({ agreement, consent }: { agreement: string; consent: string }) {
   const [siteName, setSiteName] = useState(""); const [signerName, setSignerName] = useState("");
   const [agreed, setAgreed] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  return <div className={styles.shell}><header className={styles.header}><Link className={styles.brand} href="/manage">RootLens</Link></header><main className={styles.main}>
+  return <div className={styles.shell}><SiteHeader /><main className={styles.main}>
+    <Link className={styles.backLink} href="/manage">← 事業所一覧</Link>
     <h1 className={styles.title}>新しい事業所を登録</h1><p className={styles.lead}>事業所を登録する方が最初の現場監督者になります。現場合意と、ご本人の撮影参加への同意を同時に記録します。</p>
     <form onSubmit={async (event) => { event.preventDefault(); setBusy(true); setError(""); const response = await fetch("/api/operator/sites", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ siteName, signerName, agreed }) }); const value = await response.json(); setBusy(false); if (response.status === 401) return location.assign("/login?next=/manage/new"); if (!response.ok) return setError(value.error); location.assign(`/manage/${value.siteId}`); }}>
       <div className={styles.field}><label htmlFor="siteName">店舗・事業所名</label><input id="siteName" value={siteName} onChange={(event) => setSiteName(event.target.value)} /></div>
