@@ -60,36 +60,24 @@ class Session:
 
 
 class AccountTests(unittest.TestCase):
-    def test_session_store_uses_private_file_and_clear_removes_it(self):
+    def test_session_store_lives_only_in_memory(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "session.json"
-            store = SessionStore(path)
+            store = SessionStore()
             token = "s" * 43
             self.assertIsNone(store.load())
             store.save(token)
             self.assertEqual(store.load(), token)
-            if os.name != "nt":
-                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            store.clear()
             self.assertFalse(path.exists())
+            self.assertIsNone(SessionStore().load())
+            store.clear()
+            self.assertIsNone(store.load())
 
-    def test_session_store_rejects_malformed_file(self):
+    def test_legacy_session_file_is_not_read(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "session.json"
-            path.write_text('{"schema":"rootlens.desktop-session.v1","token":"short"}')
-            with self.assertRaisesRegex(ImportFailure, "ログイン情報を読み込めません"):
-                SessionStore(path).load()
-
-    @unittest.skipIf(os.name == "nt", "Windows link creation requires elevated privileges")
-    def test_session_store_does_not_follow_symbolic_link(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            target = root / "target.json"
-            target.write_text('{"schema":"rootlens.desktop-session.v1","token":"' + "s" * 43 + '"}')
-            path = root / "session.json"
-            path.symlink_to(target)
-            with self.assertRaisesRegex(ImportFailure, "ログイン情報を読み込めません"):
-                SessionStore(path).load()
+            path.write_text('{"schema":"rootlens.desktop-session.v1","token":"' + "s" * 43 + '"}')
+            self.assertIsNone(SessionStore().load())
 
     def test_browser_login_returns_to_loopback_and_saves_only_rootlens_session(self):
         session, store = Session(), Store()

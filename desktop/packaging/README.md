@@ -38,8 +38,7 @@ Only Qt Widgets and Multimedia are used; the build excludes Tk and Qt WebEngine.
 ## Application identity
 
 The app, installer and shortcuts display **RootLens**. The executable name, Mac bundle
-filename, Windows installation directory and application-data directory remain **RootLens Import**
-so updates retain existing settings and recordings. The Windows installer replaces the old
+filename and Windows installation directory remain **RootLens Import**. Login and recording copies are no longer retained between launches. The Windows installer replaces the old
 RootLens Import shortcuts with RootLens shortcuts.
 
 `rootlens_import/assets/rootlens.png` is an exact copy of the existing `mobile/assets/icon.png`.
@@ -181,7 +180,7 @@ Run core, library and desktop tests before building. On each supported OS, verif
 fresh installation without Python or ADB on PATH; missing-device feedback; import and
 re-import; USB disconnect and cancellation; Explorer/Finder selection of the whole recording
 folder; site-profile loading; embedded video and audio playback; previous/next navigation;
-and login, upload, and server-side verification against a test site's restricted Drive destination.
+and SMS login, upload, and server-side verification against a test site's restricted Drive destination.
 Keep unverified platform artifacts out of the site's production app folder.
 
 ## Site access
@@ -189,7 +188,7 @@ Keep unverified platform artifacts out of the site's production app folder.
 Register each field supervisor with a site before using the app. The supervisor opens
 **SMSでログイン** in the desktop settings, completes SMS verification in the system browser,
 and returns to the app through an IPv4 loopback callback. The desktop stores only the opaque
-RootLens session in its private application-data directory and deletes it on logout.
+RootLens session in memory for the running application only. A new launch requires SMS verification.
 
 RootLens manages each site's destination in the **RootLens Submit** shared Drive. The RootLens
 server accesses it with its dedicated service account. The desktop never receives a Google refresh

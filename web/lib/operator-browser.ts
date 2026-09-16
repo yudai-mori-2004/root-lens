@@ -7,7 +7,8 @@ export const OPERATOR_COOKIE = "rootlens_operator";
 const THIRTY_DAYS = 30 * 24 * 60 * 60_000;
 
 export function issueOperatorCookie(identityId: string): string {
-  return issueSignedToken({ identityId, expiresAt: Date.now() + THIRTY_DAYS });
+  const authenticatedAt = Date.now();
+  return issueSignedToken({ identityId, authenticatedAt, expiresAt: authenticatedAt + THIRTY_DAYS });
 }
 
 function cookieValue(request: Request): string | null {
@@ -24,6 +25,16 @@ export function operatorIdentityId(request: Request): string | null {
     const value = readSignedToken(cookieValue(request) ?? "");
     return typeof value.identityId === "string" && typeof value.expiresAt === "number"
       && value.expiresAt > Date.now() ? value.identityId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function operatorAuthenticatedAt(request: Request): number | null {
+  try {
+    const value = readSignedToken(cookieValue(request) ?? "");
+    return typeof value.authenticatedAt === "number" && typeof value.expiresAt === "number"
+      && value.expiresAt > Date.now() ? value.authenticatedAt : null;
   } catch {
     return null;
   }

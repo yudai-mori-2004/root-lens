@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { desktopAuthorizationCodes, desktopLoginRequests, operatorMemberships, people } from "@/db/schema";
 import { randomToken, secureEqual } from "@/lib/desktop-auth-values";
 import { sha256 } from "@/lib/encoding";
-import { authenticateOperator } from "@/lib/operator-browser";
+import { authenticateOperator, operatorAuthenticatedAt } from "@/lib/operator-browser";
 
 const bodySchema = z.object({ requestId: z.string().min(1).max(100), state: z.string().min(32).max(200) });
 
@@ -21,6 +21,9 @@ export async function POST(request: Request) {
   )).limit(1);
   if (!attempt || !secureEqual(attempt.stateSha256, sha256(parsed.data.state))) {
     return Response.json({ error: "接続要求が無効か期限切れです。" }, { status: 410 });
+  }
+  if ((operatorAuthenticatedAt(request) ?? 0) < attempt.createdAt.getTime()) {
+    return Response.json({ error: "このアプリへの接続にはSMS認証が必要です。" }, { status: 401 });
   }
   const memberships = await db.select({ id: people.id }).from(operatorMemberships)
     .innerJoin(people, eq(people.id, operatorMemberships.personId))

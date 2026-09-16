@@ -87,17 +87,24 @@ class DesktopTests(unittest.TestCase):
         root = recordings_directory(self.profile.site_id, self.root / "data")
         clip = make_recording(root)
         save_site_profile(self.profile, self.profile_path)
-        self.window._load_saved_profile()
         self.importer.assert_not_called()
         self.assertEqual(self.window.records, [])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
         self.assertEqual(self.window.connect_button.text(), "接続")
-        self.assertTrue(self.window.connect_button.isEnabled())
+        self.assertFalse(self.window.connect_button.isEnabled())
 
     def test_first_launch_requires_site_before_connection(self):
         self.assertFalse(self.window.connect_button.isEnabled())
         self.window.start_import()
         self.importer.assert_not_called()
+
+    def test_logout_removes_the_previous_sites_recordings_from_the_window(self):
+        self.populate()
+        self.assertEqual(len(self.window.records), 2)
+        self.window.logout()
+        self.assertIsNone(self.window.profile)
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
+        self.assertFalse(self.window.upload_button.isEnabled())
 
     def test_login_completion_saves_and_selects_the_only_site(self):
         self.window.busy = True
@@ -105,7 +112,7 @@ class DesktopTests(unittest.TestCase):
         self.window._login_finished({"sites": [{"id": "site_live", "name": "営業所"}]}, "")
         self.assertEqual(self.window.profile.site_id, "site_live")
         self.assertEqual(self.window.profile.site_name, "営業所")
-        self.assertEqual(json.loads(self.profile_path.read_text())["site_id"], "site_live")
+        self.assertFalse(self.profile_path.exists())
         self.assertFalse(self.window.busy)
 
     def test_previous_next_follow_saved_recordings_and_release_old_source(self):
@@ -191,7 +198,7 @@ class DesktopTests(unittest.TestCase):
         wait_for(lambda: self.window.recording_list.topLevelItemCount() == 2)
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 2)
         pending = self.window.recording_list.topLevelItem(1)
-        self.assertEqual(pending.text(1), "PCへコピー中")
+        self.assertEqual(pending.text(1), "確認用にコピー中")
         self.assertFalse(pending.flags() & Qt.ItemFlag.ItemIsSelectable)
         self.assertEqual(len(self.window.records), 1)
 
@@ -286,7 +293,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(opened.call_args.args[0].toString(),
                          "https://www.rootlens.io/evidence/sites/site_fixture/approved-data")
         self.assertEqual(set(clips[0].iterdir()), before)
-        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "内容確認待ち")
+        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "確認できます")
 
     def test_close_cancels_import_before_releasing_window(self):
         self.populate(1)

@@ -111,6 +111,21 @@ class DeviceSyncTests(unittest.TestCase):
         self.assertIs(result.sources[self.unit_id].adb, self.adb)
         self.assertEqual(result.sources[self.unit_id].serial, "USB_FIXTURE")
 
+    def test_ready_source_can_be_used_before_later_import_finishes(self):
+        published = []
+        def on_source(source):
+            published.append(source)
+            device_sync.cleanup_uploaded_recording(
+                source, drive_reader=lambda unit_ids: {self.unit_id: object()}, log=lambda _: None,
+            )
+        result = device_sync.sync_recordings(
+            self.output, drive_reader=self.reader, site_id="fixture",
+            log=lambda _: None, on_source=on_source,
+        )
+        self.assertEqual(result.imported, 1)
+        self.assertEqual(len(published), 1)
+        self.cleanup.assert_called_once()
+
     def test_saved_clip_goes_to_full_cleanup_without_copying(self):
         snapshot = object()
         self.reader.return_value = {self.unit_id: snapshot}
@@ -261,9 +276,14 @@ class DeviceSyncTests(unittest.TestCase):
         result = self.sync()
         source = result.sources[self.unit_id]
         reader = Mock(return_value={self.unit_id: object()})
-        device_sync.cleanup_uploaded_recording(source, drive_reader=reader)
+        import_cancel = threading.Event()
+        upload_cancel = threading.Event()
+        self.adb.cancel_event = import_cancel
+        device_sync.cleanup_uploaded_recording(source, drive_reader=reader,
+                                               cancel_event=upload_cancel)
         self.assertIs(self.cleanup.call_args.args[0], self.adb)
         self.assertEqual(self.cleanup.call_args.args[2:4], (self.name, self.unit_id))
+        self.assertIs(self.adb.cancel_event, import_cancel)
 
     def test_upload_cleanup_rejects_replacement_serial(self):
         source = self.sync().sources[self.unit_id]

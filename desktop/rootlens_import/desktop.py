@@ -23,13 +23,14 @@ from .approval import approve_recording
 from .drive import DriveUploader, UploadProgress, UploadResult
 from .library import read_recording, recordings_directory, settings_path
 from .preview import VideoPreview
-from .site import SiteProfile, load_site_profile, save_site_profile
+from .site import SiteProfile
+from .workspace import WorkWorkspace
 
 
 PROGRESS_LABELS = {
-    "discovering": "端末を確認中", "importing": "PCへコピー中",
-    "verifying": "端末とPCを照合中",
-    "ready": "内容確認待ち", "drive_saved": "Driveに保存済み",
+    "discovering": "端末を確認中", "importing": "確認用にコピー中",
+    "verifying": "端末と確認用データを照合中",
+    "ready": "確認できます", "drive_saved": "Driveに保存済み",
     "deleting": "端末から削除中", "cleanup_pending": "端末の削除待ち",
     "local_cleanup_pending": "PCのコピー削除待ち",
     "incomplete": "端末の保存未完了", "error": "取り込みエラー",
@@ -72,6 +73,7 @@ def reveal_folder(path):
 class ImportSignals(QObject):
     log = Signal(str)
     clip = Signal(object)
+    source = Signal(object)
     done = Signal(object, str, bool)
     drive_checked = Signal(object, str)
     upload_progress = Signal(object)
@@ -85,7 +87,8 @@ class ImportWindow(QMainWindow):
                  gateway_factory=None, approver=None):
         super().__init__()
         self.profile_path = Path(profile_path) if profile_path is not None else settings_path()
-        self.data_root = data_root
+        self.workspace = WorkWorkspace() if data_root is None else None
+        self.data_root = self.workspace.path if self.workspace is not None else Path(data_root)
         self.importer = importer or sync_recordings
         self.cleaner = cleaner or cleanup_uploaded_recording
         self.uploader_factory = uploader_factory or DriveUploader
@@ -104,6 +107,7 @@ class ImportWindow(QMainWindow):
         self.upload_saved = False
         self.progress_states = {}
         self.device_sources = {}
+        self.uploaded_unit_ids = set()
         self.recording_names = {}
         self.blocked_names = set()
         self.busy = False
@@ -111,6 +115,9 @@ class ImportWindow(QMainWindow):
         self.closing = False
         self.cancel_event = threading.Event()
         self.worker = None
+        self.upload_running = False
+        self.upload_cancel_event = threading.Event()
+        self.upload_worker = None
         self._library_dirty = False
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setSingleShot(True)
@@ -120,13 +127,14 @@ class ImportWindow(QMainWindow):
         queued = Qt.ConnectionType.QueuedConnection
         self.signals.log.connect(self._show_log, queued)
         self.signals.clip.connect(self._clip_progress, queued)
+        self.signals.source.connect(self._source_available, queued)
         self.signals.done.connect(self._import_finished, queued)
         self.signals.drive_checked.connect(self._drive_checked, queued)
         self.signals.upload_progress.connect(self._upload_progress, queued)
         self.signals.upload_done.connect(self._upload_finished, queued)
         self.signals.login_done.connect(self._login_finished, queued)
         self._build()
-        self._load_saved_profile()
+        self.status_label.setText("「設定」からSMSでログインしてください。")
 
     def _build(self):
         self.setWindowTitle(APP_NAME)
@@ -261,24 +269,19 @@ class ImportWindow(QMainWindow):
         self.setCentralWidget(page)
         self._update_controls()
 
-    def _load_saved_profile(self):
-        if not self.profile_path.exists():
-            self.status_label.setText("「設定」からSMSでログインしてください。")
-            return
-        try:
-            self.set_profile(load_site_profile(self.profile_path))
-        except (ImportFailure, OSError, ValueError) as error:
-            self.status_label.setText(f"事業所の設定を読み込めません。「設定」から読み込み直してください。\n{error}")
-
     def set_profile(self, profile):
         if self.busy:
             raise ImportFailure("現在の作業が終わってから事業所を変更してください。")
+        if self.workspace is not None and self.profile is not None and self.profile.site_id != profile.site_id:
+            self.preview.clear()
+            self.data_root = self.workspace.reset()
         directory = recordings_directory(profile.site_id, self.data_root)
         self.preview.clear()
         self.profile = profile
         self.recordings_root = directory
         self.progress_states.clear()
         self.device_sources.clear()
+        self.uploaded_unit_ids.clear()
         self.recording_names.clear()
         self.blocked_names.clear()
         self.upload_states.clear()
@@ -357,17 +360,24 @@ class ImportWindow(QMainWindow):
                 return
             selected = sites[labels.index(label)]
         profile = SiteProfile(selected["id"], selected["name"], self.account.api_origin)
-        save_site_profile(profile, self.profile_path)
         self.set_profile(profile)
 
     def logout(self):
         try:
             self.account.logout()
-            self.profile_path.unlink(missing_ok=True)
+            self.preview.clear()
+            if self.workspace is not None:
+                self.data_root = self.workspace.reset()
             self.profile = None
             self.recordings_root = None
             self.records = []
             self.all_records = []
+            self.progress_states.clear()
+            self.device_sources.clear()
+            self.uploaded_unit_ids.clear()
+            self.recording_names.clear()
+            self.blocked_names.clear()
+            self.upload_states.clear()
             self.refresh_recordings(rescan=False)
             self.site_label.setText("事業所：未設定")
             self.status_label.setText("ログアウトしました。「設定」からRootLensへログインしてください。")
@@ -474,13 +484,16 @@ class ImportWindow(QMainWindow):
         self.settings_button.setEnabled(not self.busy and not self.closing)
         self.folder_button.setEnabled(record is not None and not self.closing)
         self.drive_button.setEnabled(self.profile is not None and not self.closing)
-        upload_ready = (record is not None and self.profile is not None
-                        and not self.busy and not self.closing and not self.completion_error)
+        upload_ready = (record is not None and record.unit_id in self.device_sources
+                        and self.profile is not None
+                        and not self.upload_running and not self.closing
+                        and (not self.busy or self.job_kind == "import")
+                        and not self.completion_error)
         self.upload_button.setEnabled(bool(upload_ready))
         self.upload_button.setToolTip(self.completion_error if self.completion_error else
                                      ("" if self.profile else "「設定」からSMSでログインしてください。"))
-        self.cancel_upload_button.setVisible(self.busy and self.job_kind == "upload")
-        self.cancel_upload_button.setEnabled(self.busy and self.job_kind == "upload" and not self.cancel_event.is_set())
+        self.cancel_upload_button.setVisible(self.upload_running)
+        self.cancel_upload_button.setEnabled(self.upload_running and not self.upload_cancel_event.is_set())
         allowed = [i for i, item in enumerate(self.records)
                    if self._recording_name(item) not in self.blocked_names]
         self.previous_button.setEnabled(index >= 0 and any(i < index for i in allowed))
@@ -491,6 +504,7 @@ class ImportWindow(QMainWindow):
             return
         self.busy = True
         self.device_sources.clear()
+        self.uploaded_unit_ids.clear()
         self.recording_names.clear()
         self.job_kind = "import"
         self.cancel_event.clear()
@@ -510,6 +524,7 @@ class ImportWindow(QMainWindow):
             try:
                 summary = self.importer(output=directory, log=self.signals.log.emit,
                                         cancel_event=self.cancel_event, on_clip=self.signals.clip.emit,
+                                        on_source=self.signals.source.emit,
                                         site_id=profile.site_id,
                                         drive_reader=lambda unit_ids: self.drive_reader(
                                             profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
@@ -557,6 +572,13 @@ class ImportWindow(QMainWindow):
         if not self._refresh_timer.isActive():
             self._refresh_timer.start()
 
+    @Slot(object)
+    def _source_available(self, source):
+        if source.unit_id not in self.uploaded_unit_ids:
+            self.device_sources[source.unit_id] = source
+            self.recording_names[source.unit_id] = source.name
+            self._update_controls()
+
     def _flush_progress(self):
         rescan = self._library_dirty
         self._library_dirty = False
@@ -564,8 +586,9 @@ class ImportWindow(QMainWindow):
 
     @Slot(object, str, bool)
     def _import_finished(self, summary, error, cancelled):
-        self.busy = False
+        self.busy = self.upload_running
         self.job_kind = None
+        self.worker = None
         self._refresh_timer.stop()
         self._library_dirty = False
         self.progress.setVisible(False)
@@ -575,7 +598,8 @@ class ImportWindow(QMainWindow):
             self.device_sources.clear()
             self.recording_names.clear()
         else:
-            self.device_sources = dict(getattr(summary, "sources", {}))
+            self.device_sources = {unit_id: source for unit_id, source in getattr(summary, "sources", {}).items()
+                                   if unit_id not in self.uploaded_unit_ids}
             self.recording_names.update({unit_id: source.name for unit_id, source in self.device_sources.items()})
         self.refresh_recordings()
         if self.closing:
@@ -602,8 +626,9 @@ class ImportWindow(QMainWindow):
 
     def start_upload(self):
         record = self.selected_recording()
-        if (record is None or self.profile is None
-                or self.busy or self.closing or self.completion_error):
+        if (record is None or record.unit_id not in self.device_sources or self.profile is None
+                or self.upload_running or self.closing or self.completion_error
+                or self.busy and self.job_kind != "import"):
             return
         try:
             read_recording(record.path)
@@ -611,11 +636,13 @@ class ImportWindow(QMainWindow):
             self.refresh_recordings()
             self.status_label.setText(str(error))
             return
-        self.busy = True
-        self.job_kind = "upload"
+        self.upload_running = True
+        if not self.busy:
+            self.busy = True
+            self.job_kind = "upload"
         self.upload_record = record
         self.upload_saved = False
-        self.cancel_event.clear()
+        self.upload_cancel_event.clear()
         self.upload_states[record.unit_id] = "承認待ち"
         self.upload_status_label.setText(f"{record.created_text} — ブラウザで提供を承認してください。")
         self.upload_status_label.setVisible(True)
@@ -633,20 +660,21 @@ class ImportWindow(QMainWindow):
             try:
                 gateway = self.gateway_factory(profile)
                 approval_event_id = self.approver(
-                    record.path, gateway, cancel_event=self.cancel_event, open_browser=webbrowser.open,
+                    record.path, gateway, cancel_event=self.upload_cancel_event, open_browser=webbrowser.open,
                 )
-                uploader = self.uploader_factory(profile, gateway=gateway)
+                uploader = self.uploader_factory(profile, gateway=gateway,
+                                                state_dir=self.data_root / "uploads")
                 result = uploader.upload_recording(record.path, approval_event_id,
                                                    on_progress=self.signals.upload_progress.emit,
-                                                   cancel_event=self.cancel_event)
+                                                   cancel_event=self.upload_cancel_event)
                 if isinstance(result, UploadResult) and result.unit_id == record.unit_id:
                     self.signals.upload_progress.emit(UploadProgress(record.unit_id, "cleaning_device",
                                                       result.total_bytes, result.total_bytes))
                     self.signals.log.emit("保存を確認しました。スマートグラスから録画を削除しています…")
                     try:
                         self.cleaner(source, drive_reader=lambda unit_ids: self.drive_reader(
-                            profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
-                                     log=self.signals.log.emit, cancel_event=self.cancel_event)
+                            profile, unit_ids, self.upload_cancel_event, self.gateway_factory(profile)),
+                                     log=self.signals.log.emit, cancel_event=self.upload_cancel_event)
                     except (ImportFailure, OSError):
                         cleanup_error = "アップロードは完了しました。端末からの削除は、次の接続で再試行します。"
                     except Exception:
@@ -665,12 +693,12 @@ class ImportWindow(QMainWindow):
                     except Exception:
                         pass
             self.signals.upload_done.emit(result, error, cancelled, cleanup_error)
-        self.worker = threading.Thread(target=run, name="rootlens-drive-upload", daemon=True)
-        self.worker.start()
+        self.upload_worker = threading.Thread(target=run, name="rootlens-drive-upload", daemon=True)
+        self.upload_worker.start()
 
     @Slot(object)
     def _upload_progress(self, progress):
-        if (not self.busy or self.job_kind != "upload" or self.upload_record is None
+        if (not self.upload_running or self.upload_record is None
                 or progress.unit_id != self.upload_record.unit_id):
             return
         total = max(0, int(progress.total_bytes))
@@ -693,8 +721,8 @@ class ImportWindow(QMainWindow):
             self._refresh_timer.start()
 
     def cancel_upload(self):
-        if self.busy and self.job_kind == "upload":
-            self.cancel_event.set()
+        if self.upload_running:
+            self.upload_cancel_event.set()
             self.upload_status_label.setText("端末からの削除を中止しています…" if self.upload_saved
                                              else "アップロードを中止しています…")
             self._update_controls()
@@ -702,8 +730,11 @@ class ImportWindow(QMainWindow):
     @Slot(object, str, bool, str)
     def _upload_finished(self, result, error, cancelled, cleanup_error=""):
         record = self.upload_record
-        self.busy = False
-        self.job_kind = None
+        self.upload_running = False
+        self.upload_worker = None
+        if self.job_kind == "upload":
+            self.job_kind = None
+        self.busy = self.job_kind is not None
         self.upload_record = None
         self._refresh_timer.stop()
         self.upload_progress_bar.setVisible(False)
@@ -711,6 +742,7 @@ class ImportWindow(QMainWindow):
                     and result.unit_id == record.unit_id and not error and not cancelled)
         if verified:
             name = self._recording_name(record)
+            self.uploaded_unit_ids.add(record.unit_id)
             device_cleanup_error = bool(cleanup_error)
             self.device_sources.pop(record.unit_id, None)
             self.recording_names.pop(record.unit_id, None)
@@ -765,6 +797,7 @@ class ImportWindow(QMainWindow):
         if self.busy:
             self.closing = True
             self.cancel_event.set()
+            self.upload_cancel_event.set()
             self.status_label.setText("現在の作業を中止して閉じています…")
             self._update_controls()
             event.ignore()
@@ -772,6 +805,8 @@ class ImportWindow(QMainWindow):
         self.preview.clear()
         self._refresh_timer.stop()
         self.account.close()
+        if self.workspace is not None:
+            self.workspace.close()
         event.accept()
 
 
@@ -780,6 +815,11 @@ def main():
     application.setApplicationName(APP_NAME)
     application.setOrganizationName("RootLens")
     application.setWindowIcon(app_icon())
+    for legacy in (settings_path(), settings_path().with_name("session.json")):
+        try:
+            legacy.unlink(missing_ok=True)
+        except OSError as error:
+            raise ImportFailure("以前のログイン設定を削除できません。保存先を確認してください。") from error
     window = ImportWindow()
     window.show()
     return application.exec()

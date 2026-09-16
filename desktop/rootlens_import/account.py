@@ -1,22 +1,16 @@
-"""Browser login and private RootLens session storage for the desktop app."""
+"""Browser login; desktop credentials live only for the running app session."""
 
 from base64 import urlsafe_b64encode
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json
 import os
-from pathlib import Path
 import secrets
 import threading
 from urllib.parse import parse_qs, urlsplit
 
-from .core import ImportFailure, check_cancelled, is_link
-from .library import settings_path
-from .site import write_private_json
+from .core import ImportFailure, check_cancelled
 
 DEFAULT_API_ORIGIN = "https://www.rootlens.io"
-SESSION_SCHEMA = "rootlens.desktop-session.v1"
-SESSION_MAX_BYTES = 16 * 1024
 
 
 def _valid_token(token):
@@ -25,36 +19,19 @@ def _valid_token(token):
 
 
 class SessionStore:
-    def __init__(self, path=None):
-        self.path = Path(path) if path is not None else settings_path().with_name("session.json")
+    def __init__(self):
+        self.token = None
 
     def load(self):
-        if not self.path.exists():
-            return None
-        try:
-            if is_link(self.path) or not self.path.is_file() or self.path.stat().st_size > SESSION_MAX_BYTES:
-                raise ValueError()
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-            if (not isinstance(value, dict) or set(value) != {"schema", "token"}
-                    or value["schema"] != SESSION_SCHEMA or not _valid_token(value["token"])):
-                raise ValueError()
-            return value["token"]
-        except (OSError, ValueError, UnicodeError, TypeError):
-            raise ImportFailure("このPCのログイン情報を読み込めません。設定からもう一度ログインしてください。") from None
+        return self.token
 
     def save(self, token):
         if not _valid_token(token):
-            raise ImportFailure("ログイン情報を保存できませんでした。設定からもう一度ログインしてください。")
-        try:
-            write_private_json(self.path, {"schema": SESSION_SCHEMA, "token": token})
-        except (OSError, ImportFailure) as error:
-            raise ImportFailure("このPCにログイン情報を保存できません。管理者に保存場所を確認してもらってください。") from error
+            raise ImportFailure("ログイン情報を確認できませんでした。設定からもう一度ログインしてください。")
+        self.token = token
 
     def clear(self):
-        try:
-            self.path.unlink(missing_ok=True)
-        except OSError as error:
-            raise ImportFailure("このPCのログイン情報を削除できません。管理者に保存場所を確認してもらってください。") from error
+        self.token = None
 
 
 def _api_origin(value=None):
@@ -123,6 +100,7 @@ class RootLensAccount:
         self.store = store or SessionStore()
 
     def close(self):
+        self.store.clear()
         self.session.close()
 
     def _request(self, method, path, *, token=None, json_body=None):

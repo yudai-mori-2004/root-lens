@@ -158,8 +158,36 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.upload_record.path, self.clips[0])
         self.assertEqual(self.uploader.upload_recording.call_args.args, (self.clips[0], "apv_test"))
         self.approver.assert_called_once_with(
-            self.clips[0], ANY, cancel_event=self.window.cancel_event, open_browser=ANY)
+            self.clips[0], ANY, cancel_event=self.window.upload_cancel_event, open_browser=ANY)
         self.assertTrue(self.window.folder_button.isEnabled())
+
+    def test_ready_recording_can_upload_while_later_recordings_are_still_copying(self):
+        self.uploader.upload_recording.side_effect = self.uploaded_to_drive
+        release_import = threading.Event()
+
+        def importing(**kwargs):
+            first = self.records[0]
+            kwargs['on_drive_checked']({}, '')
+            kwargs['on_clip'](ClipProgress(self.names[first.unit_id], first.path, 'ready'))
+            kwargs['on_source'](self.source_for(first))
+            release_import.wait(3)
+            return SyncSummary(kwargs['output'], imported=2,
+                               sources={first.unit_id: self.source_for(first)})
+
+        self.importer.side_effect = importing
+        self.window.start_import()
+        wait_for(lambda: self.window.recording_list.topLevelItemCount() == 1
+                 and self.window.upload_button.isEnabled())
+        self.assertTrue(self.window.busy)
+        self.assertEqual(self.window.job_kind, 'import')
+        self.window.start_upload()
+        wait_for(lambda: self.uploader.upload_recording.call_count == 1 and not self.window.upload_running)
+        self.assertTrue(self.window.busy)
+        self.assertEqual(self.window.records, [])
+        release_import.set()
+        wait_for(lambda: not self.window.busy)
+        self.assertEqual(self.window.records, [])
+        self.assertNotIn(self.records[0].unit_id, self.window.device_sources)
 
     def test_upload_does_not_start_when_explicit_approval_fails(self):
         self.approver.side_effect = ImportFailure("承認されませんでした")
@@ -249,10 +277,10 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.cleaner.assert_called_once()
         self.assertIs(self.cleaner.call_args.args[0], original)
-        self.assertIs(self.cleaner.call_args.kwargs['cancel_event'], self.window.cancel_event)
+        self.assertIs(self.cleaner.call_args.kwargs['cancel_event'], self.window.upload_cancel_event)
         self.cleaner.call_args.kwargs['drive_reader']({original.unit_id})
         self.drive_reader.assert_called_once_with(
-            self.profile, {original.unit_id}, self.window.cancel_event, ANY)
+            self.profile, {original.unit_id}, self.window.upload_cancel_event, ANY)
         self.assertEqual(self.window.selected_recording().path, self.clips[1])
 
     def test_cleanup_failure_keeps_drive_success_as_non_uploadable_pending_row(self):
@@ -321,7 +349,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertTrue(entered.wait(1))
         self.window.close()
         self.assertTrue(self.window.closing)
-        self.assertTrue(self.window.cancel_event.is_set())
+        self.assertTrue(self.window.upload_cancel_event.is_set())
         wait_for(lambda: not self.window.busy)
         self.assertIsNone(self.window.preview.path)
         self.assertEqual(self.window.progress_states[self.names[self.records[0].unit_id]].state,
@@ -355,7 +383,7 @@ class UploadDesktopTests(unittest.TestCase):
     def test_cancellation_preserves_clip_and_retry_uses_same_action(self):
         self.begin_held_upload()
         self.window.cancel_upload()
-        self.assertTrue(self.window.cancel_event.is_set())
+        self.assertTrue(self.window.upload_cancel_event.is_set())
         self.assertFalse(self.window.cancel_upload_button.isEnabled())
         self.release.set()
         wait_for(lambda: not self.window.busy)
