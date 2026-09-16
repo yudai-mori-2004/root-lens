@@ -76,7 +76,7 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     document.on("error", reject);
   });
 
-  const body = agreementBodyForSite(template.electronicBody, input.siteName);
+  const body = agreementBodyForSite(template.body, input.siteName);
   for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
     if (!line || line === "---") { document.y += LINE_HEIGHT; continue; }

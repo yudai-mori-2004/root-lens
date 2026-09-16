@@ -6,6 +6,21 @@ import { createAgreementPdf } from "./agreement-original";
 import { sha256 } from "./encoding";
 
 describe("agreement original", () => {
+  it("uses the same consent record for a site agreement", async () => {
+    const pdf = await createAgreementPdf({
+      agreementId: "agr_site_demo_20260917",
+      kind: "site_agreement",
+      siteId: "site_demo",
+      siteName: "RootLens Bakery 豊中店",
+      signer: { name: "山田 太郎", phoneLast4: "4821", identityId: "identity_demo" },
+      acceptedAt: new Date("2026-09-17T01:15:00.000Z"),
+      acceptedStatement: "上記内容を確認し、同意します",
+    });
+    expect(Buffer.from(pdf.subarray(0, 5)).toString("ascii")).toBe("%PDF-");
+    if (process.env.WRITE_SITE_AGREEMENT_SAMPLE) {
+      await writeFile(process.env.WRITE_SITE_AGREEMENT_SAMPLE, pdf);
+    }
+  });
   it("renders the fixed agreement text and SMS acceptance record as a PDF", async () => {
     const pdf = await createAgreementPdf({
       agreementId: "agr_00000000-0000-4000-8000-000000000001",
