@@ -9,8 +9,9 @@ import { sha256 } from "./encoding";
 describe("electronic agreement body", () => {
   it("keeps paper signing fields out of staff consent", () => {
     const body = agreementTemplates.staff_consent.body;
-    expect(body).toContain("すでに提供された撮影データについては");
-    expect(body).toContain("お問い合わせ：RootLens");
+    expect(body).toContain("販売先へ提供済みの撮影データについては");
+    expect(body).toContain("別途、撮影場所の管理者と対象となる方の同意を取得します");
+    expect(body).toContain("撮影データを保管・複製・加工・分析します");
     expect(body).not.toContain("- [ ]");
     expect(body).not.toContain("署名（紙で同意する場合）");
     expect(body).not.toContain("| 記入欄 |");
@@ -19,6 +20,7 @@ describe("electronic agreement body", () => {
     expect(page).toMatch(/<ul\b/);
     expect(page).not.toContain("[ ]");
     expect(page).not.toContain("記入欄");
+    expect(page).toContain("撮影参加に関する同意書");
   });
 
   it("shows the site name and excludes the paper signature page", () => {
