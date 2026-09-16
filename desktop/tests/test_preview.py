@@ -70,6 +70,16 @@ class PreviewTests(unittest.TestCase):
         wait_for(lambda: self.preview.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
         self.assertLess(self.preview.player.position(), 1500)
 
+    def test_refreshing_the_selected_video_does_not_restart_playback(self):
+        self.preview.load(self.video, autoplay=True)
+        wait_for(lambda: self.preview.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
+        self.preview.player.pause()
+        self.preview.player.setPosition(1000)
+        wait_for(lambda: self.preview.player.position() >= 1000)
+        self.preview.load(self.video, autoplay=True)
+        self.assertGreaterEqual(self.preview.player.position(), 1000)
+        self.assertEqual(self.preview.player.playbackState(), QMediaPlayer.PlaybackState.PausedState)
+
 
 class TimeTextTests(unittest.TestCase):
     def test_long_recording_and_zero(self):

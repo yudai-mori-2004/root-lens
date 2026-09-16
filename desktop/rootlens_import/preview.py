@@ -109,9 +109,6 @@ class VideoPreview(QWidget):
             self.message.show()
             return
         if path == self.path:
-            if autoplay:
-                self.player.setPosition(0)
-                self.player.play()
             return
         self.player.stop()
         self.path = path
