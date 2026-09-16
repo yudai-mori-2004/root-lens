@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtGui import QIcon
 
 
-APP_NAME = "RootLens"
+APP_NAME = "RootLens Importer"
 ICON_PATH = Path(__file__).with_name("assets") / "rootlens.png"
 
 

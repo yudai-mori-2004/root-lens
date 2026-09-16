@@ -5,9 +5,10 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, Mock, patch
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
 from rootlens_import import desktop
 from rootlens_import.core import (ClipProgress, FILES, ImportCancelled, ImportFailure,
@@ -62,8 +63,53 @@ class UploadDesktopTests(unittest.TestCase):
             name = self.names[record.unit_id]
             self.window._clip_progress(ClipProgress(name, record.path, "ready"))
         self.window._flush_progress()
-        self.window.device_sources = {record.unit_id: self.source_for(record)
-                                      for record in records}
+        for record in records:
+            self.window._source_available(self.source_for(record))
+
+    def test_discard_requires_connection_and_removes_only_selected_recording(self):
+        first = self.records[0]
+        self.assertTrue(self.window.discard_button.isEnabled())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+                patch.object(desktop, "discard_unapproved_recording") as discard:
+            self.window.confirm_discard()
+            wait_for(lambda: not self.window.busy)
+        discard.assert_called_once()
+        self.assertFalse(first.path.exists())
+        self.assertTrue(self.records[1].path.exists())
+        self.assertEqual(len(self.window.records), 1)
+        self.assertFalse(self.drive_snapshot)
+
+    def test_disconnect_disables_approval_and_discard_without_hiding_recordings(self):
+        transport = ("adb", "23", "original-device-serial")
+        self.window.device_transport = transport
+        with patch.object(QMessageBox, "warning") as warning:
+            self.window._connection_checked(transport, False)
+        warning.assert_called_once()
+        self.assertEqual(self.window.connection_label.text(), "未接続")
+        self.assertFalse(self.window.upload_button.isEnabled())
+        self.assertFalse(self.window.discard_button.isEnabled())
+        self.assertEqual(len(self.window.records), 2)
+
+    def test_incomplete_capture_is_selectable_and_deletable_from_device(self):
+        name = "rec-20260911T120000.000Z"
+        self.window.device_transport = ("adb", "23", "original-device-serial")
+        self.window.device_root = "/sdcard/Android/data/io.rootlens.mentra/files/recordings"
+        self.window._clip_progress(ClipProgress(name, None, "incomplete"))
+        self.window._flush_progress()
+        item = next(self.window.recording_list.topLevelItem(index)
+                    for index in range(self.window.recording_list.topLevelItemCount())
+                    if self.window.recording_list.topLevelItem(index).data(0, Qt.ItemDataRole.UserRole + 2) == name)
+        self.window.recording_list.setCurrentItem(item)
+        self.assertTrue(self.window.discard_button.isEnabled())
+        self.assertFalse(self.window.upload_button.isEnabled())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+                patch.object(desktop, "probe_transport", return_value=True), \
+                patch.object(desktop, "discard_problem_capture") as discard:
+            self.window.confirm_discard()
+            wait_for(lambda: not self.window.busy)
+        discard.assert_called_once()
+        self.assertNotIn(name, self.window.progress_states)
+        self.assertEqual(len(self.window.records), 2)
 
     def import_current_device(self, **kwargs):
         ready = saved = 0
@@ -150,7 +196,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.settings_button.isEnabled())
         self.assertFalse(self.window.connect_button.isEnabled())
         self.assertFalse(self.window.upload_button.isEnabled())
-        self.assertEqual(self.window.connect_button.text(), "接続")
+        self.assertEqual(self.window.connect_button.toolTip(), "端末を再確認")
         with self.assertRaises(ImportFailure):
             self.window.set_profile(self.profile)
         self.window.select_relative(1)
@@ -246,7 +292,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.upload_button.isEnabled())
         self.assertFalse(self.clips[0].exists())
         self.assertIn("アップロードが完了", self.window.status_label.text())
-        self.assertEqual(self.window.count_label.text(), "録画 0 件")
+        self.assertEqual(self.window.count_label.text(), "撮影データ 0 件")
 
     def test_restart_does_not_rebuild_pending_list_from_local_copies(self):
         self.uploader.upload_recording.side_effect = self.uploaded_to_drive
@@ -263,7 +309,7 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
-        self.assertEqual(self.window.count_label.text(), "録画 1 件")
+        self.assertEqual(self.window.count_label.text(), "撮影データ 1 件")
         self.assertNotIn('drive_recordings', self.importer.call_args.kwargs)
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
@@ -277,7 +323,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
-        self.assertEqual(self.window.count_label.text(), '録画 1 件')
+        self.assertEqual(self.window.count_label.text(), '撮影データ 1 件')
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
 
@@ -404,7 +450,7 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual(len(self.window.records), 2)
         self.assertIn("中止", self.window.status_label.text())
-        self.assertEqual(self.window.upload_button.text(), "承認へ進む")
+        self.assertEqual(self.window.upload_button.text(), "提供を承認")
         self.assertTrue(self.window.upload_button.isEnabled())
         self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
         self.uploader.upload_recording.side_effect = ImportFailure("通信が途切れました")

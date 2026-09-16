@@ -46,14 +46,14 @@ def main(arguments=None):
         (stage / "アプリケーション").symlink_to("/Applications", target_is_directory=True)
         (stage / "はじめに.txt").write_text(
             "RootLens Import.app を「アプリケーション」にドラッグしてください。\n"
-            "アプリの「設定」を開き、事業所に登録された電話番号を使ってSMSでログインします。\n"
+            "アプリの「SMSでログイン」を押し、事業所に登録された電話番号でログインします。\n"
             "ログイン後、使用する事業所を確認してください。\n"
-            "スマートグラスをUSBケーブルでつなぎ、「接続」を押してください。\n"
-            "録画の映像と音声を確認したら、「承認へ進む」を押します。\n"
+            "スマートグラスをUSBケーブルでつなぎ、「端末を再確認」を押してください。\n"
+            "録画の映像と音声を確認したら、「提供を承認」を押します。\n"
             "保存を確認できた録画は、スマートグラスから削除されます。\n"
             "詳しい手順は、事業所のDriveにある「アップロード手順説明.pdf」をご覧ください。\n", encoding="utf-8",
         )
-        subprocess.run(["hdiutil", "create", "-volname", "RootLens", "-srcfolder", str(stage),
+        subprocess.run(["hdiutil", "create", "-volname", f"RootLens {info['CFBundleShortVersionString']}", "-srcfolder", str(stage),
                         "-format", "UDZO", str(image)], check=True)
     digest = hashlib.sha256(image.read_bytes()).hexdigest()
     image.with_suffix(".dmg.sha256").write_text(f"{digest}  {image.name}\n", encoding="ascii")

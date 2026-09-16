@@ -9,7 +9,9 @@ from .core import (
     ensure_unit_id, import_clip, import_lock, is_link, recover_staging, UNIT_ID, FILES,
     checksum, validate_local_files,
 )
-from .device_cleanup import cleanup_recording, discover_pending
+from .device_cleanup import (cleanup_recording, discover_pending, discard_recording,
+                             discover_pending_discards, discard_problem_recording,
+                             discover_pending_problem_discards)
 
 
 @dataclass(frozen=True)
@@ -34,7 +36,20 @@ class SyncSummary:
     cleanup_pending: int = 0
     local_cleaned: int = 0
     local_cleanup_pending: int = 0
+    discard_pending: int = 0
     sources: dict[str, DeviceSource] = field(default_factory=dict)
+    transport: tuple[str, str, str] | None = None
+    device_root: str | None = None
+
+
+def probe_transport(transport):
+    executable, transport_id, serial = transport
+    adb = Adb(executable)
+    adb.selector = ["-t", transport_id]
+    try:
+        return adb.run("get-serialno", timeout=5) == serial
+    except (ImportFailure, OSError):
+        return False
 
 
 def remove_saved_local_copy(output, unit_id, recording):
@@ -104,7 +119,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
     root = f"/sdcard/Android/data/{selected_package}/files/recordings"
     output, staging = _output_directory(output)
     counts = dict(imported=0, existing=0, incomplete=0, failed=0, cleaned=0,
-                  cleanup_pending=0, local_cleaned=0, local_cleanup_pending=0)
+                  cleanup_pending=0, local_cleaned=0, local_cleanup_pending=0, discard_pending=0)
     sources = {}
     operation_lock = threading.Lock()
 
@@ -152,6 +167,23 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
 
     with import_lock(staging):
         recover_staging(staging)
+    for pending_name, original_name, unit_id in discover_pending_discards(adb, root):
+        try:
+            with import_lock(staging):
+                discard_recording(adb, root, pending_name, unit_id)
+            remove_uploaded_local_copy(output, unit_id)
+            log("前回削除を選んだ録画の削除を完了しました。")
+        except (ImportFailure, OSError) as error:
+            counts["discard_pending"] += 1
+            log("録画の削除が完了していません。端末を再確認してください。" + str(error))
+    for pending_name, original_name in discover_pending_problem_discards(adb, root):
+        try:
+            with import_lock(staging):
+                discard_problem_recording(adb, root, pending_name)
+            log("前回削除を選んだ録画の削除を完了しました。")
+        except (ImportFailure, OSError) as error:
+            counts["discard_pending"] += 1
+            log("録画の削除が完了していません。端末を再確認してください。" + str(error))
     names = adb.clip_names(root)
     pending = discover_pending(adb, root)
     complete = {}
@@ -237,7 +269,42 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                 except (ImportFailure, OSError) as error:
                     counts["local_cleanup_pending"] += 1
                     log(str(error))
-    return SyncSummary(output, **counts, sources=sources)
+    return SyncSummary(output, **counts, sources=sources,
+                       transport=(str(adb.executable), adb.selector[1], serial), device_root=root)
+
+
+def discard_problem_capture(transport, root, name, cancel_event=None):
+    if not transport or not root:
+        raise ImportFailure("スマートグラスを確認できません。端末を再確認してください。")
+    executable, transport_id, serial = transport
+    adb = Adb(executable, cancel_event=cancel_event)
+    adb.selector = ["-t", transport_id]
+    if adb.run("get-serialno") != serial:
+        raise ImportFailure("スマートグラスとの接続が変わりました。端末を再確認してください。")
+    discard_problem_recording(adb, root, name)
+
+
+def discard_unapproved_recording(source, directory, cancel_event=None):
+    """Retire one user-rejected recording on the same pinned USB transport."""
+    if not isinstance(source, DeviceSource) or source.adb is None:
+        raise ImportFailure("スマートグラスを確認できません。端末を再確認してください。")
+    check_cancelled(cancel_event)
+    directory = Path(directory)
+    if directory.name != source.unit_id:
+        raise ImportFailure("削除する録画を確認できません。端末を再確認してください。")
+    with source.operation_lock:
+        with import_lock(source.lock_directory):
+            previous = source.adb.cancel_event
+            source.adb.cancel_event = cancel_event
+            try:
+                if source.adb.run("get-serialno") != source.serial:
+                    raise ImportFailure("スマートグラスとの接続が変わりました。端末を再確認してください。")
+                validate_local_files(directory)
+                expected = {name: {"size": (directory / name).stat().st_size,
+                                   "sha256": checksum(directory / name, cancel_event)} for name in FILES}
+                discard_recording(source.adb, source.root, source.name, source.unit_id, expected)
+            finally:
+                source.adb.cancel_event = previous
 
 
 def cleanup_uploaded_recording(source, *, drive_reader, log=print, cancel_event=None):

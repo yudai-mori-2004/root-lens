@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { desktopSessions } from "@/db/schema";
 import { desktopSites } from "@/lib/desktop-auth";
 import { sha256 } from "@/lib/encoding";
+import { operatorPhoneLast4 } from "@/lib/operator-identity";
 
 export async function GET(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -14,7 +15,11 @@ export async function GET(request: Request) {
     isNull(desktopSessions.revokedAt),
   )).limit(1);
   if (!session) return Response.json({ error: "invalid or expired session" }, { status: 401 });
-  return Response.json({ sites: await desktopSites(session.identityId) });
+  const [sites, phoneLast4] = await Promise.all([
+    desktopSites(session.identityId),
+    operatorPhoneLast4(session.identityId).catch(() => null),
+  ]);
+  return Response.json({ sites, phoneLast4 });
 }
 
 export async function DELETE(request: Request) {

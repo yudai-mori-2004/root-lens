@@ -2,6 +2,7 @@
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 import tempfile
 import threading
@@ -10,6 +11,7 @@ import unittest
 from unittest.mock import ANY, Mock, patch
 
 from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from rootlens_import import desktop
@@ -53,6 +55,27 @@ def make_recording(root, index=0):
 
 
 class DesktopTests(unittest.TestCase):
+    def test_recording_labels_show_relative_days_and_year_when_needed(self):
+        now = datetime(2026, 9, 16, 12, 0)
+        self.assertEqual(desktop.recording_time_label("2026/09/16 08:05:00", now), "今日 08:05")
+        self.assertEqual(desktop.recording_time_label("2026/09/15 08:05:00", now), "昨日 08:05")
+        self.assertEqual(desktop.recording_time_label("2026/09/14 08:05:00", now), "一昨日 08:05")
+        self.assertEqual(desktop.recording_time_label("2026/08/20 08:05:00", now), "08/20 08:05")
+        self.assertEqual(desktop.recording_time_label("2025/12/31 08:05:00", now), "2025/12/31 08:05")
+
+    def test_arrow_keys_move_one_recording_at_a_time(self):
+        self.populate(3)
+        self.window.show()
+        self.window.activateWindow()
+        APPLICATION.processEvents()
+        self.window.recording_list.setFocus()
+        QTest.keyClick(self.window.recording_list, Qt.Key.Key_Down)
+        self.assertEqual(self.window.recording_list.currentIndex().row(), 1)
+        QTest.keyClick(self.window.recording_list, Qt.Key.Key_Right)
+        self.assertEqual(self.window.recording_list.currentIndex().row(), 2)
+        QTest.keyClick(self.window.recording_list, Qt.Key.Key_Left)
+        self.assertEqual(self.window.recording_list.currentIndex().row(), 1)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name).resolve()
@@ -90,7 +113,7 @@ class DesktopTests(unittest.TestCase):
         self.importer.assert_not_called()
         self.assertEqual(self.window.records, [])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
-        self.assertEqual(self.window.connect_button.text(), "接続")
+        self.assertEqual(self.window.connect_button.toolTip(), "端末を再確認")
         self.assertFalse(self.window.connect_button.isEnabled())
 
     def test_first_launch_requires_site_before_connection(self):
@@ -159,7 +182,7 @@ class DesktopTests(unittest.TestCase):
         self.window.start_import()
         self.assertEqual(len(calls), 1)
         self.assertFalse(self.window.connect_button.isEnabled())
-        self.assertEqual(self.window.connect_button.text(), "接続")
+        self.assertEqual(self.window.connect_button.toolTip(), "端末を再確認")
         release.set()
         wait_for(lambda: not self.window.busy)
         self.window.start_import()
@@ -260,10 +283,12 @@ class DesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertEqual(self.window.selected_recording().path, clips[1])
         failed = self.window.recording_list.topLevelItem(0)
-        self.assertFalse(failed.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertTrue(failed.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.window.recording_list.setCurrentItem(failed)
+        self.assertEqual(self.window.selected_problem().name, name)
         self.window._clip_progress(ClipProgress(name, clips[0], 'verifying'))
         wait_for(lambda: not self.window._refresh_timer.isActive())
-        self.assertFalse(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertTrue(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
         self.window._clip_progress(ClipProgress(name, clips[0], 'ready'))
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertTrue(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
@@ -374,7 +399,7 @@ class DesktopTests(unittest.TestCase):
         self.window._clip_progress(ClipProgress('rec-20260911T000001.000Z', None, 'drive_saved'))
         self.window._flush_progress()
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
-        self.assertEqual(self.window.count_label.text(), '録画 0 件')
+        self.assertEqual(self.window.count_label.text(), '撮影データ 0 件')
 
 
 if __name__ == '__main__':

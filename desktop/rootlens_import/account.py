@@ -151,7 +151,7 @@ class RootLensAccount:
             return None
         if status != 200:
             raise ImportFailure("ログイン状態を確認できませんでした。しばらくしてからやり直してください。")
-        return {"token": token, "sites": _sites(value)}
+        return {"token": token, "sites": _sites(value), "phoneLast4": value.get("phoneLast4")}
 
     def login(self, open_browser, cancel_event=None):
         cancel = cancel_event or threading.Event()
@@ -187,7 +187,7 @@ class RootLensAccount:
                 raise ImportFailure("ログインを完了できませんでした。ブラウザからやり直してください。")
             sites = _sites(value)
             self.store.save(token)
-            return {"token": token, "sites": sites}
+            return {"token": token, "sites": sites, "phoneLast4": value.get("phoneLast4")}
         finally:
             server.server_close()
 

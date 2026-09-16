@@ -24,6 +24,10 @@ PENDING_PREFIX = ".rootlens-cleanup-"
 PENDING_NAME = re.compile(
     r"\.rootlens-cleanup-(rec-\d{8}T\d{6}\.\d{3}Z)-(unit_[A-Za-z0-9_-]+)-([0-9a-f]{64})\Z"
 )
+DISCARD_NAME = re.compile(r"\.rootlens-discard-(rec-\d{8}T\d{6}\.\d{3}Z)-(unit_[A-Za-z0-9_-]+)\Z")
+PROBLEM_DISCARD_NAME = re.compile(r"\.rootlens-discard-problem-(rec-\d{8}T\d{6}\.\d{3}Z)\Z")
+PROBLEM_FILES = KNOWN_FILES | {"failure.json", *(name + ".partial" for name in FILES),
+                               "camera_frames.raw.jsonl.partial"}
 DRIVE_ID = re.compile(r"[A-Za-z0-9_-]{1,256}\Z")
 STAT_FORMAT = "%s|%d|%i|%y|%z"
 CHANGED = "録画の内容が確認中に変わりました。端末に残っているデータを保持し、削除を中止しました。"
@@ -111,9 +115,126 @@ def discover_pending(adb, root):
     return result
 
 
-def _snapshot(adb, root, remote):
+def discover_pending_discards(adb, root):
+    """Find user-confirmed discards left unfinished by a lost USB connection."""
+    _validate_root(root)
+    quoted = shlex.quote(root)
+    if _shell(adb, f"if [ ! -e {quoted} ] && [ ! -L {quoted} ]; then echo absent; fi") == "absent":
+        return []
+    result = []
+    for name in sorted(_names(adb, root, root)):
+        if name.startswith(".rootlens-discard-problem-"):
+            continue
+        if not name.startswith(".rootlens-discard-"):
+            continue
+        match = DISCARD_NAME.fullmatch(name)
+        if match is None or not UNIT_ID.fullmatch(match.group(2)):
+            raise ImportFailure(INVALID)
+        _shell(adb, _directory_guard(root, root + "/" + name))
+        result.append((name, match.group(1), match.group(2)))
+    return result
+
+
+def discover_pending_problem_discards(adb, root):
+    _validate_root(root)
+    quoted = shlex.quote(root)
+    if _shell(adb, f"if [ ! -e {quoted} ] && [ ! -L {quoted} ]; then echo absent; fi") == "absent":
+        return []
+    result = []
+    for name in sorted(_names(adb, root, root)):
+        if not name.startswith(".rootlens-discard-problem-"):
+            continue
+        match = PROBLEM_DISCARD_NAME.fullmatch(name)
+        if match is None:
+            raise ImportFailure(INVALID)
+        _shell(adb, _directory_guard(root, root + "/" + name))
+        result.append((name, match.group(1)))
+    return result
+
+
+def discard_problem_recording(adb, root, name):
+    """Retire an explicitly rejected incomplete/failed capture."""
+    _validate_root(root)
+    _check(adb)
+    pending = PROBLEM_DISCARD_NAME.fullmatch(name)
+    if pending:
+        remote = root + "/" + name
+    elif CLIP_NAME.fullmatch(name):
+        remote = root + "/" + name
+        _snapshot(adb, root, remote, allowed=PROBLEM_FILES)
+        target = root + "/.rootlens-discard-problem-" + name
+        source_q, target_q = shlex.quote(remote), shlex.quote(target)
+        _shell(adb, _directory_guard(root, remote)
+               + f" && [ ! -e {target_q} ] && [ ! -L {target_q} ]"
+               + f" && mv -n -T -- {source_q} {target_q}"
+               + f" && [ ! -e {source_q} ] && [ -d {target_q} ] && [ ! -L {target_q} ]")
+        remote = target
+    else:
+        raise ImportFailure(INVALID)
+    _delete_marked_recording(adb, root, remote, PROBLEM_FILES)
+
+
+def discard_recording(adb, root, name, unit_id, expected=None):
+    """Delete only the confirmed unit; a durable rename lets the next connection finish."""
+    _validate_root(root)
+    _check(adb)
+    pending = DISCARD_NAME.fullmatch(name)
+    if pending:
+        if pending.group(2) != unit_id or expected is not None:
+            raise ImportFailure(INVALID)
+        remote = root + "/" + name
+    elif CLIP_NAME.fullmatch(name) and UNIT_ID.fullmatch(unit_id) and expected is not None:
+        if set(expected) != set(FILES):
+            raise ImportFailure(INVALID)
+        remote = root + "/" + name
+        before = _snapshot(adb, root, remote)
+        if not set(FILES).issubset(before) or adb.metadata(remote)["unit_id"] != unit_id:
+            raise ImportFailure(INVALID)
+        checksums = adb.checksums(remote, FILES)
+        if any(before[item][0] != expected[item]["size"] or checksums[item] != expected[item]["sha256"]
+               for item in FILES):
+            raise ImportFailure(CHANGED)
+        if _snapshot(adb, root, remote) != before:
+            raise ImportFailure(CHANGED)
+        pending_name = f".rootlens-discard-{name}-{unit_id}"
+        if len(pending_name.encode("ascii")) > 255:
+            raise ImportFailure(INVALID)
+        target = root + "/" + pending_name
+        source_q, target_q = shlex.quote(remote), shlex.quote(target)
+        _shell(adb, _directory_guard(root, remote)
+               + f" && [ ! -e {target_q} ] && [ ! -L {target_q} ]"
+               + f" && mv -n -T -- {source_q} {target_q}"
+               + f" && [ ! -e {source_q} ] && [ -d {target_q} ] && [ ! -L {target_q} ]")
+        remote = target
+    else:
+        raise ImportFailure(INVALID)
+
+    _delete_marked_recording(adb, root, remote, KNOWN_FILES, unit_id)
+
+
+def _delete_marked_recording(adb, root, remote, allowed, unit_id=None):
+    _shell(adb, _directory_guard(root, remote) + " && sync", timeout=120)
+    before = _snapshot(adb, root, remote, allowed=allowed)
+    if unit_id and "metadata.json" in before and adb.metadata(remote)["unit_id"] != unit_id:
+        raise ImportFailure(INVALID)
+    for filename in sorted(before):
+        if _snapshot(adb, root, remote, allowed=allowed) != before:
+            raise ImportFailure(CHANGED)
+        quoted = shlex.quote(remote + "/" + filename)
+        signature = shlex.quote(before[filename][1])
+        _shell(adb, _directory_guard(root, remote)
+               + f" && [ -f {quoted} ] && [ ! -L {quoted} ]"
+               + f" && [ \"$(stat -c {shlex.quote(STAT_FORMAT)} -- {quoted})\" = {signature} ]"
+               + f" && rm -- {quoted}")
+        del before[filename]
+    if _snapshot(adb, root, remote, allowed=allowed):
+        raise ImportFailure(CHANGED)
+    _shell(adb, _directory_guard(root, remote) + " && rmdir -- " + shlex.quote(remote))
+
+
+def _snapshot(adb, root, remote, allowed=KNOWN_FILES):
     names = _names(adb, root, remote)
-    if not names.issubset(KNOWN_FILES):
+    if not names.issubset(allowed):
         raise ImportFailure(INVALID)
     ordered = sorted(names)
     commands = [_directory_guard(root, remote)]
@@ -129,7 +250,7 @@ def _snapshot(adb, root, remote):
         if len(parts) != 5 or not parts[0].isdigit():
             raise ImportFailure(INVALID)
         size = int(parts[0])
-        if name in FILES and size <= 0:
+        if allowed == KNOWN_FILES and name in FILES and size <= 0:
             raise ImportFailure(INVALID)
         result[name] = (size, signature)
     if _names(adb, root, remote) != names:

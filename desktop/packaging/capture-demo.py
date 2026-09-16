@@ -107,17 +107,6 @@ def main(arguments=None):
             window.show()
             wait_for(window.isVisible)
             snapshot("01-first-launch")
-            def capture_settings():
-                dialog = QApplication.activeModalWidget()
-                if dialog is None:
-                    QTimer.singleShot(50, capture_settings)
-                    return
-                dialog.grab().save(str(output / "02-site-settings.png"))
-                manifest["screens"]["02-site-settings"] = {"logical_size": [dialog.width(), dialog.height()],
-                                                             "device_pixel_ratio": dialog.devicePixelRatio()}
-                dialog.reject()
-            QTimer.singleShot(150, capture_settings)
-            window.show_settings()
             root = recordings_directory(args.site_id, data / "data")
             video_bytes = sample.read_bytes()
             for index in range(3):
@@ -133,6 +122,19 @@ def main(arguments=None):
                     "files": list(FILES), "unit_id": identity, "created_at": f"2026-09-11T0{index}:00:00.000Z",
                     "actual_duration_ms": 8000}), encoding="utf-8")
             window.set_profile(SiteProfile(args.site_id, args.site_name))
+            window.sites = [{"id": args.site_id, "name": args.site_name}]
+            window.account_last4 = "4821"
+            def capture_site_menu():
+                menu = QApplication.activePopupWidget()
+                if menu is None:
+                    QTimer.singleShot(50, capture_site_menu)
+                    return
+                menu.grab().save(str(output / "02-site-menu.png"))
+                manifest["screens"]["02-site-menu"] = {"logical_size": [menu.width(), menu.height()],
+                                                         "device_pixel_ratio": menu.devicePixelRatio()}
+                menu.hide()
+            QTimer.singleShot(150, capture_site_menu)
+            window.show_site_menu()
             window._drive_checked({}, "")
             for index, clip in enumerate(sorted(root.iterdir())):
                 name = f"rec-20260911T0{index}0000.000Z"

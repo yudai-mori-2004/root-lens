@@ -18,7 +18,8 @@ analysis = Analysis(
     datas=[(str(runtime / name), "rootlens_import/runtime")
            for name in ("NOTICE.txt", "runtime-manifest.json")]
           + [(os.environ["ROOTLENS_RUNTIME_NOTICES"], "THIRD-PARTY-NOTICES"),
-             (str(pc / "rootlens_import/assets/rootlens.png"), "rootlens_import/assets")],
+             (str(pc / "rootlens_import/assets/rootlens.png"), "rootlens_import/assets"),
+             (str(pc / "rootlens_import/assets/lucide"), "rootlens_import/assets/lucide")],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
@@ -54,7 +55,7 @@ if sys.platform == "darwin":
         icon=str(packaging / "icons/rootlens.icns"),
         bundle_identifier="io.rootlens.import",
         info_plist={
-            "CFBundleDisplayName": "RootLens",
+            "CFBundleDisplayName": "RootLens Importer",
             "CFBundleShortVersionString": __version__,
             "CFBundleVersion": __version__,
             "CFBundleDevelopmentRegion": "ja",

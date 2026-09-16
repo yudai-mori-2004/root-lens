@@ -19,6 +19,8 @@ class DeviceFixture:
 
     def __init__(self, source):
         self.source = source
+        self.executable = "fixture"
+        self.selector = ["-t", "23"]
         self.cancel_event = None
         self.hashed = []
         self.pulled = []
@@ -87,7 +89,10 @@ class DeviceSyncTests(unittest.TestCase):
         self.pending = Mock(return_value=[])
         self.cleanup = Mock()
         for target, value in (("Adb", Mock(return_value=self.adb)), ("find_adb", Mock(return_value="fixture")),
-                              ("discover_pending", self.pending), ("cleanup_recording", self.cleanup)):
+                              ("discover_pending", self.pending),
+                              ("discover_pending_discards", Mock(return_value=[])),
+                              ("discover_pending_problem_discards", Mock(return_value=[])),
+                              ("cleanup_recording", self.cleanup)):
             patcher = patch.object(device_sync, target, value)
             patcher.start()
             self.addCleanup(patcher.stop)

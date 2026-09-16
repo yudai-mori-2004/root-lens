@@ -38,11 +38,14 @@ WebEngine's Chromium third-party attributions; Tk remains excluded.
 
 ## Application identity
 
-The app, installer and shortcuts display **RootLens**. The executable name, Mac bundle
-filename and Windows installation directory remain **RootLens Import**. Login persists until it expires or the user logs out; recording copies do not persist between launches. The Windows installer replaces the old
-RootLens Import shortcuts with RootLens shortcuts.
+The app, installer and shortcuts display **RootLens Importer**. The executable name, Mac bundle
+filename and Windows installation directory remain **RootLens Import** for in-place upgrades.
+Login persists until it expires or the user logs out; recording copies do not persist between launches.
+The Windows installer removes the older RootLens and RootLens Import shortcuts.
 
 `rootlens_import/assets/rootlens.png` is an exact copy of the existing `mobile/assets/icon.png`.
+The control icons are the unmodified [Lucide](https://lucide.dev/) SVG assets in
+`rootlens_import/assets/lucide/`; their license is bundled in the same directory.
 `packaging/generate-icons.py` uses the pinned Qt 6.11.2 runtime to resize this same image into
 PNG-backed `.ico` and `.icns` containers. No logo is redrawn. Run it from the repository when
 the source logo changes; `packaging/icons/manifest.json` records the source and output hashes.
@@ -138,7 +141,7 @@ because native video surfaces are not included in `QWidget.grab()` on every plat
 Use the Mentra Infinity Cable's data connection, attach its contacts to the right temple,
 and connect it to the PC. Mentra's [official ADB instructions](https://github.com/Mentra-Community/MentraOS/blob/main/asg_client/README.md#connecting-via-adb)
 describe the connection and ship the glasses with USB debugging enabled. Start the app and
-press **接続**. Developers can diagnose the connection with the bundled
+press the **端末を再確認** refresh button. Developers can diagnose the connection with the bundled
 `_internal/rootlens_import/runtime/adb.exe devices` from the installed app directory.
 
 Platform-Tools includes the ADB program and its Windows DLLs; it is not a universal USB

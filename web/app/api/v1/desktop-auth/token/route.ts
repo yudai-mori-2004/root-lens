@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { desktopAuthorizationCodes, desktopSessions } from "@/db/schema";
 import { desktopSites } from "@/lib/desktop-auth";
+import { operatorPhoneLast4 } from "@/lib/operator-identity";
 import { codeChallenge, randomToken, secureEqual } from "@/lib/desktop-auth-values";
 import { sha256 } from "@/lib/encoding";
 
@@ -40,7 +41,11 @@ export async function POST(request: Request) {
       return true;
     });
     if (!won) return Response.json({ error: "invalid authorization code" }, { status: 401 });
-    return Response.json({ sessionToken, sites: await desktopSites(authorization.identityId) });
+    const [sites, phoneLast4] = await Promise.all([
+      desktopSites(authorization.identityId),
+      operatorPhoneLast4(authorization.identityId).catch(() => null),
+    ]);
+    return Response.json({ sessionToken, sites, phoneLast4 });
   } catch {
     return Response.json({ error: "invalid authorization code" }, { status: 401 });
   }

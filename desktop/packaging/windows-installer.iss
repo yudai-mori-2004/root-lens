@@ -7,7 +7,7 @@
 
 [Setup]
 AppId={{DF82D3D9-DF73-4D27-A1DA-5E7ECB83FEE2}
-AppName=RootLens
+AppName=RootLens Importer
 AppVersion={#AppVersion}
 AppPublisher=RootLens
 DefaultDirName={localappdata}\Programs\RootLens Import
@@ -35,13 +35,15 @@ Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "desktopicon"; Description: "デスクトップにアイコンを作成する"; Flags: checkedonce
 
 [Icons]
-Name: "{group}\RootLens"; Filename: "{app}\RootLens Import.exe"
-Name: "{autodesktop}\RootLens"; Filename: "{app}\RootLens Import.exe"; Tasks: desktopicon
+Name: "{group}\RootLens Importer"; Filename: "{app}\RootLens Import.exe"
+Name: "{autodesktop}\RootLens Importer"; Filename: "{app}\RootLens Import.exe"; Tasks: desktopicon
 
 [InstallDelete]
 Type: files; Name: "{userprograms}\RootLens Import\RootLens Import.lnk"
 Type: dirifempty; Name: "{userprograms}\RootLens Import"
 Type: files; Name: "{autodesktop}\RootLens Import.lnk"
+Type: files; Name: "{userprograms}\RootLens\RootLens.lnk"
+Type: files; Name: "{autodesktop}\RootLens.lnk"
 
 [Run]
-Filename: "{app}\RootLens Import.exe"; Description: "RootLens を起動する"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\RootLens Import.exe"; Description: "RootLens Importer を起動する"; Flags: nowait postinstall skipifsilent

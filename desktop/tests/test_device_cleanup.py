@@ -15,7 +15,9 @@ import unittest
 from rootlens_import.core import (FILES, ImportCancelled, ImportFailure,
                                   unit_files_sha256, validate_metadata)
 from rootlens_import.device_cleanup import (
-    AUXILIARY_FILES, PENDING_NAME, cleanup_recording, discover_pending, _manifest,
+    AUXILIARY_FILES, PENDING_NAME, cleanup_recording, discover_pending,
+    discard_recording, discover_pending_discards, discard_problem_recording,
+    discover_pending_problem_discards, _manifest,
 )
 from unit_fixtures import unit_id
 
@@ -145,6 +147,79 @@ class DeviceCleanupTests(unittest.TestCase):
         self.assertTrue(self.path.is_dir())
         self.assertFalse(any(" && mv " in command or " && rm -- " in command or " && rmdir -- " in command
                              for command in self.adb.commands))
+
+    def test_discard_removes_only_the_confirmed_recording(self):
+        expected = {name: self.descriptor.files[name] for name in FILES}
+        discard_recording(self.adb, ROOT, NAME, self.unit_id, expected)
+        self.assertFalse(self.path.exists())
+        self.assertTrue((self.neighbor / "keep.txt").is_file())
+        self.assertEqual(discover_pending_discards(self.adb, ROOT), [])
+
+    def test_discard_rejects_a_mismatched_copy_without_mutating_device(self):
+        expected = {name: dict(self.descriptor.files[name]) for name in FILES}
+        expected["rgb.mp4"]["sha256"] = "0" * 64
+        with self.assertRaises(ImportFailure):
+            discard_recording(self.adb, ROOT, NAME, self.unit_id, expected)
+        self.assert_no_mutation()
+
+    def test_interrupted_discard_resumes_from_the_durable_marker(self):
+        expected = {name: self.descriptor.files[name] for name in FILES}
+        interrupted = False
+
+        def disconnect(command):
+            nonlocal interrupted
+            if not interrupted and " && rm -- " in command:
+                interrupted = True
+                raise ImportFailure("lost USB reply")
+
+        self.adb.after_shell = disconnect
+        with self.assertRaises(ImportFailure):
+            discard_recording(self.adb, ROOT, NAME, self.unit_id, expected)
+        pending = discover_pending_discards(self.adb, ROOT)
+        self.assertEqual(len(pending), 1)
+        self.adb.after_shell = None
+        discard_recording(self.adb, ROOT, pending[0][0], self.unit_id)
+        self.assertEqual(discover_pending_discards(self.adb, ROOT), [])
+        self.assertTrue((self.neighbor / "keep.txt").is_file())
+
+    def test_incomplete_recording_can_be_discarded_without_a_valid_unit_id(self):
+        (self.path / "metadata.json").unlink()
+        (self.path / "rgb.mp4").rename(self.path / "rgb.mp4.partial")
+        (self.path / "failure.json").write_text('{"reason":"capture failed"}')
+        discard_problem_recording(self.adb, ROOT, NAME)
+        self.assertFalse(self.path.exists())
+        self.assertTrue((self.neighbor / "keep.txt").exists())
+
+    def test_problem_discard_resumes_after_usb_interruption(self):
+        (self.path / "metadata.json").unlink()
+        (self.path / "metadata.json.partial").write_text("unfinished")
+
+        def disconnect(command):
+            if " && rm -- " in command:
+                raise ImportFailure("lost USB")
+
+        self.adb.after_shell = disconnect
+        with self.assertRaises(ImportFailure):
+            discard_problem_recording(self.adb, ROOT, NAME)
+        pending = discover_pending_problem_discards(self.adb, ROOT)
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(discover_pending_discards(self.adb, ROOT), [])
+        self.adb.after_shell = None
+        discard_problem_recording(self.adb, ROOT, pending[0][0])
+        self.assertEqual(discover_pending_problem_discards(self.adb, ROOT), [])
+        self.assertTrue((self.neighbor / "keep.txt").exists())
+
+    def test_problem_discard_rejects_unknown_file_and_link(self):
+        unknown = self.path / "other.txt"
+        unknown.write_text("keep")
+        with self.assertRaises(ImportFailure):
+            discard_problem_recording(self.adb, ROOT, NAME)
+        unknown.unlink()
+        target = self.path / "external-link"
+        target.symlink_to(self.neighbor)
+        with self.assertRaises(ImportFailure):
+            discard_problem_recording(self.adb, ROOT, NAME)
+        self.assertTrue((self.path / "rgb.mp4").exists())
 
     def test_complete_recording_retires_all_seven_only_after_fresh_drive_and_sync(self):
         result = self.clean()
