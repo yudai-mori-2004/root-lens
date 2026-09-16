@@ -39,15 +39,17 @@ describe("electronic agreement body", () => {
 
   it("shows the site name and excludes the paper signature page", () => {
     const body = agreementBodyForSite(agreementTemplates.site_agreement.body, "テスト事業所");
-    expect(body).toContain("［テスト事業所］");
-    expect(body).toContain("第15条（準拠法）");
-    expect(body).not.toContain("合意日：");
+    expect(body).toContain("テスト事業所（以下「甲」という。）");
+    expect(body).toContain("第16条（準拠法）");
+    expect(body).toContain("匿名化処理の完了後7日間");
+    expect(body).toContain("撮影データを取り扱う委託先の名称");
+    expect(body).not.toContain("【締結年】");
+    expect(body).not.toContain("【甲の代表者の役職・氏名】");
     expect(agreementTemplates.site_agreement.sha256).toBe(sha256(agreementTemplates.site_agreement.body));
     const page = renderToStaticMarkup(createElement(AgreementDocument, { body }));
     expect(page).toContain("テスト事業所");
-    expect(page).toContain("<span>4</span>乙は、第1条の目的の範囲内であっても");
-    expect(page).toContain("<span>(1)</span>撮影された個人の特定");
-    expect(page).not.toContain("<span>1.</span>");
-    expect(page).not.toContain("合意日：");
+    expect(page).toContain("第6条（撮影データの利用及び提供）");
+    expect(page).toContain("第16条（準拠法）");
+    expect(page).not.toContain("【甲の代表者の役職・氏名】");
   });
 });

@@ -88,12 +88,6 @@ export async function POST(request: Request) {
       acceptedAt: attempt.acceptedAt, agreementId: attempt.siteAgreementId,
       driveFileId: attempt.siteAgreementFileId,
     });
-    const staffConsent = await storeAgreementOriginal({
-      site, drive, kind: "staff_consent", personId: attempt.personId, identityId,
-      signerName, phoneLast4: attempt.phoneLast4, acceptedAt: attempt.acceptedAt,
-      agreementId: attempt.staffConsentId, driveFileId: attempt.staffConsentFileId,
-    });
-
     await db.transaction(async (tx) => {
       const [current] = await tx.select({ processingOwner: siteRegistrationAttempts.processingOwner,
         completedAt: siteRegistrationAttempts.completedAt })
@@ -110,7 +104,7 @@ export async function POST(request: Request) {
         id: attempt.personId, siteId: attempt.siteId, name: signerName, role: "supervisor",
       });
       await tx.insert(operatorMemberships).values({ identityId, personId: attempt.personId });
-      await tx.insert(agreementRecords).values([siteAgreement, staffConsent]);
+      await tx.insert(agreementRecords).values(siteAgreement);
       await tx.update(siteRegistrationAttempts).set({ completedAt: new Date(), processingOwner: null,
         processingStartedAt: null }).where(eq(siteRegistrationAttempts.requestId, requestId));
     });

@@ -79,7 +79,10 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
   const body = agreementBodyForSite(template.body, input.siteName);
   for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
-    if (!line || line === "---") { document.y += LINE_HEIGHT; continue; }
+    if (!line || line === "---") {
+      document.y += input.kind === "site_agreement" ? 4 : LINE_HEIGHT;
+      continue;
+    }
     if (line.startsWith("# ")) {
       agreementLine(document, line.slice(2), { align: "center" });
     } else if (line.startsWith("## ")) {
