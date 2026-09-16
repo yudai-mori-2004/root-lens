@@ -26,9 +26,10 @@ export default function SiteClient({ siteId, initialData }: { siteId: string; in
     <p className={styles.lead}>各スタッフの撮影参加への同意管理を行うページです。</p>
     <section className={styles.section}>
       <div className={styles.sectionHead}><h2 className={styles.sectionTitle}>スタッフ</h2><button type="button" className={styles.addIconButton} aria-label="スタッフを追加" title="スタッフを追加" onClick={() => { setError(""); setInviteUrl(""); setShowAdd(true); }}><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></button></div>
-      <div className={styles.stack}>{data.members.map((member) => <div className={`${styles.card} ${styles.row}`} key={member.id}>
-        <div><strong>{member.name}</strong>{member.jobTitle && <span className={styles.memberTitle}> · {member.jobTitle}</span>}
-          <div className={styles.meta}>{member.consentId ? `同意済み · ${new Date(member.consentSignedAt!).toLocaleString("ja-JP")}` : "同意待ち"}</div>
+      <div className={styles.stack}>{data.members.map((member) => <div className={`${styles.card} ${styles.row} ${styles.memberCard} ${member.consentId ? styles.memberConsented : styles.memberPending}`} key={member.id}>
+        <div className={styles.memberSummary}>
+          <div className={styles.memberHeading}><strong>{member.name}</strong><span className={styles.memberRole}>{member.role === "supervisor" ? "現場監督者" : member.role === "admin" ? "管理者" : "スタッフ"}</span><span className={styles.memberConsent}>{member.consentId ? "同意済み" : "同意待ち"}</span></div>
+          <div className={styles.memberDetails} title={[member.jobTitle, member.note].filter(Boolean).join(" · ")}>{[member.jobTitle, member.note].filter(Boolean).join(" · ") || "担当・メモ未設定"}</div>
         </div>
         <button type="button" className={styles.editLink} onClick={() => setEditingId(member.id)} aria-label={`${member.name}のプロフィールを編集`}><Image src="/pencil.svg" alt="" width={18} height={18} />編集</button>
       </div>)}</div>
@@ -67,7 +68,6 @@ export default function SiteClient({ siteId, initialData }: { siteId: string; in
           site: changed.id === current.site.personId ? { ...current.site, role: changed.role as "admin" | "supervisor" } : current.site,
           members: current.members.map((member) => member.id === changed.id ? changed : member),
         }));
-        setEditingId(null);
       }}
       onRemoved={() => {
         if (editingId === data.site.personId) return router.push("/manage");

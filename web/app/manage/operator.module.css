@@ -4,10 +4,10 @@
 .utility { display: flex; justify-content: flex-end; margin: -1.5rem 0 1.5rem; }
 .backLink, .textButton { display: inline-block; margin-bottom: 1.5rem; border: 0; background: none; color: var(--color-ink-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
 .textButton { margin: 0; }
-.title { margin: 0 0 .45rem; font-size: clamp(1.5rem, 2.6vw, 2.15rem); font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
+.title { margin: 0 0 .45rem; font-size: 1.5rem; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
 .lead { margin: 0 0 1.5rem; color: var(--color-ink-muted); font-size: var(--text-md); line-height: 1.6; }
 .section { padding: 1.5rem 0; border-top: 1px solid var(--color-rule); }
-.sectionTitle { margin: 0 0 1rem; font-size: var(--text-lg); line-height: 1.4; }
+.sectionTitle { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
 .sectionHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
 .sectionHead .sectionTitle, .dialogHead .sectionTitle { margin: 0; }
 .addIconButton { display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--color-rule-strong); border-radius: 6px; background: var(--color-paper); color: var(--color-ink); cursor: pointer; }
@@ -36,14 +36,6 @@
 .accountHeader { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .accountLabel { display: block; margin-bottom: .2rem; color: var(--color-ink-muted); font-size: var(--text-sm); }
 .accountName { display: block; font-weight: 600; }
-.accountPhone { display: flex; gap: 1rem; margin: .8rem 0 0; font-size: var(--text-sm); }
-.accountPhone dt { color: var(--color-ink-muted); }
-.accountPhone dd { margin: 0; font-variant-numeric: tabular-nums; }
-.accountTableWrap { overflow-x: auto; margin-top: .75rem; }
-.accountTable { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-sm); }
-.accountTable th, .accountTable td { padding: .55rem .65rem .55rem 0; border-top: 1px solid var(--color-rule); }
-.accountTable th { color: var(--color-ink-muted); font-weight: 500; white-space: nowrap; }
-.accountTable td:last-child, .accountTable th:last-child { padding-right: 0; }
 .accountLogout { border: 0; background: none; color: var(--color-ink); font: inherit; white-space: nowrap; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
 .accountLogout:hover { color: var(--color-grass-deep); }
 .siteNameLink { text-decoration: none; color: var(--color-ink); }
@@ -64,14 +56,16 @@ a.card:hover { border-color: var(--color-grass-deep); }
 .meta { color: var(--color-ink-muted); font-size: var(--text-sm); margin-top: .3rem; }
 .error { color: #9a2e21; margin: 1rem 0; }
 .success { color: var(--color-grass-deep); margin: 1rem 0; }
-.agreement { margin: 1.5rem 0 1rem; padding: 1.5rem 0; border-top: 1px solid var(--color-rule); border-bottom: 1px solid var(--color-rule); font-size: var(--text-md); line-height: 1.75; overflow-wrap: anywhere; }
-.agreement h2 { margin: 0 0 1.5rem; font-size: var(--text-lg); line-height: 1.45; }
-.agreement h3 { margin: 2rem 0 .55rem; font-size: var(--text-md); line-height: 1.55; }
-.agreement p { margin: 0 0 1rem; }
-.agreement ul { margin: 0 0 1rem; padding-left: 1.4em; }
-.agreement li + li { margin-top: .45rem; }
-.agreementClauses p { display: grid; grid-template-columns: 1.7em minmax(0, 1fr); gap: .15em; margin-bottom: .55rem; }
-.agreementNestedClause { margin-left: 1.8em; }
+.agreementViewport { height: min(600px, 60dvh); min-height: 280px; margin: 1.5rem 0 1rem; padding: clamp(.75rem, 2vw, 1.25rem); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--color-rule-strong); background: var(--color-paper-muted); }
+.agreementViewport:focus-visible { outline: 2px solid var(--color-grass-deep); outline-offset: 2px; }
+.agreement { max-width: 680px; min-height: 100%; margin: 0 auto; padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--color-rule); background: var(--color-paper); color: var(--color-ink); font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: .95rem; line-height: 1.75; overflow-wrap: anywhere; box-sizing: border-box; }
+.agreement h2 { margin: 0 0 1.75rem; font-size: .95rem; font-weight: 600; line-height: 1.6; text-align: center; }
+.agreement h3 { margin: 1.5rem 0 .35rem; font-size: .95rem; font-weight: 600; line-height: 1.6; }
+.agreement p { margin: 0 0 .85rem; white-space: pre-wrap; }
+.agreementClauses { margin: 0 0 .85rem; padding: 0; list-style: none; }
+.agreementClauses p, .agreementClauses li { display: grid; grid-template-columns: 1.7em minmax(0, 1fr); gap: .15em; margin: 0 0 .25rem; }
+.agreementClauses p span, .agreementClauses li span { white-space: nowrap; }
+.agreementClauses .agreementNestedClause { margin-left: 1.8em; grid-template-columns: 2.2em minmax(0, 1fr); }
 .check { display: flex; gap: .75rem; align-items: flex-start; margin: 1.25rem 0; line-height: 1.6; }
 .check input { margin-top: .35rem; accent-color: var(--color-grass-deep); }
 .link { text-decoration: underline; text-underline-offset: .2em; }
@@ -79,10 +73,21 @@ a.card:hover { border-color: var(--color-grass-deep); }
 .details { display: grid; grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); column-gap: .5rem; margin: .65rem 0 0; }
 .details dt, .details dd { margin: 0; padding: .3rem 0; overflow-wrap: anywhere; }
 .details dt { font-weight: 700; }
-.memberTitle { color: var(--color-ink-muted); }
+.memberCard { height: 80px; box-sizing: border-box; padding-top: .55rem; padding-bottom: .55rem; }
+.memberConsented { background: var(--color-grass-soft); }
+.memberPending { background: var(--color-paper-muted); }
+.memberSummary { min-width: 0; flex: 1; }
+.memberHeading { display: flex; align-items: baseline; gap: .55rem; min-width: 0; white-space: nowrap; }
+.memberHeading strong { overflow: hidden; text-overflow: ellipsis; }
+.memberRole { flex: none; color: var(--color-ink-muted); font-size: var(--text-xs); }
+.memberConsent { flex: none; padding: .12rem .5rem; border: 1px solid currentColor; border-radius: 999px; font-size: var(--text-xs); font-weight: 600; line-height: 1.3; }
+.memberConsented .memberConsent { color: var(--color-grass-deep); }
+.memberPending .memberConsent { color: var(--color-ink-muted); }
+.memberDetails { margin-top: .25rem; overflow: hidden; color: var(--color-ink-muted); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .editLink { display: inline-flex; align-items: center; gap: .5rem; border: 0; background: none; font: inherit; color: var(--color-ink); text-decoration: none; min-height: 44px; padding: .35rem .5rem; cursor: pointer; }
 .editLink:hover { text-decoration: underline; text-underline-offset: .2em; }
 .profileForm .field { margin-bottom: .75rem; }
+.saveStatus { min-height: 1.5em; margin: .25rem 0 0; color: var(--color-ink-muted); font-size: var(--text-sm); }
 .profileFormGrid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(8rem, 1fr); gap: .75rem; align-items: start; }
 .profileRecord { margin-top: 1.25rem; }
 .profileRecord .sectionTitle { margin-bottom: 0; }
@@ -93,4 +98,4 @@ a.card:hover { border-color: var(--color-grass-deep); }
 .confirmPanel p { margin: 0 0 1rem; line-height: 1.65; }
 .profileOverlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: var(--page-gutter); background: rgba(0, 0, 0, .36); }
 .profileDialog { width: min(600px, 100%); max-height: calc(100dvh - 2 * var(--page-gutter)); overflow: auto; padding: clamp(1rem, 2vw, 1.5rem); background: var(--color-paper); border: 1px solid var(--color-rule-strong); box-shadow: 0 12px 36px rgba(0, 0, 0, .12); }
-@media (max-width: 600px) { .main { padding-top: 1.5rem; } .row, .pageHead { align-items: stretch; flex-direction: column; } .utility { margin: 0 0 1.25rem; } .accountTable thead { display: none; } .accountTable tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: .5rem 0; border-top: 1px solid var(--color-rule); } .accountTable td { display: grid; gap: .1rem; min-width: 0; padding: .3rem .5rem .3rem 0; border: 0; overflow-wrap: anywhere; } .accountTable td::before { content: attr(data-label); color: var(--color-ink-muted); font-size: var(--text-xs); } }
+@media (max-width: 600px) { .main { padding-top: 1.5rem; } .row:not(.memberCard), .pageHead { align-items: stretch; flex-direction: column; } .utility { margin: 0 0 1.25rem; } .memberCard { gap: .35rem; padding-left: .8rem; padding-right: .6rem; } .memberHeading { gap: .3rem; } .memberRole { display: none; } .memberCard .editLink { flex: none; } }

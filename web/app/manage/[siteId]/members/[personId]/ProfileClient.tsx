@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import type { ManagedSiteData } from "@/lib/operator-data";
 import styles from "../../../operator.module.css";
 
 type Role = "staff" | "admin" | "supervisor";
+type Draft = { jobTitle: string; note: string; role: Role };
 
 export default function ProfileClient({ siteId, personId, initialData, embedded = false, onClose, onChanged, onRemoved }: {
   siteId: string; personId: string; initialData: ManagedSiteData; embedded?: boolean;
@@ -21,32 +22,69 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
   const [note, setNote] = useState(initialMember.note ?? "");
   const [role, setRole] = useState<Role>(initialMember.role as Role);
   const [busy, setBusy] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "pending" | "saving" | "error">("saved");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
+  const draft = useRef<Draft>({ jobTitle: initialMember.jobTitle ?? "", note: initialMember.note ?? "", role: initialMember.role as Role });
+  const saved = useRef(JSON.stringify(draft.current));
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlight = useRef<Promise<boolean>>(Promise.resolve(true));
+  const member = initialMember;
+  async function persist(): Promise<boolean> {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const snapshot = { ...draft.current };
+    const serialized = JSON.stringify(snapshot);
+    const previous = inFlight.current;
+    const request = previous.then(async () => {
+      if (saved.current === serialized) return true;
+      setSaveState("saving"); setError("");
+      try {
+        const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, {
+          method: "PATCH", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: member.name, ...snapshot }),
+        });
+        if (response.status === 401) { router.push(`/login?next=/manage/${siteId}`); return false; }
+        if (!response.ok) throw new Error((await response.json()).error ?? "保存できませんでした。");
+        saved.current = serialized;
+        onChanged?.({ ...member, jobTitle: snapshot.jobTitle || null, note: snapshot.note || null, role: snapshot.role });
+        if (!embedded && data.site.personId === personId && snapshot.role === "staff") router.replace("/manage");
+        if (JSON.stringify(draft.current) === serialized) setSaveState("saved");
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "保存できませんでした。");
+        setSaveState("error");
+        return false;
+      }
+    });
+    inFlight.current = request;
+    return request;
+  }
+  function updateDraft(next: Draft, immediate = false) {
+    draft.current = next;
+    setSaveState("pending");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = immediate ? null : setTimeout(() => { void persist(); }, 450);
+    if (immediate) void persist();
+  }
+  async function close() {
+    if (busy) return;
+    if (await persist()) onClose?.();
+  }
   useEffect(() => {
     if (!embedded) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose?.(); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") void close(); };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [embedded, onClose]);
-  const member = initialMember;
+  });
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const lastSupervisor = member.role === "supervisor" && data.members.filter((item) => item.role === "supervisor" && item.identityId).length === 1;
   const canChangeSupervisor = data.site.role === "supervisor";
-  async function save(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    try {
-      const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, {
-        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: member.name, jobTitle, note, role }),
-      });
-      if (response.status === 401) return router.push(`/login?next=/manage/${siteId}`);
-      if (!response.ok) throw new Error((await response.json()).error ?? "保存できませんでした。");
-      if (embedded) onChanged?.({ ...member, jobTitle: jobTitle || null, note: note || null, role });
-      else router.push(data.site.personId === personId && role === "staff" ? "/manage" : `/manage/${siteId}`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "保存できませんでした。"); }
-    finally { setBusy(false); }
-  }
   async function remove() {
     setBusy(true); setError("");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    await inFlight.current;
     try {
       const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, { method: "DELETE" });
       if (response.status === 401) return router.push(`/login?next=/manage/${siteId}`);
@@ -57,18 +95,18 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
     finally { setBusy(false); }
   }
   const content = <>
-    {embedded ? <button type="button" className={styles.backLink} onClick={onClose}>← スタッフ一覧に戻る</button>
-      : <Link className={styles.backLink} href={`/manage/${siteId}`}>← {data.site.name}</Link>}
+    {embedded ? <button type="button" className={styles.backLink} onClick={() => { void close(); }}>← スタッフ一覧に戻る</button>
+      : <Link className={styles.backLink} href={`/manage/${siteId}`} onClick={(event) => { if (saveState !== "saved") { event.preventDefault(); void persist().then((ok) => { if (ok) router.push(`/manage/${siteId}`); }); } }}>← {data.site.name}</Link>}
     <h1 className={styles.title}>{member.name}</h1>
     <>
-      <form className={styles.profileForm} onSubmit={save}>
+      <div className={styles.profileForm}>
         <div className={styles.profileFormGrid}>
-        <div className={styles.field}><label htmlFor="jobTitle">担当・役職</label><input id="jobTitle" value={jobTitle} maxLength={100} onChange={(event) => setJobTitle(event.target.value)} placeholder="例：調理担当" /></div>
-        <div className={styles.field}><label htmlFor="role">権限</label><select id="role" value={role} disabled={Boolean(lastSupervisor) || (member.role === "supervisor" && !canChangeSupervisor)} onChange={(event) => setRole(event.target.value as Role)}><option value="staff">スタッフ</option><option value="admin">管理者</option><option value="supervisor" disabled={!canChangeSupervisor}>現場監督者</option></select>{lastSupervisor && <span className={styles.roleHint}>最後の現場監督者は変更できません</span>}</div>
+        <div className={styles.field}><label htmlFor="jobTitle">担当・役職</label><input id="jobTitle" value={jobTitle} maxLength={100} onChange={(event) => { const value = event.target.value; setJobTitle(value); updateDraft({ ...draft.current, jobTitle: value }); }} onBlur={() => { if (saveState !== "saved") void persist(); }} placeholder="例：調理担当" /></div>
+        <div className={styles.field}><label htmlFor="role">権限</label><select id="role" value={role} disabled={Boolean(lastSupervisor) || (member.role === "supervisor" && !canChangeSupervisor)} onChange={(event) => { const value = event.target.value as Role; setRole(value); updateDraft({ ...draft.current, role: value }, true); }}><option value="staff">スタッフ</option><option value="admin">管理者</option><option value="supervisor" disabled={!canChangeSupervisor}>現場監督者</option></select>{lastSupervisor && <span className={styles.roleHint}>最後の現場監督者は変更できません</span>}</div>
         </div>
-        <div className={styles.field}><label htmlFor="memberNote">現場用メモ</label><textarea id="memberNote" value={note} maxLength={1000} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="担当業務などを記録できます" /></div>
-        <button className={styles.button} disabled={busy}>{busy ? "保存中…" : "変更を保存"}</button>
-      </form>
+        <div className={styles.field}><label htmlFor="memberNote">現場用メモ</label><textarea id="memberNote" value={note} maxLength={1000} rows={2} onChange={(event) => { const value = event.target.value; setNote(value); updateDraft({ ...draft.current, note: value }); }} onBlur={() => { if (saveState !== "saved") void persist(); }} placeholder="担当業務などを記録できます" /></div>
+        <p className={styles.saveStatus} role="status">{saveState === "saved" ? "保存済み" : saveState === "saving" ? "保存中…" : saveState === "error" ? "保存できませんでした。閉じると再試行します。" : "変更を保存します…"}</p>
+      </div>
       <section className={styles.profileRecord}>
         <h2 className={styles.sectionTitle}>登録と同意</h2>
         <dl className={styles.details}>
