@@ -68,6 +68,10 @@ a.card:hover { border-color: var(--color-grass-deep); }
 .agreementClauses .agreementNestedClause { margin-left: 1.8em; grid-template-columns: 2.2em minmax(0, 1fr); }
 .check { display: flex; gap: .75rem; align-items: flex-start; margin: 1.25rem 0; line-height: 1.6; }
 .check input { margin-top: .35rem; accent-color: var(--color-grass-deep); }
+.consentChecklist { margin: 1.25rem 0; padding: 0; border: 0; }
+.consentChecklist legend { margin-bottom: .75rem; font-weight: 600; }
+.consentChecklist .check { margin: 0; padding: .7rem 0; border-top: 1px solid var(--color-rule); cursor: pointer; }
+.consentChecklist .check:last-child { border-bottom: 1px solid var(--color-rule); }
 .link { text-decoration: underline; text-underline-offset: .2em; }
 .actions { display: flex; flex-wrap: wrap; gap: .65rem; }
 .details { display: grid; grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); column-gap: .5rem; margin: .65rem 0 0; }

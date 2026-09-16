@@ -7,11 +7,11 @@ import AgreementDocument from "@/components/operator/AgreementDocument";
 import styles from "../../manage/operator.module.css";
 
 type Invite = { personName: string; siteName: string };
-export default function InviteClient({ token, agreement }: { token: string; agreement: string }) {
+export default function InviteClient({ token, agreement, confirmations }: { token: string; agreement: string; confirmations: string[] }) {
   const router = useRouter();
   const [invite, setInvite] = useState<Invite | null>(null);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [agreed, setAgreed] = useState(false);
+  const [checked, setChecked] = useState<boolean[]>(() => confirmations.map(() => false));
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,7 @@ export default function InviteClient({ token, agreement }: { token: string; agre
     setBusy(true); setError("");
     try {
       const response = await fetch(`/api/operator/invites/${token}/accept`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agreed }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirmations: checked }),
       });
       if (response.status === 401) return router.push(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
       const value = await response.json();
@@ -44,8 +44,14 @@ export default function InviteClient({ token, agreement }: { token: string; agre
       <p className={styles.lead}>{invite.siteName}から{invite.personName}さんへ届いた案内です。ご本人が以下の内容を確認してください。</p>
       <AgreementDocument body={agreement} />
       {authenticated === true ? <>
-        <label className={styles.check}><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /><span>本文書の全内容を確認し、同意します。</span></label>
-        <button className={styles.button} disabled={!agreed || busy} onClick={accept}>{busy ? "同意を記録中…" : "同意する"}</button>
+        <fieldset className={styles.consentChecklist}>
+          <legend>同意の確認</legend>
+          {confirmations.map((statement, index) => <label className={styles.check} key={index}>
+            <input type="checkbox" checked={checked[index]} onChange={(event) => setChecked((current) => current.map((value, item) => item === index ? event.target.checked : value))} />
+            <span>{statement}</span>
+          </label>)}
+        </fieldset>
+        <button className={styles.button} disabled={!checked.every(Boolean) || busy} onClick={accept}>{busy ? "同意を記録中…" : "同意する"}</button>
       </> : authenticated === false && <a className={styles.button} href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}>SMSでログインして同意する</a>}
     </>}
     {error && <p className={styles.error}>{error}</p>}

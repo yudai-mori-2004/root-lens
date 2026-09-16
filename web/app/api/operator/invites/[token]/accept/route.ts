@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, ne } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import { agreementRecords, operatorInvites, operatorMemberships, people, sites } from "@/db/schema";
 import { storeAgreementOriginal } from "@/lib/agreement-service";
@@ -8,13 +7,14 @@ import { sha256 } from "@/lib/encoding";
 import { operatorPhoneLast4 } from "@/lib/operator-identity";
 import { authenticateOperator } from "@/lib/operator-browser";
 import { siteDrive } from "@/lib/site-drive";
+import { staffConsentAcceptance } from "@/lib/staff-consent-confirmations";
 
 const LEASE_MS = 5 * 60_000;
 
 export async function POST(request: Request, context: { params: Promise<{ token: string }> }) {
   const identityId = await authenticateOperator(request);
   if (!identityId) return Response.json({ error: "SMSログインが必要です。" }, { status: 401 });
-  const body = z.object({ agreed: z.literal(true) }).safeParse(await request.json().catch(() => null));
+  const body = staffConsentAcceptance.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: "本文書を確認し、同意してから進んでください。" }, { status: 400 });
 
   const { token } = await context.params;
