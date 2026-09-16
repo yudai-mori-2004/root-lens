@@ -27,7 +27,7 @@ export default function ManageClient({ sites, phoneLast4 }: { sites: Site[]; pho
         </div>
       </section>
       <section className={styles.section}>
-        <div className={styles.sectionHead}><h2 className={styles.sectionTitle}>管理している事業所</h2><Link className={styles.addIconButton} href="/manage/new" aria-label="新しい事業所を登録" title="新しい事業所を登録"><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></Link></div>
+        <div className={styles.sectionHead}><h2 className={styles.sectionTitle}>事業所リスト（{sites.length}）</h2><Link className={styles.addIconButton} href="/manage/new" aria-label="新しい事業所を登録" title="新しい事業所を登録"><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></Link></div>
         {sites.length === 0 ? <p className={styles.empty}>管理している事業所はありません。</p> : <div className={styles.stack}>{sites.map((site) => <div className={`${styles.card} ${styles.row}`} key={site.id}>
           <div><Link className={styles.siteNameLink} href={`/manage/${site.id}`} prefetch><strong>{site.name}</strong></Link><div className={styles.meta}>{site.personName} · {site.role === "supervisor" ? "現場監督者" : "管理者"}{site.jobTitle ? ` · ${site.jobTitle}` : ""}</div></div>
           {site.role === "supervisor" ? <button type="button" className={styles.editLink} aria-label={`${site.name}の設定`} onClick={() => { setSettingsSiteId(site.id); setPendingSetting(null); }}><Settings size={18} strokeWidth={1.8} aria-hidden="true" />設定</button>
