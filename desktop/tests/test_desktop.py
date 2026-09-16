@@ -191,7 +191,7 @@ class DesktopTests(unittest.TestCase):
         wait_for(lambda: self.window.recording_list.topLevelItemCount() == 2)
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 2)
         pending = self.window.recording_list.topLevelItem(1)
-        self.assertEqual(pending.text(1), "取り込み中")
+        self.assertEqual(pending.text(1), "PCへコピー中")
         self.assertFalse(pending.flags() & Qt.ItemFlag.ItemIsSelectable)
         self.assertEqual(len(self.window.records), 1)
 
@@ -286,7 +286,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(opened.call_args.args[0].toString(),
                          "https://www.rootlens.io/evidence/sites/site_fixture/approved-data")
         self.assertEqual(set(clips[0].iterdir()), before)
-        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "未アップロード")
+        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), "内容確認待ち")
 
     def test_close_cancels_import_before_releasing_window(self):
         self.populate(1)
@@ -352,7 +352,7 @@ class DesktopTests(unittest.TestCase):
         self.window._clip_progress(ClipProgress('rec-20260911T000001.000Z', None, 'drive_saved'))
         self.window._flush_progress()
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
-        self.assertEqual(self.window.count_label.text(), 'アップロード待ち 0 件')
+        self.assertEqual(self.window.count_label.text(), '内容確認・アップロード待ち 0 件')
 
 
 if __name__ == '__main__':

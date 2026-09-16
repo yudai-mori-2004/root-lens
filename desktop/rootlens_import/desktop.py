@@ -27,11 +27,12 @@ from .site import SiteProfile, load_site_profile, save_site_profile
 
 
 PROGRESS_LABELS = {
-    "discovering": "確認中", "importing": "取り込み中", "verifying": "確認中",
-    "ready": "未アップロード", "drive_saved": "Driveに保存済み",
+    "discovering": "端末を確認中", "importing": "PCへコピー中",
+    "verifying": "端末とPCを照合中",
+    "ready": "内容確認待ち", "drive_saved": "Driveに保存済み",
     "deleting": "端末から削除中", "cleanup_pending": "端末の削除待ち",
     "local_cleanup_pending": "PCのコピー削除待ち",
-    "incomplete": "録画が未完了", "error": "取り込みエラー",
+    "incomplete": "端末の保存未完了", "error": "取り込みエラー",
 }
 
 
@@ -187,7 +188,7 @@ class ImportWindow(QMainWindow):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
-        self.count_label = QLabel("未アップロード 0 件")
+        self.count_label = QLabel("内容確認・アップロード待ち 0 件")
         left_layout.addWidget(self.count_label)
         self.recording_list = QTreeWidget()
         self.recording_list.setColumnCount(2)
@@ -407,13 +408,15 @@ class ImportWindow(QMainWindow):
             remote_name = self._recording_name(record)
             ready_names.add(remote_name)
             progress = self.progress_states.get(remote_name)
-            state = PROGRESS_LABELS.get(progress.state, "確認中") if progress else "確認中"
+            state = PROGRESS_LABELS.get(progress.state, "端末の確認待ち") if progress else "端末の確認待ち"
             item = QTreeWidgetItem([f"{record.created_text}\n{record.duration_text}", state])
             item.setData(0, Qt.ItemDataRole.UserRole, str(record.path))
             item.setToolTip(0, record.path.name)
             if remote_name in self.blocked_names:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                 item.setText(1, "取り込みエラー")
+            if progress and progress.state == "ready":
+                item.setToolTip(1, "PCに取り込み済み。内容を確認し、問題なければ「アップロード」を押してください。")
             if progress and progress.error:
                 item.setToolTip(1, progress.error)
             if record.unit_id in self.upload_states and remote_name not in self.blocked_names:
@@ -424,7 +427,7 @@ class ImportWindow(QMainWindow):
         for name, progress in self.progress_states.items():
             if name in ready_names or progress.state == "drive_saved":
                 continue
-            item = QTreeWidgetItem([name, PROGRESS_LABELS.get(progress.state, "確認中")])
+            item = QTreeWidgetItem([name, PROGRESS_LABELS.get(progress.state, "端末の確認待ち")])
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             item.setToolTip(1, progress.error)
             self.recording_list.addTopLevelItem(item)
@@ -434,7 +437,7 @@ class ImportWindow(QMainWindow):
         self.recording_list.setCurrentItem(selected_item)
         self.recording_list.verticalScrollBar().setValue(scroll_value)
         self.recording_list.blockSignals(False)
-        self.count_label.setText(f"アップロード待ち {len(self.records)} 件" if self.drive_synced else "録画一覧")
+        self.count_label.setText(f"内容確認・アップロード待ち {len(self.records)} 件" if self.drive_synced else "録画一覧")
         self._selection_changed()
 
     def _selection_changed(self, *_):

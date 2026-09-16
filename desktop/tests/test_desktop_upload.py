@@ -203,7 +203,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.upload_button.isEnabled())
         self.assertFalse(self.clips[0].exists())
         self.assertIn("アップロードが完了", self.window.status_label.text())
-        self.assertEqual(self.window.count_label.text(), "アップロード待ち 0 件")
+        self.assertEqual(self.window.count_label.text(), "内容確認・アップロード待ち 0 件")
 
     def test_restart_does_not_rebuild_pending_list_from_local_copies(self):
         self.uploader.upload_recording.side_effect = self.uploaded_to_drive
@@ -220,7 +220,7 @@ class UploadDesktopTests(unittest.TestCase):
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
-        self.assertEqual(self.window.count_label.text(), "アップロード待ち 1 件")
+        self.assertEqual(self.window.count_label.text(), "内容確認・アップロード待ち 1 件")
         self.assertNotIn('drive_recordings', self.importer.call_args.kwargs)
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
@@ -234,7 +234,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.window.start_import()
         wait_for(lambda: not self.window.busy)
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
-        self.assertEqual(self.window.count_label.text(), 'アップロード待ち 1 件')
+        self.assertEqual(self.window.count_label.text(), '内容確認・アップロード待ち 1 件')
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
         self.assertFalse(self.clips[0].exists())
 
