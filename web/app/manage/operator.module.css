@@ -29,6 +29,12 @@
 .buttonSecondary { background: var(--color-paper); color: var(--color-ink); }
 .buttonSecondary:hover:not(:disabled) { background: var(--color-grass-soft); color: var(--color-ink); }
 .button:disabled { opacity: .45; cursor: default; }
+.registrationProgress { display: flex; align-items: center; gap: .6rem; margin: .25rem 0 1rem; color: var(--color-ink-muted); line-height: 1.6; }
+.registrationProgress svg { flex: none; animation: registrationSpin 1s linear infinite; }
+.registrationComplete { padding: 1.25rem 0; }
+.registrationComplete p { margin: 0 0 1.25rem; line-height: 1.65; }
+@keyframes registrationSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .registrationProgress svg { animation: none; } }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .pageHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; }
 .pageHead .lead { margin-bottom: 0; }
