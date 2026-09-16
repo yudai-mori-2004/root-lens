@@ -20,6 +20,11 @@ def main(arguments=None):
     parser.add_argument('file', type=Path)
     args = parser.parse_args(arguments)
     path = args.file.expanduser()
+    def stage(name):
+        if sys.platform == 'win32':
+            print(json.dumps({'stage': name, 'at': time.monotonic()}), flush=True)
+
+    stage('start')
     if path.is_symlink() or not path.is_file():
         print(json.dumps({'ok': False, 'error': 'The selected local media file is unavailable.'}))
         return 1
@@ -41,7 +46,9 @@ def main(arguments=None):
 
     previous_handler = qInstallMessageHandler(qt_message)
     application = QApplication.instance() or QApplication([sys.argv[0]])
+    stage('application')
     preview = VideoPreview()
+    stage('preview')
     preview.resize(640, 430)
     preview.setWindowTitle('RootLens media check')
     preview.audio.setMuted(True)
@@ -68,8 +75,11 @@ def main(arguments=None):
         if result['done']:
             return
         result.update(done=True, code=code, error=error, final_state=state())
+        stage('finish-before-clear')
         preview.clear()
+        stage('finish-after-clear')
         preview.close()
+        stage('finish-after-close')
         application.exit(code)
 
     def evaluate():
@@ -79,11 +89,15 @@ def main(arguments=None):
     def video_frame(frame):
         if frame.isValid():
             counts['video_frames'] += 1
+            if counts['video_frames'] == 1:
+                stage('video-frame')
             evaluate()
 
     def audio_buffer(buffer):
         if buffer.isValid() and buffer.byteCount() > 0:
             counts['audio_buffers'] += 1
+            if counts['audio_buffers'] == 1:
+                stage('audio-buffer')
             evaluate()
 
     def media_error(error, detail):
@@ -100,17 +114,22 @@ def main(arguments=None):
     deadline.setSingleShot(True)
     deadline.timeout.connect(lambda: finish(1, 'No decoded video frame and audio buffer within 15 seconds'))
     preview.show()
+    stage('before-load')
     preview.load(path.resolve())
+    stage('after-load')
 
     def start_playback():
         if not preview.player.isAvailable() or preview.player.error() != QMediaPlayer.Error.NoError:
             finish(1, preview.player.errorString() or 'The multimedia backend is unavailable.')
         else:
             deadline.start(15000)
+            stage('before-playback')
             preview.toggle_playback()
+            stage('after-playback')
 
     QTimer.singleShot(0, start_playback)
     application.exec()
+    stage('after-event-loop')
     diagnostic = {'qt_version': qVersion(), 'platform': sys.platform,
                   'audio_output_devices': [device.description() for device in QMediaDevices.audioOutputs()],
                   'file_bytes': path.stat().st_size, 'state': result.get('final_state'),

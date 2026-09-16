@@ -31,6 +31,8 @@ if __name__ == "__main__":
         from rootlens_import.core import main
         sys.exit(main(sys.argv[2:]))
     if sys.argv[1:2] == ["--check-media"]:
+        if os.name == "nt":
+            print('{"stage":"launcher"}', flush=True)
         from media_check import main
         sys.exit(main(sys.argv[2:]))
     if sys.argv[1:2] == ["--check-runtime"]:
