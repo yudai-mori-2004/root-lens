@@ -16,6 +16,7 @@ from .core import CLIP_NAME, FILES, HASH, UNIT_ID, PACKAGES, ImportCancelled, Im
 
 AUXILIARY_FILES = (
     "camera_frames.raw.jsonl", "sync_report.json",
+    "content_hash.txt",  # Legacy device file; never used as upload or approval evidence.
     "camera_capture_failures.txt", "camera_index.bin", "video_index.bin",
     "accelerometer_index.bin", "gyroscope_index.bin",
 )

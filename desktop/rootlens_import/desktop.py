@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
 
 from .core import Adb, ClipProgress, ImportCancelled, ImportFailure
 from .device_sync import (sync_recordings, cleanup_uploaded_recording, discard_unapproved_recording,
-                          discard_problem_capture, remove_uploaded_local_copy, probe_transport)
+                          discard_problem_capture, delete_saved_capture,
+                          remove_uploaded_local_copy, probe_transport)
 from .branding import APP_NAME, app_icon
 from .icons import icon
 from .account import RootLensAccount, SessionStore
@@ -25,6 +26,7 @@ from .approval import approve_recording
 from .drive import DriveUploader, UploadProgress, UploadResult
 from .library import read_recording, recordings_directory, settings_path
 from .preview import VideoPreview
+from .screen_state import Phase, ScreenState, screen_phase
 from .site import SiteProfile
 from .workspace import WorkWorkspace
 
@@ -37,6 +39,10 @@ PROGRESS_LABELS = {
     "local_cleanup_pending": "PCのコピー削除待ち",
     "incomplete": "端末の保存未完了", "error": "取り込みエラー",
 }
+SELECTABLE_STATES = frozenset({"ready", "incomplete", "error", "cleanup_pending"})
+REVIEW_GUIDE = ("映像と音声を確認し、提供に適した録画だけを承認してください。"
+                "撮影ミスや作業中の手元が確認できない録画、同意していない人や"
+                "撮影を避ける対象が含まれる録画は、承認せずに削除してください。")
 
 
 def read_drive_recordings(profile, unit_ids, cancel_event, gateway):
@@ -103,6 +109,7 @@ class ImportSignals(QObject):
     log = Signal(str)
     clip = Signal(object)
     source = Signal(object)
+    device = Signal(object, str)
     done = Signal(object, str, bool)
     drive_checked = Signal(object, str)
     upload_progress = Signal(object)
@@ -137,11 +144,12 @@ class RecordingCard(QStyledItemDelegate):
             chip_font = QFont(option.font)
             chip_font.setPointSize(11)
             painter.setFont(chip_font)
-            chip_width = painter.fontMetrics().horizontalAdvance(chip) + 22
+            loading = bool(index.data(Qt.ItemDataRole.UserRole + 3))
+            chip_width = painter.fontMetrics().horizontalAdvance("•••" if loading else chip) + 22
             chip_rect = card.adjusted(card.width() - chip_width - 10, 37, -10, -8)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(QColor("#aaa9a3"))
-            painter.setBrush(QColor("#f7f7f4"))
+            painter.setPen(QColor("#d2c59d" if loading else "#aaa9a3"))
+            painter.setBrush(QColor("#fff4d6" if loading else "#f7f7f4"))
             painter.drawRoundedRect(chip_rect, 11, 11)
             painter.setPen(QColor("#343434"))
             painter.drawText(chip_rect, Qt.AlignmentFlag.AlignCenter, chip)
@@ -151,7 +159,7 @@ class RecordingCard(QStyledItemDelegate):
             painter.setFont(detail)
             painter.setPen(QColor("#575757"))
             detail_left = 16
-            if index.flags() & Qt.ItemFlag.ItemIsSelectable and not index.data(Qt.ItemDataRole.UserRole + 2):
+            if index.data(Qt.ItemDataRole.UserRole) and not index.data(Qt.ItemDataRole.UserRole + 2):
                 icon("play", size=14).paint(painter, card.adjusted(15, 43, -card.width() + 29, -12))
                 detail_left = 34
             painter.drawText(card.adjusted(detail_left, 39, -chip_width - 18, -7), Qt.AlignmentFlag.AlignVCenter,
@@ -183,6 +191,9 @@ class ImportWindow(QMainWindow):
         self.approver = approver or approve_recording
         self.browser = None
         self.profile = None
+        self.pending_profile = None
+        self.reconnect_after_switch = False
+        self.pending_discard = None
         self.sites = []
         self.account_last4 = None
         self.device_transport = None
@@ -213,6 +224,10 @@ class ImportWindow(QMainWindow):
         self.upload_worker = None
         self._library_dirty = False
         self._refresh_timer = QTimer(self)
+        self.loading_timer = QTimer(self)
+        self.loading_timer.setInterval(500)
+        self.loading_timer.timeout.connect(self._animate_loading)
+        self.loading_phase = 0
         self._refresh_timer.setSingleShot(True)
         self._refresh_timer.setInterval(120)
         self._refresh_timer.timeout.connect(self._flush_progress)
@@ -221,6 +236,7 @@ class ImportWindow(QMainWindow):
         self.signals.log.connect(self._show_log, queued)
         self.signals.clip.connect(self._clip_progress, queued)
         self.signals.source.connect(self._source_available, queued)
+        self.signals.device.connect(self._device_available, queued)
         self.signals.done.connect(self._import_finished, queued)
         self.signals.drive_checked.connect(self._drive_checked, queued)
         self.signals.upload_progress.connect(self._upload_progress, queued)
@@ -375,13 +391,13 @@ class ImportWindow(QMainWindow):
         actions = QHBoxLayout()
         confirmation = QVBoxLayout()
         confirmation.setSpacing(5)
-        instruction = QLabel("提供する録画を確認してください")
-        instruction.setObjectName("approvalTitle")
-        confirmation.addWidget(instruction)
-        detail = QLabel("映像と音声を確認し、提供に適した録画だけを承認してください。撮影ミスや作業中の手元が確認できない録画、同意していない人や撮影を避ける対象が含まれる録画は、承認せずに削除してください。")
-        detail.setObjectName("reviewGuide")
-        detail.setWordWrap(True)
-        confirmation.addWidget(detail)
+        self.review_title = QLabel("提供する録画を確認してください")
+        self.review_title.setObjectName("approvalTitle")
+        confirmation.addWidget(self.review_title)
+        self.review_guide = QLabel(REVIEW_GUIDE)
+        self.review_guide.setObjectName("reviewGuide")
+        self.review_guide.setWordWrap(True)
+        confirmation.addWidget(self.review_guide)
         actions.addLayout(confirmation, 1)
         actions.addStretch()
         self.discard_button = QPushButton("")
@@ -468,6 +484,35 @@ class ImportWindow(QMainWindow):
         self.refresh_recordings()
         self._update_controls()
 
+    def switch_profile(self, profile):
+        if self.profile and self.profile.site_id == profile.site_id:
+            return
+        if not self._screen_state().can_switch_site:
+            return
+        reconnect = self.device_connected or self.job_kind == "import"
+        if self.busy:
+            self.pending_profile = profile
+            self.reconnect_after_switch = reconnect
+            if self.job_kind == "import":
+                self.cancel_event.set()
+                self.status_label.setText("取り込みを中止し、事業所を切り替えています…")
+            else:
+                self.status_label.setText("現在の操作が終わり次第、事業所を切り替えます。")
+            return
+        self.set_profile(profile)
+        if reconnect:
+            self.start_import()
+
+    def _complete_site_switch(self):
+        if self.pending_profile is None or self.busy or self.closing:
+            return
+        profile, reconnect = self.pending_profile, self.reconnect_after_switch
+        self.pending_profile = None
+        self.reconnect_after_switch = False
+        self.set_profile(profile)
+        if reconnect:
+            self.start_import()
+
     def show_site_menu(self):
         if self.profile is None:
             self.start_login()
@@ -487,7 +532,7 @@ class ImportWindow(QMainWindow):
                 action.setChecked(True)
                 action.setEnabled(False)
             else:
-                action.triggered.connect(lambda checked=False, row=site: self.set_profile(
+                action.triggered.connect(lambda checked=False, row=site: self.switch_profile(
                     SiteProfile(row["id"], row["name"], self.account.api_origin)))
         menu.addSeparator()
         logout_action = menu.addAction(icon("log-out", size=18),
@@ -672,14 +717,19 @@ class ImportWindow(QMainWindow):
     def selected_recording(self):
         item = self.recording_list.currentItem()
         path = item.data(0, Qt.ItemDataRole.UserRole) if item else None
-        return next((record for record in self.records if str(record.path) == path
-                     and self._recording_name(record) not in self.blocked_names), None)
+        for record in self.records:
+            name = self._recording_name(record)
+            progress = self.progress_states.get(name)
+            if (str(record.path) == path and name not in self.blocked_names
+                    and (progress is None or progress.state == "ready")):
+                return record
+        return None
 
     def selected_problem(self):
         item = self.recording_list.currentItem()
         name = item.data(0, Qt.ItemDataRole.UserRole + 2) if item else None
         progress = self.progress_states.get(name)
-        return progress if progress and progress.state in ("error", "incomplete") else None
+        return progress if progress and progress.state in ("error", "incomplete", "cleanup_pending") else None
 
     def _recording_name(self, record):
         source = self.device_sources.get(record.unit_id)
@@ -711,22 +761,28 @@ class ImportWindow(QMainWindow):
             ready_names.add(remote_name)
             progress = self.progress_states.get(remote_name)
             state = PROGRESS_LABELS.get(progress.state, "端末の確認待ち") if progress else "端末の確認待ち"
+            loading = ((progress is not None and progress.state not in SELECTABLE_STATES)
+                       or (self.upload_running and self.upload_record is not None
+                           and self.upload_record.unit_id == record.unit_id))
             display_time = recording_time_label(record.created_text)
             item = QTreeWidgetItem([f"{display_time}\n{record.duration_text}", state])
             item.setData(0, Qt.ItemDataRole.UserRole, str(record.path))
-            chip = (self.upload_states.get(record.unit_id) or
-                    ("確認が必要" if remote_name in self.blocked_names else "承認待ち"))
+            chip = ("•••" if loading else
+                    "取り込みエラー" if remote_name in self.blocked_names else "承認待ち")
             item.setData(0, Qt.ItemDataRole.UserRole + 1, chip)
+            item.setData(0, Qt.ItemDataRole.UserRole + 3, loading)
             item.setToolTip(0, record.created_text)
             if remote_name in self.blocked_names:
                 item.setData(0, Qt.ItemDataRole.UserRole + 2, remote_name)
                 item.setText(1, "取り込みエラー")
+            if loading:
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             if progress and progress.state == "ready":
                 item.setToolTip(1, "内容を確認し、問題なければ「提供を承認」を押してください。")
             if progress and progress.error:
                 item.setToolTip(1, progress.error)
             if record.unit_id in self.upload_states and remote_name not in self.blocked_names:
-                item.setText(1, self.upload_states[record.unit_id])
+                item.setToolTip(1, self.upload_states[record.unit_id])
             self.recording_list.addTopLevelItem(item)
             if record.path == selected_path:
                 selected_item = item
@@ -734,19 +790,20 @@ class ImportWindow(QMainWindow):
             if name in ready_names or progress.state in ("drive_saved", "local_cleanup_pending"):
                 continue
             label = PROGRESS_LABELS.get(progress.state, "端末の確認待ち")
-            detail = ("録画終了後に再確認" if progress.state == "incomplete" else
-                      "端末を再確認" if progress.state == "cleanup_pending" else label)
-            chip = ("保存未完了" if progress.state == "incomplete" else
-                    "削除待ち" if progress.state == "cleanup_pending" else label)
-            item = QTreeWidgetItem([f"{problem_time_label(name)}\n{label}", label])
+            loading = progress.state not in SELECTABLE_STATES
+            chip = ("•••" if loading else
+                    "保存未完了" if progress.state == "incomplete" else
+                    "削除待ち" if progress.state == "cleanup_pending" else "取り込みエラー")
+            item = QTreeWidgetItem([f"{problem_time_label(name)}\n{'処理中' if loading else label}", label])
             item.setData(0, Qt.ItemDataRole.UserRole + 1, chip)
-            if progress.state in ("error", "incomplete"):
+            item.setData(0, Qt.ItemDataRole.UserRole + 3, loading)
+            if not loading:
                 item.setData(0, Qt.ItemDataRole.UserRole + 2, name)
             else:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-            guidance = ("グラス側で録画の保存が完了していません。録画を終了し、端末を再確認してください。"
+            guidance = ("グラス側で録画の保存が完了していません。端末から削除できます。"
                         if progress.state == "incomplete" else
-                        "Driveには保存済みです。端末を再確認するとグラスからの削除を再試行します。再アップロードは不要です。"
+                        "Driveへの保存内容を再確認した上で、端末から削除できます。再アップロードは不要です。"
                         if progress.state == "cleanup_pending" else progress.error)
             item.setToolTip(0, guidance)
             item.setToolTip(1, guidance)
@@ -754,28 +811,54 @@ class ImportWindow(QMainWindow):
             if name == selected_problem_name:
                 selected_item = item
         if selected_item is None:
-            selected_item = next((self.recording_list.topLevelItem(index) for index, record in enumerate(self.records)
-                                  if self._recording_name(record) not in self.blocked_names), None)
+            selected_item = next((self.recording_list.topLevelItem(index)
+                                  for index in range(self.recording_list.topLevelItemCount())
+                                  if self.recording_list.topLevelItem(index).flags() & Qt.ItemFlag.ItemIsSelectable), None)
         self.recording_list.setCurrentItem(selected_item)
         self.recording_list.verticalScrollBar().setValue(scroll_value)
         self.recording_list.blockSignals(False)
+        has_loading = any(self.recording_list.topLevelItem(index).data(0, Qt.ItemDataRole.UserRole + 3)
+                          for index in range(self.recording_list.topLevelItemCount()))
+        if has_loading and not self.loading_timer.isActive():
+            self.loading_timer.start()
+        elif not has_loading:
+            self.loading_timer.stop()
         self.count_label.setText(f"撮影データ {self.recording_list.topLevelItemCount()} 件"
                                  if self.drive_synced else "撮影データ")
         self._selection_changed()
+
+    def _animate_loading(self):
+        self.loading_phase = (self.loading_phase + 1) % 3
+        dots = "•" * (self.loading_phase + 1)
+        for index in range(self.recording_list.topLevelItemCount()):
+            item = self.recording_list.topLevelItem(index)
+            if item.data(0, Qt.ItemDataRole.UserRole + 3):
+                item.setData(0, Qt.ItemDataRole.UserRole + 1, dots)
 
     def _selection_changed(self, *_):
         record = self.selected_recording()
         if record:
             self.recording_title.setText(recording_time_label(record.created_text))
-            self.preview.load(record.path / "rgb.mp4")
+            self.preview.load(record.path / "rgb.mp4", autoplay=True)
+            self.review_title.setText("提供する録画を確認してください")
+            self.review_guide.setText(REVIEW_GUIDE)
         elif problem := self.selected_problem():
             self.recording_title.setText(problem_time_label(problem.name))
             self.preview.clear()
-            self.preview.empty.setText("この録画は取り込みできていません。\n端末のデータを再確認するか、削除してください。")
+            saved = problem.state == "cleanup_pending"
+            self.preview.empty.setText("Driveへの保存は完了しています。\n端末に残るデータを削除できます。" if saved else
+                                       "この録画は取り込みできていません。\n端末から削除できます。")
+            self.review_title.setText("端末に残るデータを削除できます")
+            self.review_guide.setText(
+                ("Driveへの保存内容を確認してから端末のデータを削除します。"
+                 + (" " + problem.error if problem.error else "")) if saved else
+                "この録画は提供を承認できません。不要であれば端末から削除してください。")
         else:
             self.recording_title.setText("録画を選んでください")
             self.preview.clear()
             self.preview.empty.setText("録画を選ぶと、ここで再生できます。")
+            self.review_title.setText("提供する録画を確認してください")
+            self.review_guide.setText(REVIEW_GUIDE)
         self._update_controls()
 
     def select_relative(self, offset):
@@ -794,24 +877,13 @@ class ImportWindow(QMainWindow):
         if not hasattr(self, "recording_list"):
             return
         record = self.selected_recording()
-        index = self.records.index(record) if record else -1
-        self.connect_button.setEnabled(bool(self.profile)
-                                       and not self.busy and not self.closing)
-        self.settings_button.setEnabled(not self.busy and not self.closing)
-        self.folder_button.setEnabled(record is not None and not self.closing)
-        self.drive_button.setEnabled(self.profile is not None and not self.closing)
-        upload_ready = (record is not None and record.unit_id in self.device_sources
-                        and self.device_connected
-                        and self.profile is not None
-                        and not self.upload_running and not self.closing
-                        and (not self.busy or self.job_kind == "import")
-                        and not self.completion_error)
-        self.upload_button.setEnabled(bool(upload_ready))
-        problem = self.selected_problem()
-        self.discard_button.setEnabled(bool(
-            self.device_connected and not self.busy and not self.closing
-            and ((record is not None and record.unit_id in self.device_sources)
-                 or (problem is not None and self.device_root and self.device_transport))))
+        state = self._screen_state()
+        self.connect_button.setEnabled(state.can_connect)
+        self.settings_button.setEnabled(state.can_switch_site or state.phase == Phase.SIGNED_OUT)
+        self.folder_button.setEnabled(record is not None and state.phase != Phase.CLOSING)
+        self.drive_button.setEnabled(self.profile is not None and state.phase != Phase.CLOSING)
+        self.upload_button.setEnabled(state.can_approve)
+        self.discard_button.setEnabled(state.can_delete)
         self.upload_button.setToolTip(self.completion_error if self.completion_error else
                                      ("" if self.profile else "画面上部の「SMSでログイン」からログインしてください。"))
         self.cancel_upload_button.setVisible(self.upload_running)
@@ -824,8 +896,24 @@ class ImportWindow(QMainWindow):
         self.previous_button.setEnabled(index >= 0 and any(i < index for i in allowed))
         self.next_button.setEnabled(index >= 0 and any(i > index for i in allowed))
 
+    def _screen_state(self):
+        record = self.selected_recording()
+        problem = self.selected_problem()
+        selection = "ready" if record else "problem" if problem else "none"
+        return ScreenState(
+            screen_phase(profile=self.profile, job=self.job_kind,
+                         connected=self.device_connected, uploading=self.upload_running,
+                         switching=self.pending_profile is not None,
+                         deleting=self.pending_discard is not None, closing=self.closing),
+            selection=selection,
+            source_available=bool(record and record.unit_id in self.device_sources),
+            problem_accessible=bool(problem and self.device_transport and self.device_root
+                                    and (problem.state != "cleanup_pending" or problem.unit_id)),
+            drive_ready=not self.completion_error,
+        )
+
     def start_import(self):
-        if self.profile is None or self.busy or self.closing:
+        if not self._screen_state().can_connect:
             return
         self.busy = True
         self.device_connected = False
@@ -855,6 +943,7 @@ class ImportWindow(QMainWindow):
                 summary = self.importer(output=directory, log=self.signals.log.emit,
                                         cancel_event=self.cancel_event, on_clip=self.signals.clip.emit,
                                         on_source=self.signals.source.emit,
+                                        on_device=self.signals.device.emit,
                                         site_id=profile.site_id,
                                         drive_reader=lambda unit_ids: self.drive_reader(
                                             profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
@@ -916,6 +1005,17 @@ class ImportWindow(QMainWindow):
                 self.connection_timer.start()
             self._update_controls()
 
+    @Slot(object, str)
+    def _device_available(self, transport, root):
+        if self.job_kind != "import" or self.closing:
+            return
+        self.device_transport = transport
+        self.device_root = root
+        self.device_connected = True
+        self._set_connection_status("connected")
+        self.connection_timer.start()
+        self._update_controls()
+
     def _check_connection(self):
         transport = self.device_transport
         if transport is None or self.connection_check_running or self.closing:
@@ -960,7 +1060,7 @@ class ImportWindow(QMainWindow):
         self._refresh_timer.stop()
         self._library_dirty = False
         self.progress.setVisible(False)
-        if error or cancelled:
+        if (error or cancelled) and self.pending_discard is None:
             self.progress_states.clear()
             self.drive_synced = False
             self.device_sources.clear()
@@ -970,7 +1070,7 @@ class ImportWindow(QMainWindow):
             self.device_root = None
             self.connection_timer.stop()
             self._set_connection_status("disconnected")
-        else:
+        elif summary is not None:
             self.device_sources = {unit_id: source for unit_id, source in getattr(summary, "sources", {}).items()
                                    if unit_id not in self.uploaded_unit_ids}
             self.recording_names.update({unit_id: source.name for unit_id, source in self.device_sources.items()})
@@ -980,6 +1080,9 @@ class ImportWindow(QMainWindow):
             self._set_connection_status("connected")
             if self.device_transport is not None:
                 self.connection_timer.start()
+        else:
+            self.device_connected = self.device_transport is not None
+            self._set_connection_status("connected" if self.device_connected else "disconnected")
         self.refresh_recordings()
         if self.closing:
             self.close()
@@ -991,11 +1094,11 @@ class ImportWindow(QMainWindow):
         else:
             parts = [f"新しく取り込んだ録画 {summary.imported} 件" if summary.imported else "録画の確認が終わりました。"]
             if summary.incomplete:
-                parts.append(f"録画が未完了 {summary.incomplete} 件")
+                parts.append(f"保存未完了 {summary.incomplete} 件。不要な録画は選んで削除できます。")
             if summary.failed:
                 parts.append(f"取り込みエラー {summary.failed} 件")
             if getattr(summary, "cleanup_pending", 0):
-                parts.append("端末から削除できなかった録画があります。もう一度「端末を再確認」を押してください。")
+                parts.append("削除待ちの録画があります。対象を選ぶと理由を確認できます。")
             if getattr(summary, "local_cleanup_pending", 0):
                 parts.append("PCのコピーを削除できなかった録画があります。保存先を確認してください。")
             if getattr(summary, "discard_pending", 0):
@@ -1006,19 +1109,38 @@ class ImportWindow(QMainWindow):
             if len(parts) == 1:
                 self.status_label.hide()
         self._update_controls()
+        if self.pending_discard is not None:
+            selected = self.pending_discard
+            self.pending_discard = None
+            self._perform_discard(*selected)
+            return
+        self._complete_site_switch()
 
     def confirm_discard(self):
         record = self.selected_recording()
         problem = self.selected_problem()
-        if (not self.discard_button.isEnabled() or (record is None and problem is None)):
+        if not self._screen_state().can_delete:
             return
+        saved = problem is not None and problem.state == "cleanup_pending"
+        question = ("Driveへの保存内容を確認して、端末に残るデータを削除しますか？\nDrive上のデータは残ります。"
+                    if saved else "この録画をスマートグラスとPCから削除しますか？\n削除した録画は元に戻せません。")
         answer = QMessageBox.question(
-            self, "録画を削除", "この録画をスマートグラスとPCから削除しますか？\n削除した録画は元に戻せません。",
+            self, "録画を削除", question,
             QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
             QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
+        if self.busy and self.job_kind == "import":
+            self.pending_discard = (record, problem)
+            self.cancel_event.set()
+            self.status_label.setText("取り込みを止めて、選んだ録画を削除します…")
+            self._update_controls()
+            return
+        self._perform_discard(record, problem)
+
+    def _perform_discard(self, record, problem):
+        saved = problem is not None and problem.state == "cleanup_pending"
         self.preview.clear()
         self.busy = True
         self.job_kind = "discard"
@@ -1030,6 +1152,7 @@ class ImportWindow(QMainWindow):
         source = self.device_sources.get(record.unit_id) if record else None
         transport = self.device_transport
         device_root = self.device_root
+        profile = self.profile
 
         def run():
             device_deleted = False
@@ -1037,15 +1160,22 @@ class ImportWindow(QMainWindow):
                 if transport and not probe_transport(transport):
                     self.signals.connection_checked.emit(transport, False)
                     raise ImportFailure("スマートグラスとの接続が切れました。端末を再確認してください。")
-                if problem:
+                if saved:
+                    delete_saved_capture(
+                        transport, device_root, problem.name, problem.unit_id,
+                        lambda unit_ids: self.drive_reader(
+                            profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
+                        self.cancel_event, log=self.signals.log.emit)
+                elif problem:
                     discard_problem_capture(transport, device_root, problem.name, self.cancel_event)
                 else:
                     discard_unapproved_recording(source, record.path, self.cancel_event)
                 device_deleted = True
                 if record:
                     remove_uploaded_local_copy(self.recordings_root, record.unit_id)
-                elif problem.path is not None:
-                    remove_uploaded_local_copy(self.recordings_root, problem.path.name)
+                elif problem.path is not None or saved:
+                    remove_uploaded_local_copy(self.recordings_root,
+                                               problem.unit_id if saved else problem.path.name)
                 error = ""
             except (ImportFailure, OSError) as failure:
                 error = str(failure)
@@ -1077,12 +1207,12 @@ class ImportWindow(QMainWindow):
         self._update_controls()
         if self.closing:
             self.close()
+        else:
+            self._complete_site_switch()
 
     def start_upload(self):
         record = self.selected_recording()
-        if (record is None or record.unit_id not in self.device_sources or not self.device_connected or self.profile is None
-                or self.upload_running or self.closing or self.completion_error
-                or self.busy and self.job_kind != "import"):
+        if not self._screen_state().can_approve:
             return
         try:
             read_recording(record.path)
@@ -1219,7 +1349,8 @@ class ImportWindow(QMainWindow):
                 cleanup_error = (cleanup_error + " " if cleanup_error else "") + "PCのコピーを削除できませんでした。次の接続時に再確認します。"
             self.progress_states[name] = ClipProgress(name, None,
                 "cleanup_pending" if device_cleanup_error else
-                "local_cleanup_pending" if local_cleanup_error else "drive_saved", cleanup_error)
+                "local_cleanup_pending" if local_cleanup_error else "drive_saved", cleanup_error,
+                unit_id=record.unit_id)
         self.refresh_recordings()
         if self.closing:
             self.close()
@@ -1242,6 +1373,7 @@ class ImportWindow(QMainWindow):
             self.status_label.hide()
         self.refresh_recordings(rescan=False)
         self._update_controls()
+        self._complete_site_switch()
 
     def show_recording_folder(self):
         record = self.selected_recording()

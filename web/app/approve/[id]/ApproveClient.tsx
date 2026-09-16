@@ -6,6 +6,7 @@ import styles from "@/app/manage/operator.module.css";
 
 type Details = {
   statement: string;
+  siteName: string;
   unitId: string;
   files: { path: string; bytes: number; sha256: string }[];
   consentSnapshot: { siteAgreementCount: number; staffConsentCount: number };
@@ -42,7 +43,7 @@ export default function ApproveClient({ approvalId }: { approvalId: string }) {
 
   return <div className={styles.shell}><SiteHeader /><main className={styles.main}>
     <h1 className={styles.title}>撮影データの提供承認</h1>
-    {details && <><p className={styles.lead}>{details.statement}</p><dl className={styles.details}><dt>撮影単位</dt><dd>{details.unitId}</dd><dt>確認対象</dt><dd>{details.files.map((file) => file.path).join(" / ")}</dd><dt>適用される事前同意</dt><dd>現場合意 {details.consentSnapshot.siteAgreementCount}件・スタッフ同意 {details.consentSnapshot.staffConsentCount}件</dd></dl><button type="button" className={styles.button} disabled={working} onClick={approve}>{working ? "記録中…" : "確認して提供を承認"}</button></>}
+    {details && <><p className={styles.lead}>{details.statement}</p><dl className={styles.details}><dt>事業所（保存先）</dt><dd>{details.siteName}</dd><dt>撮影単位</dt><dd>{details.unitId}</dd><dt>確認対象</dt><dd>{details.files.map((file) => file.path).join(" / ")}</dd><dt>適用される事前同意</dt><dd>現場合意 {details.consentSnapshot.siteAgreementCount}件・スタッフ同意 {details.consentSnapshot.staffConsentCount}件</dd></dl><button type="button" className={styles.button} disabled={working} onClick={approve}>{working ? "記録中…" : "確認して提供を承認"}</button></>}
     {message && <p className={styles.lead}>{message}</p>}
   </main></div>;
 }

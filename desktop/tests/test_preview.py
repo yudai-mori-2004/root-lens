@@ -65,6 +65,11 @@ class PreviewTests(unittest.TestCase):
         self.assertIsNone(self.preview.path)
         self.assertTrue(self.preview.player.source().isEmpty())
 
+    def test_autoplay_starts_selected_video_at_beginning(self):
+        self.preview.load(self.video, autoplay=True)
+        wait_for(lambda: self.preview.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
+        self.assertLess(self.preview.player.position(), 1500)
+
 
 class TimeTextTests(unittest.TestCase):
     def test_long_recording_and_zero(self):

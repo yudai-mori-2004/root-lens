@@ -1,25 +1,45 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { people } from "@/db/schema";
+import { operatorMemberships, people, sites } from "@/db/schema";
 import { authenticateOperator } from "@/lib/operator-browser";
-import { siteOperator, type SiteRole } from "@/lib/site-membership";
+import type { SiteRole } from "@/lib/site-membership";
 
 const bodySchema = z.object({ role: z.enum(["staff", "admin", "supervisor"]) });
 
 export async function PATCH(request: Request, context: { params: Promise<{ siteId: string; personId: string }> }) {
   const identityId = await authenticateOperator(request);
   const { siteId, personId } = await context.params;
-  const operator = identityId ? await siteOperator(identityId, siteId) : null;
-  if (!operator) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
+  if (!identityId) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "権限を確認してください。" }, { status: 400 });
-  const [target] = await db.select().from(people).where(and(eq(people.id, personId), eq(people.siteId, siteId))).limit(1);
-  if (!target) return Response.json({ error: "スタッフが見つかりません。" }, { status: 404 });
   const nextRole = parsed.data.role as SiteRole;
-  if (operator.role !== "supervisor" && (target.role === "supervisor" || nextRole === "supervisor")) {
-    return Response.json({ error: "現場監督者の権限は現場監督者のみ変更できます。" }, { status: 403 });
-  }
-  await db.update(people).set({ role: nextRole }).where(eq(people.id, personId));
-  return Response.json({ personId, role: nextRole });
+  return db.transaction(async (transaction) => {
+    const [site] = await transaction.select({ id: sites.id }).from(sites)
+      .where(and(eq(sites.id, siteId), eq(sites.status, "active"))).for("update");
+    if (!site) return Response.json({ error: "事業所が見つかりません。" }, { status: 404 });
+
+    const [operator] = await transaction.select({ role: people.role }).from(operatorMemberships)
+      .innerJoin(people, eq(people.id, operatorMemberships.personId))
+      .where(and(eq(operatorMemberships.identityId, identityId), eq(people.siteId, siteId),
+        eq(people.status, "active"), sql`${people.role} IN ('admin', 'supervisor')`)).limit(1);
+    if (!operator) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
+
+    const [target] = await transaction.select().from(people)
+      .where(and(eq(people.id, personId), eq(people.siteId, siteId), eq(people.status, "active"))).limit(1);
+    if (!target) return Response.json({ error: "スタッフが見つかりません。" }, { status: 404 });
+    if (operator.role !== "supervisor" && (target.role === "supervisor" || nextRole === "supervisor")) {
+      return Response.json({ error: "現場監督者の権限は現場監督者のみ変更できます。" }, { status: 403 });
+    }
+    if (target.role === "supervisor" && nextRole !== "supervisor") {
+      const supervisors = await transaction.select({ id: people.id }).from(people)
+        .innerJoin(operatorMemberships, eq(operatorMemberships.personId, people.id))
+        .where(and(eq(people.siteId, siteId), eq(people.status, "active"), eq(people.role, "supervisor")));
+      if (supervisors.some((supervisor) => supervisor.id === personId) && supervisors.length <= 1) {
+        return Response.json({ error: "最後の現場監督者は降格できません。先に別のスタッフを現場監督者にしてください。" }, { status: 409 });
+      }
+    }
+    await transaction.update(people).set({ role: nextRole }).where(eq(people.id, personId));
+    return Response.json({ personId, role: nextRole });
+  });
 }

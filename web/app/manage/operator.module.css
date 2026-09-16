@@ -12,6 +12,8 @@
 .field label { font-size: var(--text-sm); font-weight: 700; }
 .field input, .field select { width: 100%; min-height: 46px; border: 1px solid var(--color-rule-strong); border-radius: 6px; padding: .65rem .85rem; background: var(--color-paper); color: var(--color-ink); font: inherit; }
 .row select { min-height: 44px; border: 1px solid var(--color-rule); border-radius: 6px; padding: .5rem .75rem; background: var(--color-paper); color: var(--color-ink); font: inherit; }
+.roleControl { display: grid; gap: .35rem; }
+.roleHint { color: var(--color-ink-muted); font-size: var(--text-xs); line-height: 1.4; }
 .field input:focus-visible, .field select:focus-visible, .button:focus-visible, .textButton:focus-visible, .backLink:focus-visible, .link:focus-visible { outline: 2px solid var(--color-grass-deep); outline-offset: 2px; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--color-ink); border-radius: 6px; padding: .65rem 1rem; background: var(--color-ink); color: var(--color-paper); font: inherit; font-weight: 600; text-align: center; cursor: pointer; }
 .button:hover:not(:disabled) { background: var(--color-grass-deep); border-color: var(--color-grass-deep); }
@@ -19,6 +21,7 @@
 .buttonSecondary:hover:not(:disabled) { background: var(--color-grass-soft); color: var(--color-ink); }
 .button:disabled { opacity: .45; cursor: default; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.inviteForm { align-items: flex-end; }
 .stack { display: grid; gap: .65rem; }
 .card { border: 1px solid var(--color-rule); border-radius: 7px; padding: 1rem 1.2rem; background: var(--color-paper); }
 a.card:hover { border-color: var(--color-grass-deep); }

@@ -38,8 +38,8 @@ WebEngine's Chromium third-party attributions; Tk remains excluded.
 
 ## Application identity
 
-The app, installer and shortcuts display **RootLens Importer**. The executable name, Mac bundle
-filename and Windows installation directory remain **RootLens Import** for in-place upgrades.
+The app, executable, Mac bundle, installer and shortcuts display **RootLens Importer**. The
+Windows installation directory remains **RootLens Import** for in-place upgrades.
 Login persists until it expires or the user logs out; recording copies do not persist between launches.
 The Windows installer removes the older RootLens and RootLens Import shortcuts.
 
@@ -59,14 +59,14 @@ EXE icon resource, compares it with the `.ico` input, and saves a 256-pixel PNG 
 python packaging/build.py --platform-tools /path/to/platform-tools --output /path/to/build-output --runtime-notices /path/to/runtime-notices
 ```
 
-Run from `desktop/`. This produces `RootLens Import.app`. Copy it to Applications
+Run from `desktop/`. This produces `RootLens Importer.app`. Copy it to Applications
 for local acceptance testing. The build architecture follows the Python runtime; an
 arm64 build must not be labeled as supporting Intel Macs.
 
 Create a disk image with the app and an Applications shortcut:
 
 ```sh
-python packaging/package-macos.py --app '/path/to/build-output/RootLens Import.app' --output /path/to/installers
+python packaging/package-macos.py --app '/path/to/build-output/RootLens Importer.app' --output /path/to/installers
 ```
 
 The disk image uses the neutral filename `RootLens-Import-VERSION-macOS-ARCH.dmg` and includes
@@ -218,7 +218,7 @@ On Windows, a windowed PyInstaller executable has no standard output streams. Pr
 diagnostic with `--diagnostic-output <new-log-file>` to write UTF-8 output reliably, for example:
 
 ```powershell
-& '.\RootLens Import.exe' --diagnostic-output C:/build/check-runtime.log --check-runtime
+& '.\RootLens Importer.exe' --diagnostic-output C:/build/check-runtime.log --check-runtime
 ```
 
 The diagnostic refuses to overwrite an existing output file. `--check-runtime` tests bundled

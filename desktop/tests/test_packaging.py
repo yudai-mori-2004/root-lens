@@ -110,10 +110,10 @@ class PackagingTests(unittest.TestCase):
         package = load_module("package-macos")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            app = root / "RootLens Import.app"
+            app = root / "RootLens Importer.app"
             (app / "Contents").mkdir(parents=True)
             (app / "Contents/Info.plist").write_bytes(plistlib.dumps({
-                "CFBundleShortVersionString": "0.4.2", "CFBundleExecutable": "RootLens Import"}))
+                "CFBundleShortVersionString": "0.4.2", "CFBundleExecutable": "RootLens Importer"}))
             captured = {}
 
             def command(args, **kwargs):
@@ -137,7 +137,7 @@ class PackagingTests(unittest.TestCase):
     def test_macos_release_fails_before_packaging_when_gatekeeper_rejects(self):
         package = load_module("package-macos")
         with tempfile.TemporaryDirectory() as temporary:
-            app = Path(temporary) / "RootLens Import.app"
+            app = Path(temporary) / "RootLens Importer.app"
             app.mkdir()
 
             def command(args, **kwargs):

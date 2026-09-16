@@ -130,7 +130,7 @@ def main(arguments=None):
         retained.parent.mkdir(parents=True)
         retained.write_text("Synthetic retention marker; not a recording.", encoding="utf-8")
         try:
-            executable = bundle / "RootLens Import.exe"
+            executable = bundle / "RootLens Importer.exe"
             if not executable.is_file():
                 raise RuntimeError("The Windows executable is missing.")
             evidence["checks"]["bundle-icon"] = verify_executable_icon(executable, output, "bundle")
@@ -147,7 +147,7 @@ def main(arguments=None):
             installed = sandbox / "Program Files" / "RootLens Import"
             run([installer, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
                  "/DIR=" + str(installed), "/LOG=" + str(output / "install.log")], timeout=180)
-            installed_executable = installed / "RootLens Import.exe"
+            installed_executable = installed / "RootLens Importer.exe"
             if not installed_executable.is_file() or sha256(installed_executable) != sha256(executable):
                 raise RuntimeError("Installed executable differs from the verified bundle.")
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, uninstall_key) as key:
@@ -167,10 +167,10 @@ def main(arguments=None):
                 run([installed / "unins000.exe", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                      "/LOG=" + str(output / "uninstall.log")], timeout=180)
                 for _ in range(100):
-                    if not (installed / "RootLens Import.exe").exists():
+                    if not (installed / "RootLens Importer.exe").exists():
                         break
                     time.sleep(.1)
-                if (installed / "RootLens Import.exe").exists() or not retained.is_file():
+                if (installed / "RootLens Importer.exe").exists() or not retained.is_file():
                     raise RuntimeError("Uninstall did not remove the app while preserving app data.")
                 evidence["checks"]["uninstall-keeps-data"] = {"ok": True}
             (output / "windows-acceptance.json").write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")

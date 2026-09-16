@@ -17,6 +17,7 @@ PDF生成時だけOSの一時ディレクトリにHTMLを作成する。一時HT
 ```text
 document/business/
 ├── assets/                         # 文書で使う画像
+├── company-introductions/          # 相手別の会社紹介資料と原稿
 ├── documents/
 │   ├── current/                    # 現在使用する文書
 │   │   ├── agreements/             # 店舗・事業所との基本合意

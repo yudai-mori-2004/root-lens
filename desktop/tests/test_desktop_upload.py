@@ -100,6 +100,7 @@ class UploadDesktopTests(unittest.TestCase):
                     for index in range(self.window.recording_list.topLevelItemCount())
                     if self.window.recording_list.topLevelItem(index).data(0, Qt.ItemDataRole.UserRole + 2) == name)
         self.window.recording_list.setCurrentItem(item)
+        self.assertEqual(item.data(0, Qt.ItemDataRole.UserRole + 1), '保存未完了')
         self.assertTrue(self.window.discard_button.isEnabled())
         self.assertFalse(self.window.upload_button.isEnabled())
         with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
@@ -110,6 +111,61 @@ class UploadDesktopTests(unittest.TestCase):
         discard.assert_called_once()
         self.assertNotIn(name, self.window.progress_states)
         self.assertEqual(len(self.window.records), 2)
+
+    def test_deleting_during_import_keeps_device_connection_after_cancel(self):
+        transport = ("adb", "23", "original-device-serial")
+        self.window.device_transport = transport
+        self.window.device_root = "/device/recordings"
+        self.window.device_connected = True
+        self.window.job_kind = "import"
+        self.window.busy = True
+        selected = self.records[0]
+        self.window.pending_discard = (selected, None)
+        with patch.object(self.window, "_perform_discard") as discard:
+            self.window._import_finished(None, "", True)
+        discard.assert_called_once_with(selected, None)
+        self.assertEqual(self.window.device_transport, transport)
+        self.assertTrue(self.window.device_connected)
+
+    def test_only_failed_capture_still_allows_device_deletion(self):
+        self.window.progress_states.clear()
+        self.window.device_sources.clear()
+        self.window.all_records.clear()
+        self.window.device_transport = ("adb", "23", "original-device-serial")
+        self.window.device_root = "/sdcard/Android/data/io.rootlens.mentra/files/recordings"
+        self.window.device_connected = True
+        self.window._clip_progress(ClipProgress("rec-20260911T120000.000Z", None, "error", "broken file"))
+        self.window._flush_progress()
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
+        self.assertTrue(self.window.discard_button.isEnabled())
+        self.assertFalse(self.window.upload_button.isEnabled())
+
+    def test_saved_cleanup_pending_can_be_deleted_from_the_window(self):
+        self.observe_device(self.records[:1])
+        self.uploader.upload_recording.side_effect = self.uploaded_to_drive
+        self.cleaner.side_effect = ImportFailure('USB disconnected')
+        self.window.start_upload()
+        wait_for(lambda: not self.window.busy)
+        self.window.device_transport = ('adb', '23', 'original-device-serial')
+        self.window.device_root = '/sdcard/Android/data/io.rootlens.mentra/files/recordings'
+        self.window._update_controls()
+        row = self.window.recording_list.topLevelItem(0)
+        self.assertTrue(row.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertEqual(self.window.selected_problem().unit_id, self.records[0].unit_id)
+        self.assertTrue(self.window.discard_button.isEnabled())
+        self.assertFalse(self.window.upload_button.isEnabled())
+        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes) as question, \
+                patch.object(desktop, 'probe_transport', return_value=True), \
+                patch.object(desktop, 'delete_saved_capture') as delete:
+            self.window.confirm_discard()
+            wait_for(lambda: not self.window.busy)
+        self.assertIn('Drive上のデータは残ります', question.call_args.args[2])
+        self.assertEqual(delete.call_args.args[:4],
+                         (self.window.device_transport, self.window.device_root,
+                          self.names[self.records[0].unit_id], self.records[0].unit_id))
+        delete.call_args.args[4]({self.records[0].unit_id})
+        self.assertIn(self.records[0].unit_id, self.drive_snapshot)
+        self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
 
     def import_current_device(self, **kwargs):
         ready = saved = 0
@@ -193,7 +249,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.factory.call_count, 1)
         self.assertNotEqual(factory_threads, [main_thread])
         self.importer.assert_not_called()
-        self.assertFalse(self.window.settings_button.isEnabled())
+        self.assertTrue(self.window.settings_button.isEnabled())
         self.assertFalse(self.window.connect_button.isEnabled())
         self.assertFalse(self.window.upload_button.isEnabled())
         self.assertEqual(self.window.connect_button.toolTip(), "端末を再確認")
@@ -264,7 +320,8 @@ class UploadDesktopTests(unittest.TestCase):
         self.window._upload_progress(UploadProgress(digest, "uploading", 1024, 4096, "rgb.mp4"))
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertEqual(self.window.upload_progress_bar.value(), 25)
-        self.assertIn("25%", self.window.recording_list.topLevelItem(0).text(1))
+        self.assertEqual(self.window.recording_list.topLevelItem(0).data(0, Qt.ItemDataRole.UserRole + 1), '•••')
+        self.assertIn("25%", self.window.upload_status_label.text())
         self.assertIn("1.0 KB / 4.0 KB", self.window.status_label.text())
         before = self.window.status_label.text()
         self.window._upload_progress(UploadProgress(unit_id(999), "uploading", 4096, 4096))
@@ -344,7 +401,7 @@ class UploadDesktopTests(unittest.TestCase):
             self.profile, {original.unit_id}, self.window.upload_cancel_event, ANY)
         self.assertEqual(self.window.selected_recording().path, self.clips[1])
 
-    def test_cleanup_failure_keeps_drive_success_as_non_uploadable_pending_row(self):
+    def test_cleanup_failure_keeps_drive_success_as_deletable_pending_row(self):
         self.observe_device(self.records[:1])
         self.uploader.upload_recording.side_effect = self.uploaded_to_drive
         self.cleaner.side_effect = ImportFailure('USB disconnected')
@@ -354,8 +411,13 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 1)
         row = self.window.recording_list.topLevelItem(0)
         self.assertEqual(row.text(1), '端末の削除待ち')
-        self.assertFalse(row.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertTrue(row.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertEqual(row.data(0, Qt.ItemDataRole.UserRole + 1), '削除待ち')
         self.assertFalse(self.window.upload_button.isEnabled())
+        self.window.device_transport = ('adb', '23', 'original-device-serial')
+        self.window.device_root = '/sdcard/Android/data/io.rootlens.mentra/files/recordings'
+        self.window._update_controls()
+        self.assertTrue(self.window.discard_button.isEnabled())
         self.assertIsNone(self.window.preview.path)
         self.assertIn('アップロードは完了', self.window.status_label.text())
         self.assertIn('次の接続', self.window.status_label.text())
@@ -382,7 +444,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertTrue(entered.wait(1))
         wait_for(lambda: self.window.upload_saved and not self.window._refresh_timer.isActive())
         self.assertIn('端末から削除中', self.window.upload_status_label.text())
-        self.assertEqual(self.window.recording_list.topLevelItem(0).text(1), '端末から削除中')
+        self.assertEqual(self.window.recording_list.topLevelItem(0).data(0, Qt.ItemDataRole.UserRole + 1), '•••')
         self.assertEqual(self.window.upload_progress_bar.value(), 100)
         self.window.cancel_upload()
         self.assertEqual(self.window.upload_status_label.text(), '端末からの削除を中止しています…')

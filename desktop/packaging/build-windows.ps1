@@ -19,7 +19,7 @@ if ($InnoSetupCompiler) {
     if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
     $Installer = Join-Path $Output "RootLens-Import-Setup-$Version-windows-x64.exe"
     $InstallerSignature = Get-AuthenticodeSignature -LiteralPath $Installer
-    $ApplicationSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $Output "RootLens Import/RootLens Import.exe")
+    $ApplicationSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $Output "RootLens Import/RootLens Importer.exe")
     $Manifest = @{
         version = $Version
         architecture = "x64"

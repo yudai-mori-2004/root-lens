@@ -101,6 +101,36 @@ class DeviceSyncTests(unittest.TestCase):
         return device_sync.sync_recordings(self.output, drive_reader=self.reader, site_id="fixture",
                                            log=lambda _: None, on_clip=self.events.append)
 
+    def test_recording_assigned_to_another_site_is_not_offered_for_approval_or_deletion(self):
+        result = device_sync.sync_recordings(
+            self.output, drive_reader=self.reader, site_id="other_site",
+            log=lambda _: None, on_clip=self.events.append)
+        self.assertEqual(result.sources, {})
+        self.assertEqual(self.events, [])
+        self.assertFalse(self.output.joinpath(self.unit_id).exists())
+
+    def test_manual_saved_cleanup_uses_current_drive_record_and_pending_marker(self):
+        marker = SimpleNamespace(name='.rootlens-cleanup-marker', original_name=self.name,
+                                 unit_id=self.unit_id)
+        self.pending.return_value = [marker]
+        snapshot = object()
+        self.reader.return_value = {self.unit_id: snapshot}
+        device_sync.delete_saved_capture(('fixture', '23', 'USB_FIXTURE'),
+                                         '/sdcard/Android/data/io.rootlens.mentra.debug/files/recordings',
+                                         self.name, self.unit_id, self.reader, log=lambda _: None)
+        self.cleanup.assert_called_once()
+        self.assertEqual(self.cleanup.call_args.args[2:4], (marker.name, self.unit_id))
+        self.assertIs(self.cleanup.call_args.args[4](self.unit_id), snapshot)
+        self.reader.assert_called_once_with({self.unit_id})
+
+    def test_manual_saved_cleanup_rejects_replaced_usb_device(self):
+        with patch.object(self.adb, 'run', return_value='OTHER_DEVICE'):
+            with self.assertRaises(core.ImportFailure):
+                device_sync.delete_saved_capture(('fixture', '23', 'USB_FIXTURE'),
+                                                 '/sdcard/Android/data/io.rootlens.mentra.debug/files/recordings',
+                                                 self.name, self.unit_id, self.reader)
+        self.cleanup.assert_not_called()
+
     def test_device_metadata_precedes_targeted_drive_read(self):
         def read(targets):
             self.assertGreater(self.adb.complete_calls, 0)

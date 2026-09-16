@@ -159,8 +159,8 @@ def main():
                 "VSVersionInfo(ffi=FixedFileInfo(filevers=" + repr(version) + ", prodvers=" + repr(version)
                 + ", mask=0x3f, flags=0, OS=0x40004, fileType=1, subtype=0, date=(0, 0)), "
                 + "kids=[StringFileInfo([StringTable('040904B0', ["
-                + "StringStruct('CompanyName', 'RootLens'), StringStruct('ProductName', 'RootLens'), "
-                + "StringStruct('FileDescription', 'RootLens'), StringStruct('FileVersion', '" + __version__ + "'), "
+                + "StringStruct('CompanyName', 'RootLens'), StringStruct('ProductName', 'RootLens Importer'), "
+                + "StringStruct('FileDescription', 'RootLens Importer'), StringStruct('FileVersion', '" + __version__ + "'), "
                 + "StringStruct('ProductVersion', '" + __version__ + "')])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])",
                 encoding="utf-8")
             environment["ROOTLENS_WINDOWS_VERSION_INFO"] = str(version_file)

@@ -1,0 +1,195 @@
+{"kind":"deck","id":"pr/8pbj5z","name":"Deck"}
+{"kind":"layout","layoutId":"dc5c27ff-2a9f-4ba1-a2c4-287630e40b93","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"2e09dce0-720d-4d5a-83c5-c8c6492c8aac","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/qp11ad","slide":1,"title":"RootLens","textShapes":5}
+{"kind":"shape","id":"sh/w32hsbix","slide":1,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/bitgj61c","slide":1,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[70,115,420,55]}
+{"kind":"textbox","id":"sh/ahkzql07","slide":1,"text":"実際の仕事を、\nAIとロボットの学習データへ","textPreview":"実際の仕事を、 | AIとロボットの学習データへ","textChars":22,"textLines":2,"bbox":[70,225,880,135]}
+{"kind":"textbox","id":"sh/l8byp0ju","slide":1,"text":"撮影協力をご検討いただく店舗・事業所の皆さまへ","textPreview":"撮影協力をご検討いただく店舗・事業所の皆さまへ","textChars":23,"textLines":1,"bbox":[74,405,820,40]}
+{"kind":"shape","id":"sh/k72hwvi9","slide":1,"bbox":[70,570,1140,1]}
+{"kind":"textbox","id":"sh/j6tgnq1o","slide":1,"text":"contact@rootlens.io","textPreview":"contact@rootlens.io","textChars":19,"textLines":1,"bbox":[70,602,400,28]}
+{"kind":"textbox","id":"sh/y5kzul03","slide":1,"text":"2026.09","textPreview":"2026.09","textChars":7,"textLines":1,"bbox":[1070,602,140,28]}
+{"kind":"notes","id":"nt/qp11ad","slide":1,"text":"RootLensが何をしているのか、現場の皆さまに何をお願いしたいのか、撮影データをどう扱うのかをご説明します。"}
+{"kind":"slide","id":"sl/0gmlzp","slide":2,"title":"RootLensが行っていること","textShapes":10}
+{"kind":"shape","id":"sh/s7upcji1","slide":2,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/r6lo3e1g","slide":2,"text":"RootLensが行っていること","textPreview":"RootLensが行っていること","textChars":16,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/65c7a90v","slide":2,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/1wn69oji","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/gvepgjix","slide":2,"text":"普段の仕事を、作業者の目線で撮影する","textPreview":"普段の仕事を、作業者の目線で撮影する","textChars":18,"textLines":1,"bbox":[76,205,1120,46]}
+{"kind":"shape","id":"sh/fulo7e1c","slide":2,"bbox":[76,300,330,185]}
+{"kind":"textbox","id":"sh/etc7et0r","slide":2,"text":"現場","textPreview":"現場","textChars":2,"textLines":1,"bbox":[98,320,286,34]}
+{"kind":"textbox","id":"sh/p0n6d8je","slide":2,"text":"同意したスタッフが\n普段の作業を撮影","textPreview":"同意したスタッフが | 普段の作業を撮影","textChars":18,"textLines":2,"bbox":[98,367,286,101]}
+{"kind":"shape","id":"sh/ozepk3i9","slide":2,"bbox":[430,392,134,3]}
+{"kind":"shape","id":"sh/6dcbmdgn","slide":2,"bbox":[560,385,18,18]}
+{"kind":"shape","id":"sh/7elsfix8","slide":2,"bbox":[600,300,280,185]}
+{"kind":"textbox","id":"sh/sfutonyt","slide":2,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[622,320,236,34]}
+{"kind":"textbox","id":"sh/tg3ahsfe","slide":2,"text":"映像を管理・確認し\n学習データとして整える","textPreview":"映像を管理・確認し | 学習データとして整える","textChars":21,"textLines":2,"bbox":[622,367,236,101]}
+{"kind":"shape","id":"sh/uhcbqxgj","slide":2,"bbox":[905,392,104,3]}
+{"kind":"shape","id":"sh/filsj2x4","slide":2,"bbox":[1005,385,18,18]}
+{"kind":"shape","id":"sh/g3etsnyp","slide":2,"bbox":[1040,300,170,185]}
+{"kind":"textbox","id":"sh/h4nalsfa","slide":2,"text":"研究開発","textPreview":"研究開発","textChars":4,"textLines":1,"bbox":[1062,320,126,34]}
+{"kind":"textbox","id":"sh/alsretgf","slide":2,"text":"AI・ロボットの\n学習や評価","textPreview":"AI・ロボットの | 学習や評価","textChars":14,"textLines":2,"bbox":[1062,367,126,101]}
+{"kind":"textbox","id":"sh/vm1s7yx0","slide":2,"text":"AI・ロボットの研究開発に使うデータを整えます","textPreview":"AI・ロボットの研究開発に使うデータを整えます","textChars":23,"textLines":1,"bbox":[76,575,1110,40]}
+{"kind":"notes","id":"nt/0gmlzp","slide":2,"text":"RootLensは、実際の仕事の様子を作業者の目線で撮影し、AIやロボットの研究開発に使えるデータとして整える事業です。利用目的は研究開発に限定し、提供先にも同じ条件を求めます。\n\n根拠：撮影協力に関する基本合意書 第1条・第6条、撮影参加に関する説明・同意書『使いみち』。"}
+{"kind":"slide","id":"sl/aewt71","slide":3,"title":"なぜ実際の仕事を撮影するのか","textShapes":8}
+{"kind":"shape","id":"sh/ls3e10ji","slide":3,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/y5cv650r","slide":3,"text":"なぜ実際の仕事を撮影するのか","textPreview":"なぜ実際の仕事を撮影するのか","textChars":14,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/z6lwza1c","slide":3,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/c3ad4vi1","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/x43ex0j6","slide":3,"text":"AIやロボットが仕事を理解するには、\n現場で人がどう動いているかを学ぶ必要がある","textPreview":"AIやロボットが仕事を理解するには、 | 現場で人がどう動いているかを学ぶ必要がある","textChars":40,"textLines":2,"bbox":[76,205,900,105]}
+{"kind":"shape","id":"sh/a1sv2l0v","slide":3,"bbox":[76,355,1110,1]}
+{"kind":"textbox","id":"sh/b21wvq1g","slide":3,"text":"実際の作業","textPreview":"実際の作業","textChars":5,"textLines":1,"bbox":[76,405,280,40]}
+{"kind":"textbox","id":"sh/ozad0bip","slide":3,"text":"道具の使い方、手順、周囲を見ながら行う判断が含まれる","textPreview":"道具の使い方、手順、周囲を見ながら行う判断が含まれる","textChars":26,"textLines":1,"bbox":[380,403,800,70]}
+{"kind":"shape","id":"sh/p0jetgja","slide":3,"bbox":[76,481,1110,1]}
+{"kind":"textbox","id":"sh/porqhszm","slide":3,"text":"作業者の目線","textPreview":"作業者の目線","textChars":6,"textLines":1,"bbox":[76,500,280,40]}
+{"kind":"textbox","id":"sh/4niponi1","slide":3,"text":"何を見て、どの順番で手を動かしているかが分かる","textPreview":"何を見て、どの順番で手を動かしているかが分かる","textChars":23,"textLines":1,"bbox":[380,498,800,70]}
+{"kind":"textbox","id":"sh/3m98fihg","slide":3,"text":"実際の現場から得られる情報を、将来の技術開発に役立てます","textPreview":"実際の現場から得られる情報を、将来の技術開発に役立てます","textChars":28,"textLines":1,"bbox":[76,625,1110,34]}
+{"kind":"notes","id":"nt/aewt71","slide":3,"text":"通常業務を作業者の目線で撮影すると、実際の仕事に含まれる細かな動きや判断を記録できます。AIやロボットは、そのデータから現場での仕事を学びます。"}
+{"kind":"slide","id":"sl/eh0mh5","slide":4,"title":"現場にお願いしたいこと","textShapes":10}
+{"kind":"shape","id":"sh/twnqhkry","slide":4,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/6tcr658n","slide":4,"text":"現場にお願いしたいこと","textPreview":"現場にお願いしたいこと","textChars":11,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/7u58fa98","slide":4,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/gze9cfqp","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/h0nalkra","slide":4,"text":"撮影場所を決める","textPreview":"撮影場所を決める","textChars":8,"textLines":1,"bbox":[76,200,280,40]}
+{"kind":"textbox","id":"sh/uxwrap8j","slide":4,"text":"撮影してよい場所・業務・時間を、現場の責任者と相談して決めます","textPreview":"撮影してよい場所・業務・時間を、現場の責任者と相談して決めます","textChars":31,"textLines":1,"bbox":[380,198,800,70]}
+{"kind":"shape","id":"sh/vy58ju94","slide":4,"bbox":[76,290,1110,1]}
+{"kind":"textbox","id":"sh/43y9gzql","slide":4,"text":"参加者を募る","textPreview":"参加者を募る","textChars":6,"textLines":1,"bbox":[76,315,280,40]}
+{"kind":"textbox","id":"sh/5o7ap4r6","slide":4,"text":"内容を確認し、本人の意思で同意した18歳以上のスタッフだけが参加します","textPreview":"内容を確認し、本人の意思で同意した18歳以上のスタッフだけが参加します","textChars":35,"textLines":1,"bbox":[380,313,800,70]}
+{"kind":"shape","id":"sh/9g7et8bm","slide":4,"bbox":[76,405,1110,1]}
+{"kind":"textbox","id":"sh/8fyx03u1","slide":4,"text":"普段どおり作業する","textPreview":"普段どおり作業する","textChars":9,"textLines":1,"bbox":[76,430,280,40]}
+{"kind":"textbox","id":"sh/7epwrytg","slide":4,"text":"貸与する機材を装着し、決めた範囲で通常の業務を撮影します","textPreview":"貸与する機材を装着し、決めた範囲で通常の業務を撮影します","textChars":28,"textLines":1,"bbox":[380,428,800,70]}
+{"kind":"shape","id":"sh/mdgfytcv","slide":4,"bbox":[76,520,1110,1]}
+{"kind":"textbox","id":"sh/hkrexsby","slide":4,"text":"気づいた点を伝える","textPreview":"気づいた点を伝える","textChars":9,"textLines":1,"bbox":[76,545,280,40]}
+{"kind":"textbox","id":"sh/wjix4nud","slide":4,"text":"装着感や業務への支障を伺い、撮影方法と機材を改善します","textPreview":"装着感や業務への支障を伺い、撮影方法と機材を改善します","textChars":27,"textLines":1,"bbox":[380,543,800,70]}
+{"kind":"notes","id":"nt/eh0mh5","slide":4,"text":"撮影する場所、業務、場面は現場側で決められます。撮影範囲から外す場所や物品も指定できます。参加するスタッフは、説明を受けた上で本人が決めます。\n\n根拠：撮影協力に関する基本合意書 第3条から第5条、プライバシーポリシー第14条。"}
+{"kind":"slide","id":"sl/gcls3r","slide":5,"title":"撮影機材と記録する情報","textShapes":10}
+{"kind":"shape","id":"sh/0batkr69","slide":5,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/zahsrm5o","slide":5,"text":"撮影機材と記録する情報","textPreview":"撮影機材と記録する情報","textChars":11,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/ep8biho3","slide":5,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/9gjuxgnq","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/ne1cv65k","slide":5,"text":"RootGlass","textPreview":"RootGlass","textChars":9,"textLines":1,"bbox":[76,570,505,32]}
+{"kind":"textbox","id":"sh/mdsbm1oz","slide":5,"text":"長時間装着の負担を減らすため、\n軽さと見た目を改善しています","textPreview":"長時間装着の負担を減らすため、 | 軽さと見た目を改善しています","textChars":30,"textLines":2,"bbox":[76,610,505,48]}
+{"kind":"shape","id":"sh/xk3u1gnm","slide":5,"bbox":[650,195,536,126]}
+{"kind":"textbox","id":"sh/wjutsb6h","slide":5,"text":"映像","textPreview":"映像","textChars":2,"textLines":1,"bbox":[672,215,492,34]}
+{"kind":"textbox","id":"sh/q5076xcf","slide":5,"text":"作業者の目線から見える、手元や周囲の様子","textPreview":"作業者の目線から見える、手元や周囲の様子","textChars":20,"textLines":1,"bbox":[672,262,492,42]}
+{"kind":"shape","id":"sh/r69of2t0","slide":5,"bbox":[650,340,536,126]}
+{"kind":"textbox","id":"sh/s72p87ul","slide":5,"text":"音声","textPreview":"音声","textChars":2,"textLines":1,"bbox":[672,360,492,34]}
+{"kind":"textbox","id":"sh/d8b6hcb6","slide":5,"text":"作業中に機材が拾う周囲の音","textPreview":"作業中に機材が拾う周囲の音","textChars":13,"textLines":1,"bbox":[672,407,492,42]}
+{"kind":"shape","id":"sh/e9k7ahcr","slide":5,"bbox":[650,485,536,126]}
+{"kind":"textbox","id":"sh/fatojmtc","slide":5,"text":"機材の動き","textPreview":"機材の動き","textChars":5,"textLines":1,"bbox":[672,505,492,34]}
+{"kind":"textbox","id":"sh/0b2pcrux","slide":5,"text":"向きや動きを記録するセンサーデータ","textPreview":"向きや動きを記録するセンサーデータ","textChars":17,"textLines":1,"bbox":[672,552,492,42]}
+{"kind":"image","id":"im/dczux4za","slide":5,"name":"","alt":"RootGlass","bbox":[76,195,505,355]}
+{"kind":"notes","id":"nt/gcls3r","slide":5,"text":"RootLensが機材を貸与し、通常使用による故障や消耗も負担します。機材は映像、音声、向きや動きを記録します。\n\n根拠：撮影協力に関する基本合意書 第2条・第10条、撮影参加に関する説明・同意書『撮影するもの』。"}
+{"kind":"slide","id":"sl/c3ju5u","slide":6,"title":"現場とRootLensの役割","textShapes":7}
+{"kind":"shape","id":"sh/x0vqpgve","slide":6,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/adk7u1w3","slide":6,"text":"現場とRootLensの役割","textPreview":"現場とRootLensの役割","textChars":14,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/bet8n6d8","slide":6,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/k3mp0ve5","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"shape","id":"sh/l4vqtgvq","slide":6,"bbox":[76,205,510,355]}
+{"kind":"textbox","id":"sh/y147ylwz","slide":6,"text":"店舗・事業所","textPreview":"店舗・事業所","textChars":6,"textLines":1,"bbox":[98,225,466,34]}
+{"kind":"textbox","id":"sh/z2d8rqdk","slide":6,"text":"撮影してよい場所と業務を決める\n\n参加を希望するスタッフへ説明・同意手続きを案内する\n\n貸与された撮影機材を保管する","textPreview":"撮影してよい場所と業務を決める |  | 参加を希望するスタッフへ説明・同意手続きを案内する |  | 貸与された撮影機材を保管する","textChars":58,"textLines":5,"bbox":[98,272,466,271]}
+{"kind":"shape","id":"sh/87694ve1","slide":6,"bbox":[675,205,510,355]}
+{"kind":"textbox","id":"sh/98fqx0vm","slide":6,"text":"RootLens","textPreview":"RootLens","textChars":8,"textLines":1,"bbox":[697,225,466,34]}
+{"kind":"textbox","id":"sh/pgnixwvq","slide":6,"text":"撮影機材と説明資料を用意する\n\n参加者本人の同意を記録する\n\n撮影データを管理・確認・加工する\n\n販売先への提案と提供を行う","textPreview":"撮影機材と説明資料を用意する |  | 参加者本人の同意を記録する |  | 撮影データを管理・確認・加工する |  | 販売先への提案と提供を行う","textChars":62,"textLines":7,"bbox":[697,272,466,271]}
+{"kind":"textbox","id":"sh/4ve14ru5","slide":6,"text":"撮影範囲と運用は、現場ごとに相談して決めます","textPreview":"撮影範囲と運用は、現場ごとに相談して決めます","textChars":22,"textLines":1,"bbox":[76,615,1110,34]}
+{"kind":"notes","id":"nt/c3ju5u","slide":6,"text":"現場側には、撮影場所と業務の決定、希望者への案内、機材の保管をお願いします。RootLensは、機材、説明と同意手続き、データ管理、提供先とのやり取りを担当します。\n\n根拠：撮影協力に関する基本合意書 第3条・第8条・第10条。"}
+{"kind":"slide","id":"sl/tz2ddm","slide":7,"title":"撮影開始までの流れ","textShapes":18}
+{"kind":"shape","id":"sh/na1gbyt8","slide":7,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/8baxk3ut","slide":7,"text":"撮影開始までの流れ","textPreview":"撮影開始までの流れ","textChars":9,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/9wjyd8by","slide":7,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/axcfmdcj","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/vylgfit4","slide":7,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[76,225,42,34]}
+{"kind":"shape","id":"sh/wzuxonup","slide":7,"bbox":[76,275,190,190]}
+{"kind":"textbox","id":"sh/x03yhsba","slide":7,"text":"現場確認","textPreview":"現場確認","textChars":4,"textLines":1,"bbox":[91,302,160,34]}
+{"kind":"textbox","id":"sh/i1cfqdcv","slide":7,"text":"撮影できる場所と\n業務を相談","textPreview":"撮影できる場所と | 業務を相談","textChars":14,"textLines":2,"bbox":[91,365,160,62]}
+{"kind":"shape","id":"sh/j2lgjitg","slide":7,"bbox":[266,370,18,3]}
+{"kind":"shape","id":"sh/nq5sfudg","slide":7,"bbox":[280,363,18,18]}
+{"kind":"textbox","id":"sh/mpwrmpwb","slide":7,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[300,225,42,34]}
+{"kind":"shape","id":"sh/9snahkvm","slide":7,"bbox":[300,275,190,190]}
+{"kind":"textbox","id":"sh/8re9ofe1","slide":7,"text":"条件提示","textPreview":"条件提示","textChars":4,"textLines":1,"bbox":[315,302,160,34]}
+{"kind":"textbox","id":"sh/zmlsbadk","slide":7,"text":"実施時間と協力費を\n撮影前に提示","textPreview":"実施時間と協力費を | 撮影前に提示","textChars":16,"textLines":2,"bbox":[315,365,160,62]}
+{"kind":"shape","id":"sh/ylcri5wz","slide":7,"bbox":[490,370,18,3]}
+{"kind":"shape","id":"sh/lonadkvq","slide":7,"bbox":[504,363,18,18]}
+{"kind":"textbox","id":"sh/0nu9kfe5","slide":7,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[524,225,42,34]}
+{"kind":"shape","id":"sh/jipsnedo","slide":7,"bbox":[524,275,190,190]}
+{"kind":"textbox","id":"sh/ihgbu9wj","slide":7,"text":"合意・同意","textPreview":"合意・同意","textChars":5,"textLines":1,"bbox":[539,302,160,34]}
+{"kind":"textbox","id":"sh/epk32xkn","slide":7,"text":"現場との合意と\n参加者本人の同意","textPreview":"現場との合意と | 参加者本人の同意","textChars":16,"textLines":2,"bbox":[539,365,160,62]}
+{"kind":"shape","id":"sh/fqt4b218","slide":7,"bbox":[714,370,18,3]}
+{"kind":"shape","id":"sh/0r2l472t","slide":7,"bbox":[728,363,18,18]}
+{"kind":"textbox","id":"sh/1svmdcje","slide":7,"text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[748,225,42,34]}
+{"kind":"shape","id":"sh/2t436hkz","slide":7,"bbox":[748,275,190,190]}
+{"kind":"textbox","id":"sh/nud4fm1k","slide":7,"text":"機材準備","textPreview":"機材準備","textChars":4,"textLines":1,"bbox":[763,302,160,34]}
+{"kind":"textbox","id":"sh/ofm5872p","slide":7,"text":"使い方を説明し\n機材を貸与","textPreview":"使い方を説明し | 機材を貸与","textChars":13,"textLines":2,"bbox":[763,365,160,62]}
+{"kind":"shape","id":"sh/pgvmhcja","slide":7,"bbox":[938,370,18,3]}
+{"kind":"shape","id":"sh/ix03udkf","slide":7,"bbox":[952,363,18,18]}
+{"kind":"textbox","id":"sh/jy943i10","slide":7,"text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[972,225,42,34]}
+{"kind":"shape","id":"sh/lcz69g3i","slide":7,"bbox":[972,275,190,190]}
+{"kind":"textbox","id":"sh/kbqp0bmx","slide":7,"text":"撮影開始","textPreview":"撮影開始","textChars":4,"textLines":1,"bbox":[987,302,160,34]}
+{"kind":"textbox","id":"sh/zaxo76ls","slide":7,"text":"決めた範囲で\n普段の作業を撮影","textPreview":"決めた範囲で | 普段の作業を撮影","textChars":15,"textLines":2,"bbox":[987,365,160,62]}
+{"kind":"textbox","id":"sh/y9o7yl47","slide":7,"text":"範囲を絞った試行から始められます","textPreview":"範囲を絞った試行から始められます","textChars":16,"textLines":1,"bbox":[76,570,1110,40]}
+{"kind":"notes","id":"nt/tz2ddm","slide":7,"text":"現場確認、案件条件の提示、基本合意、参加者本人の同意、機材準備の順に進めます。すべての条件を記録が残る形で確認してから撮影を始めます。\n\n根拠：撮影協力に関する基本合意書 第4条・第7条・第13条。"}
+{"kind":"slide","id":"sl/cme8rn","slide":8,"title":"データの利用先と契約条件","textShapes":7}
+{"kind":"shape","id":"sh/d0j29onq","slide":8,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/qxs3y94z","slide":8,"text":"データの利用先と契約条件","textPreview":"データの利用先と契約条件","textChars":12,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/ry1k7e5k","slide":8,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/03al4jmh","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"shape","id":"sh/143mdonm","slide":8,"bbox":[76,205,510,375]}
+{"kind":"textbox","id":"sh/e1s32t4b","slide":8,"text":"利用先","textPreview":"利用先","textChars":3,"textLines":1,"bbox":[98,225,466,34]}
+{"kind":"textbox","id":"sh/z214be5w","slide":8,"text":"AI・ロボットに関する技術、製品、サービスの研究・開発\n\n学習データの作成、品質確認、評価\n\n国内外の企業・研究機関への提供","textPreview":"AI・ロボットに関する技術、製品、サービスの研究・開発 |  | 学習データの作成、品質確認、評価 |  | 国内外の企業・研究機関への提供","textChars":62,"textLines":5,"bbox":[98,272,466,291]}
+{"kind":"shape","id":"sh/o7ul83md","slide":8,"bbox":[675,205,510,375]}
+{"kind":"textbox","id":"sh/9s3mh8ny","slide":8,"text":"提供先との契約条件","textPreview":"提供先との契約条件","textChars":9,"textLines":1,"bbox":[697,225,466,34]}
+{"kind":"textbox","id":"sh/1obmhs72","slide":8,"text":"利用目的を研究開発に限定\n\n個人の特定・追跡、勤務監視、人事・採用判断を利用範囲から除外\n\n広告・娯楽目的の一般公開を利用範囲から除外","textPreview":"利用目的を研究開発に限定 |  | 個人の特定・追跡、勤務監視、人事・採用判断を利用範囲から除外 |  | 広告・娯楽目的の一般公開を利用範囲から除外","textChars":67,"textLines":5,"bbox":[697,272,466,291]}
+{"kind":"textbox","id":"sh/gn258nqh","slide":8,"text":"RootLensと提供先が、同じ利用条件を共有します","textPreview":"RootLensと提供先が、同じ利用条件を共有します","textChars":26,"textLines":1,"bbox":[76,620,1110,34]}
+{"kind":"notes","id":"nt/cme8rn","slide":8,"text":"撮影データの利用目的はAI・ロボット関連の研究開発です。提供契約では、個人の特定や追跡、勤務監視、人事・採用判断、広告・娯楽目的での一般公開を利用範囲から除外します。\n\n根拠：撮影協力に関する基本合意書 第6条、撮影参加に関する説明・同意書『使いみち』、プライバシーポリシー第4条・第5条。"}
+{"kind":"slide","id":"sl/dhdtgs","slide":9,"title":"映り込みとデータ管理","textShapes":11}
+{"kind":"shape","id":"sh/4nqtcnyh","slide":9,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/3mxsj2hw","slide":9,"text":"映り込みとデータ管理","textPreview":"映り込みとデータ管理","textChars":10,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/ilobaxgb","slide":9,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/dszupczy","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/srqtg7yd","slide":9,"text":"撮影範囲を限定","textPreview":"撮影範囲を限定","textChars":7,"textLines":1,"bbox":[76,195,280,40]}
+{"kind":"textbox","id":"sh/rqhcn2hs","slide":9,"text":"同意した成人だけが映る作業を選び、避ける場所・場面・物品を事前に決めます","textPreview":"同意した成人だけが映る作業を選び、避ける場所・場面・物品を事前に決めます","textChars":36,"textLines":1,"bbox":[380,193,800,70]}
+{"kind":"shape","id":"sh/qp8bexg7","slide":9,"bbox":[76,277,1110,1]}
+{"kind":"textbox","id":"sh/1gjutczu","slide":9,"text":"提供対象を選別","textPreview":"提供対象を選別","textChars":7,"textLines":1,"bbox":[76,300,280,40]}
+{"kind":"textbox","id":"sh/0vatk7yp","slide":9,"text":"同意した成人のデータを選び、児童や私的空間を含む映像を除外します","textPreview":"同意した成人のデータを選び、児童や私的空間を含む映像を除外します","textChars":32,"textLines":1,"bbox":[380,298,800,70]}
+{"kind":"shape","id":"sh/ml8nuhkn","slide":9,"bbox":[76,382,1110,1]}
+{"kind":"textbox","id":"sh/7mho3mls","slide":9,"text":"必要な部分を隠す","textPreview":"必要な部分を隠す","textChars":8,"textLines":1,"bbox":[76,405,280,40]}
+{"kind":"textbox","id":"sh/8nq5wr2d","slide":9,"text":"偶発的な映り込みでは、顔、名札、書類、ナンバープレートなどをマスキングします","textPreview":"偶発的な映り込みでは、顔、名札、書類、ナンバープレートなどをマスキングします","textChars":38,"textLines":1,"bbox":[380,403,800,70]}
+{"kind":"shape","id":"sh/9oz65wjy","slide":9,"bbox":[76,487,1110,1]}
+{"kind":"textbox","id":"sh/up8ny1kj","slide":9,"text":"保管を制限","textPreview":"保管を制限","textChars":5,"textLines":1,"bbox":[76,510,280,40]}
+{"kind":"textbox","id":"sh/vq1o7m14","slide":9,"text":"通信と保存時の暗号化、アクセス制御を行い、扱える人を必要最小限にします","textPreview":"通信と保存時の暗号化、アクセス制御を行い、扱える人を必要最小限にします","textChars":35,"textLines":1,"bbox":[380,508,800,70]}
+{"kind":"textbox","id":"sh/wra50r2p","slide":9,"text":"確認と必要な処理を終えたデータを提供します","textPreview":"確認と必要な処理を終えたデータを提供します","textChars":21,"textLines":1,"bbox":[76,630,1110,34]}
+{"kind":"notes","id":"nt/dhdtgs","slide":9,"text":"撮影範囲を事前に限定し、提供前にも内容を確認します。偶発的な映り込みにはマスキングを行い、同意した成人のデータから提供対象を選びます。児童や私的空間を含む映像は提供対象から除外します。\n\n根拠：撮影協力に関する基本合意書 第5条、プライバシーポリシー第8条・第9条・第13条・第14条。"}
+{"kind":"slide","id":"sl/njwpxz","slide":10,"title":"参加の中止・削除・協力費","textShapes":9}
+{"kind":"shape","id":"sh/tonmd8ze","slide":10,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/6lcnit03","slide":10,"text":"参加の中止・削除・協力費","textPreview":"参加の中止・削除・協力費","textChars":12,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/7ml4byho","slide":10,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/gbe5oni5","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"shape","id":"sh/hcnmh8zq","slide":10,"bbox":[76,205,340,350]}
+{"kind":"textbox","id":"sh/u9wnmd0z","slide":10,"text":"参加の中止","textPreview":"参加の中止","textChars":5,"textLines":1,"bbox":[98,225,296,34]}
+{"kind":"textbox","id":"sh/va54fihk","slide":10,"text":"参加するかは本人が自由に決められます。\n\n一度同意した後でも、将来の撮影はいつでもやめられます。","textPreview":"参加するかは本人が自由に決められます。 |  | 一度同意した後でも、将来の撮影はいつでもやめられます。","textChars":48,"textLines":3,"bbox":[98,272,296,266]}
+{"kind":"shape","id":"sh/wfalcji1","slide":10,"bbox":[470,205,340,350]}
+{"kind":"textbox","id":"sh/xg3m5ozm","slide":10,"text":"データの削除","textPreview":"データの削除","textChars":6,"textLines":1,"bbox":[492,225,296,34]}
+{"kind":"textbox","id":"sh/h8naxszq","slide":10,"text":"提供前のデータは、参加者の依頼に応じて削除します。\n\n提供後は提供先へ利用停止・削除を求めます。対応範囲は提供先の保管状況によります。","textPreview":"提供前のデータは、参加者の依頼に応じて削除します。 |  | 提供後は提供先へ利用停止・削除を求めます。対応範囲は提供先の保管状況によります。","textChars":67,"textLines":3,"bbox":[492,272,296,266]}
+{"kind":"shape","id":"sh/g7ut4ni5","slide":10,"bbox":[864,205,340,350]}
+{"kind":"textbox","id":"sh/v6lsv2hk","slide":10,"text":"撮影協力費","textPreview":"撮影協力費","textChars":5,"textLines":1,"bbox":[886,225,296,34]}
+{"kind":"textbox","id":"sh/ulcb2x0z","slide":10,"text":"提供先が採用したデータの時間に応じて、現場へ支払います。\n\n単価と案件条件は、撮影前に記録が残る方法で提示します。","textPreview":"提供先が採用したデータの時間に応じて、現場へ支払います。 |  | 単価と案件条件は、撮影前に記録が残る方法で提示します。","textChars":57,"textLines":3,"bbox":[886,272,296,266]}
+{"kind":"textbox","id":"sh/5cna1czm","slide":10,"text":"疑問点を確認し、双方が合意してから撮影を始めます","textPreview":"疑問点を確認し、双方が合意してから撮影を始めます","textChars":24,"textLines":1,"bbox":[76,615,1110,34]}
+{"kind":"notes","id":"nt/njwpxz","slide":10,"text":"参加は本人が決め、将来の撮影も本人の希望に応じて中止できます。提供前のデータは参加者の依頼に応じて削除します。提供後は提供先へ利用停止と削除を求め、対応範囲は提供先の保管状況によります。撮影協力費は提供先が採用した時間に応じて支払い、単価などは撮影前に提示します。\n\n根拠：撮影協力に関する基本合意書 第7条・第9条、撮影参加に関する説明・同意書『参加の中止と削除』。"}
+{"kind":"slide","id":"sl/lld70u","slide":11,"title":"小規模な試行","textShapes":11}
+{"kind":"shape","id":"sh/kj6hkn2x","slide":11,"bbox":[0,0,14,720]}
+{"kind":"textbox","id":"sh/zixgrilc","slide":11,"text":"小規模な試行","textPreview":"小規模な試行","textChars":6,"textLines":1,"bbox":[70,61,1120,68]}
+{"kind":"shape","id":"sh/yhofidkr","slide":11,"bbox":[70,148,1140,1]}
+{"kind":"textbox","id":"sh/xgfyp836","slide":11,"text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1120,675,90,20]}
+{"kind":"textbox","id":"sh/cf6xgn2l","slide":11,"text":"一つの業務、少人数、短い時間から始められます","textPreview":"一つの業務、少人数、短い時間から始められます","textChars":22,"textLines":1,"bbox":[76,205,1110,52]}
+{"kind":"shape","id":"sh/bedgnilg","slide":11,"bbox":[120,330,300,150]}
+{"kind":"textbox","id":"sh/ad4fedkv","slide":11,"text":"範囲","textPreview":"範囲","textChars":2,"textLines":1,"bbox":[142,350,256,34]}
+{"kind":"textbox","id":"sh/pcvyl83a","slide":11,"text":"撮影する場所と業務を限定","textPreview":"撮影する場所と業務を限定","textChars":12,"textLines":1,"bbox":[142,397,256,66]}
+{"kind":"shape","id":"sh/ormxc32p","slide":11,"bbox":[490,330,300,150]}
+{"kind":"textbox","id":"sh/q1kzmpg7","slide":11,"text":"参加","textPreview":"参加","textChars":2,"textLines":1,"bbox":[512,350,256,34]}
+{"kind":"textbox","id":"sh/r2dgvuhc","slide":11,"text":"内容を理解し、希望した方だけ","textPreview":"内容を理解し、希望した方だけ","textChars":14,"textLines":1,"bbox":[512,397,256,66]}
+{"kind":"shape","id":"sh/cnmhozyx","slide":11,"bbox":[860,330,300,150]}
+{"kind":"textbox","id":"sh/dovyx4zi","slide":11,"text":"確認","textPreview":"確認","textChars":2,"textLines":1,"bbox":[882,350,256,34]}
+{"kind":"textbox","id":"sh/2xkzipgv","slide":11,"text":"実際の負担を見てから拡大を判断","textPreview":"実際の負担を見てから拡大を判断","textChars":15,"textLines":1,"bbox":[882,397,256,66]}
+{"kind":"textbox","id":"sh/3ytgruhg","slide":11,"text":"RootLens　森 雄大","textPreview":"RootLens　森 雄大","textChars":13,"textLines":1,"bbox":[76,570,1110,34]}
+{"kind":"textbox","id":"sh/4z2hkzy1","slide":11,"text":"contact@rootlens.io","textPreview":"contact@rootlens.io","textChars":19,"textLines":1,"bbox":[76,615,1110,30]}
+{"kind":"notes","id":"nt/lld70u","slide":11,"text":"一つの業務、少人数、短い時間から始め、現場への負担を確認した上で次を相談します。"}

@@ -109,7 +109,7 @@ def _output_directory(output):
 
 
 def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
-                    on_clip=None, on_source=None, on_drive_checked=None, adb_path=None, package=None,
+                    on_clip=None, on_source=None, on_device=None, on_drive_checked=None, adb_path=None, package=None,
                     site_id="local"):
     """Import device recordings even offline; reconcile only known unit ids."""
     check_cancelled(cancel_event)
@@ -117,15 +117,17 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
     serial = adb.connect()
     selected_package = adb.package(package)
     root = f"/sdcard/Android/data/{selected_package}/files/recordings"
+    if on_device is not None:
+        on_device((str(adb.executable), adb.selector[1], serial), root)
     output, staging = _output_directory(output)
     counts = dict(imported=0, existing=0, incomplete=0, failed=0, cleaned=0,
                   cleanup_pending=0, local_cleaned=0, local_cleanup_pending=0, discard_pending=0)
     sources = {}
     operation_lock = threading.Lock()
 
-    def report(name, state, path=None, error="", position=0, total=0):
+    def report(name, state, path=None, error="", position=0, total=0, unit_id=None):
         if on_clip is not None:
-            on_clip(ClipProgress(name, path, state, error, position, total))
+            on_clip(ClipProgress(name, path, state, error, position, total, unit_id))
 
     def read_drive(unit_ids):
         check_cancelled(cancel_event)
@@ -140,7 +142,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
         return read_drive({unit_id}).get(unit_id)
 
     def clean(name, unit_id, display_name, position=0, total=0):
-        report(display_name, "deleting", position=position, total=total)
+        report(display_name, "deleting", position=position, total=total, unit_id=unit_id)
         prefix = f"録画 {position}/{total}：" if total else ""
         log(prefix + "Driveに保存済みの録画を確認し、スマートグラスから削除しています…")
         try:
@@ -153,7 +155,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             raise
         except (ImportFailure, OSError) as error:
             counts["cleanup_pending"] += 1
-            report(display_name, "cleanup_pending", error=str(error), position=position, total=total)
+            report(display_name, "cleanup_pending", error=str(error), position=position, total=total, unit_id=unit_id)
             log(prefix + "端末からの削除が終わっていません。次の接続でもう一度確認します。")
         else:
             counts["cleaned"] += 1
@@ -163,7 +165,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             except (ImportFailure, OSError) as error:
                 counts["local_cleanup_pending"] += 1
                 log(str(error))
-            report(display_name, "drive_saved", position=position, total=total)
+            report(display_name, "drive_saved", position=position, total=total, unit_id=unit_id)
 
     with import_lock(staging):
         recover_staging(staging)
@@ -189,13 +191,20 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
     complete = {}
     for name in names:
         check_cancelled(cancel_event)
-        report(name, "discovering")
         try:
             remote = root + "/" + name
+            try:
+                identity = adb.metadata(remote)
+            except ImportFailure:
+                identity = None
+            if identity and ((identity.get("site_id") and identity["site_id"] != site_id)
+                             or (identity.get("unit_id") and not identity["unit_id"].startswith(f"unit_{site_id}_"))):
+                continue
             if not adb.complete(remote):
                 counts["incomplete"] += 1
                 report(name, "incomplete")
                 continue
+            report(name, "discovering")
             metadata = ensure_unit_id(adb, remote, site_id)
             complete[name] = metadata["unit_id"]
         except ImportCancelled:
@@ -204,7 +213,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             counts["failed"] += 1
             report(name, "error", error=str(error))
     for item in pending:
-        report(item.original_name, "deleting")
+        report(item.original_name, "deleting", unit_id=item.unit_id)
     unit_ids = set(complete.values()) | {item.unit_id for item in pending}
     log("スマートグラスの録画がDriveに保存されているか確認しています…")
     drive_error = ""
@@ -218,7 +227,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
     for item in pending:
         if drive_error:
             counts["cleanup_pending"] += 1
-            report(item.original_name, "cleanup_pending", error=drive_error)
+            report(item.original_name, "cleanup_pending", error=drive_error, unit_id=item.unit_id)
         else:
             clean(item.name, item.unit_id, item.original_name)
     total = len(complete)
@@ -282,6 +291,25 @@ def discard_problem_capture(transport, root, name, cancel_event=None):
     if adb.run("get-serialno") != serial:
         raise ImportFailure("スマートグラスとの接続が変わりました。端末を再確認してください。")
     discard_problem_recording(adb, root, name)
+
+
+def delete_saved_capture(transport, root, name, unit_id, drive_reader, cancel_event=None, log=print):
+    """Finish a saved recording's device cleanup after a fresh Drive check."""
+    if not transport or not root or not unit_id:
+        raise ImportFailure("削除する録画を確認できません。端末を再確認してください。")
+    executable, transport_id, serial = transport
+    adb = Adb(executable, cancel_event=cancel_event)
+    adb.selector = ["-t", transport_id]
+    if adb.run("get-serialno") != serial:
+        raise ImportFailure("スマートグラスとの接続が変わりました。端末を再確認してください。")
+    pending = [item for item in discover_pending(adb, root)
+               if item.original_name == name and item.unit_id == unit_id]
+    if len(pending) > 1:
+        raise ImportFailure("削除する録画を特定できません。端末を再確認してください。")
+    remote_name = pending[0].name if pending else name
+    cleanup_recording(adb, root, remote_name, unit_id,
+                      lambda identity: drive_reader({identity}).get(identity),
+                      log=log)
 
 
 def discard_unapproved_recording(source, directory, cancel_event=None):

@@ -28,5 +28,5 @@ export async function GET(request: Request, context: { params: Promise<{ siteId:
     ))
     .where(and(eq(people.siteId, siteId), eq(people.status, "active")))
     .orderBy(desc(people.createdAt));
-  return Response.json({ site: { id: siteId, name: operator.siteName, role: operator.role }, members });
+  return Response.json({ site: { id: siteId, name: operator.siteName, role: operator.role, personId: operator.personId }, members });
 }

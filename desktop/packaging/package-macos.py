@@ -45,7 +45,7 @@ def main(arguments=None):
         shutil.copytree(application, stage / application.name, symlinks=True)
         (stage / "アプリケーション").symlink_to("/Applications", target_is_directory=True)
         (stage / "はじめに.txt").write_text(
-            "RootLens Import.app を「アプリケーション」にドラッグしてください。\n"
+            "RootLens Importer.app を「アプリケーション」にドラッグしてください。\n"
             "アプリの「SMSでログイン」を押し、事業所に登録された電話番号でログインします。\n"
             "ログイン後、使用する事業所を確認してください。\n"
             "スマートグラスをUSBケーブルでつなぎ、「端末を再確認」を押してください。\n"

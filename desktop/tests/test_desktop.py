@@ -281,14 +281,16 @@ class DesktopTests(unittest.TestCase):
         self.assertIsNone(self.window.preview.path)
         self.assertFalse(self.window.folder_button.isEnabled())
         wait_for(lambda: not self.window._refresh_timer.isActive())
-        self.assertEqual(self.window.selected_recording().path, clips[1])
+        self.assertEqual(self.window.selected_problem().name, name)
         failed = self.window.recording_list.topLevelItem(0)
         self.assertTrue(failed.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.window.select_relative(1)
+        self.assertEqual(self.window.selected_recording().path, clips[1])
         self.window.recording_list.setCurrentItem(failed)
-        self.assertEqual(self.window.selected_problem().name, name)
         self.window._clip_progress(ClipProgress(name, clips[0], 'verifying'))
         wait_for(lambda: not self.window._refresh_timer.isActive())
-        self.assertTrue(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertFalse(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.assertEqual(self.window.recording_list.topLevelItem(0).data(0, Qt.ItemDataRole.UserRole + 1), '•••')
         self.window._clip_progress(ClipProgress(name, clips[0], 'ready'))
         wait_for(lambda: not self.window._refresh_timer.isActive())
         self.assertTrue(self.window.recording_list.topLevelItem(0).flags() & Qt.ItemFlag.ItemIsSelectable)
@@ -355,6 +357,32 @@ class DesktopTests(unittest.TestCase):
         with self.assertRaises(ImportFailure):
             self.window.set_profile(self.profile)
         self.window.busy = False
+
+    def test_connected_site_switch_rechecks_device_for_new_site(self):
+        self.populate(1)
+        self.window.device_connected = True
+        other = SiteProfile("site_other", "別の事業所")
+        with patch.object(self.window, "start_import") as restart:
+            self.window.switch_profile(other)
+        self.assertEqual(self.window.profile, other)
+        self.assertFalse(self.window.device_connected)
+        restart.assert_called_once()
+
+    def test_site_switch_during_import_cancels_old_work_before_reconnecting(self):
+        self.populate(1)
+        self.window.busy = True
+        self.window.job_kind = "import"
+        self.window.device_connected = True
+        other = SiteProfile("site_other", "別の事業所")
+        self.window.switch_profile(other)
+        self.assertEqual(self.window.profile, self.profile)
+        self.assertTrue(self.window.cancel_event.is_set())
+        self.window.busy = False
+        self.window.job_kind = None
+        with patch.object(self.window, "start_import") as restart:
+            self.window._complete_site_switch()
+        self.assertEqual(self.window.profile, other)
+        restart.assert_called_once()
 
     def test_removed_file_disappears_from_library_and_preview(self):
         clips = self.populate(1)

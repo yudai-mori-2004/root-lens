@@ -101,7 +101,7 @@ class VideoPreview(QWidget):
         self.mute_button.setEnabled(enabled)
         self.timeline.setEnabled(enabled and self.player.isSeekable())
 
-    def load(self, path):
+    def load(self, path, *, autoplay=False):
         path = Path(path)
         if is_link(path) or not path.is_file():
             self.clear()
@@ -109,6 +109,9 @@ class VideoPreview(QWidget):
             self.message.show()
             return
         if path == self.path:
+            if autoplay:
+                self.player.setPosition(0)
+                self.player.play()
             return
         self.player.stop()
         self.path = path
@@ -120,6 +123,8 @@ class VideoPreview(QWidget):
         self.duration_label.setText("00:00")
         self.player.setSource(QUrl.fromLocalFile(str(path)))
         self._enable(True)
+        if autoplay:
+            self.player.play()
 
     def clear(self):
         self.player.stop()

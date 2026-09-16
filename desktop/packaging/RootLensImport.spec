@@ -30,7 +30,7 @@ archive = PYZ(analysis.pure)
 executable = EXE(
     archive, analysis.scripts, [],
     exclude_binaries=True,
-    name="RootLens Import",
+    name="RootLens Importer",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -51,7 +51,7 @@ collection = COLLECT(
 if sys.platform == "darwin":
     application = BUNDLE(
         collection,
-        name="RootLens Import.app",
+        name="RootLens Importer.app",
         icon=str(packaging / "icons/rootlens.icns"),
         bundle_identifier="io.rootlens.import",
         info_plist={

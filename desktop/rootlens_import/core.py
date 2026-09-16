@@ -59,6 +59,7 @@ class ClipProgress:
     error: str = ""
     position: int = 0
     total: int = 0
+    unit_id: Optional[str] = None
 
 
 def check_cancelled(cancel_event):

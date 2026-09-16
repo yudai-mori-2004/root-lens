@@ -245,9 +245,15 @@ class DeviceCleanupTests(unittest.TestCase):
         self.clean()
         self.assertFalse(self.path.exists())
 
+    def test_legacy_content_hash_is_removed_only_after_drive_files_are_verified(self):
+        (self.path / "content_hash.txt").write_text("old device digest\n")
+        self.clean()
+        self.assertFalse(self.path.exists())
+        self.assertGreaterEqual(len(self.reads), 2)
+
     def test_finalized_camera_diagnostics_and_scratch_indexes_can_be_retired_and_resumed(self):
         extras = set(AUXILIARY_FILES) - set(FIXTURE_AUXILIARY)
-        self.assertEqual(extras, {"camera_capture_failures.txt", "camera_index.bin", "video_index.bin",
+        self.assertEqual(extras, {"content_hash.txt", "camera_capture_failures.txt", "camera_index.bin", "video_index.bin",
                                   "accelerometer_index.bin", "gyroscope_index.bin"})
         for interrupted in (False, True):
             with self.subTest(interrupted=interrupted):

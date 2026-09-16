@@ -1,6 +1,6 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db/client";
-import { approvalRequests, consentSnapshots } from "@/db/schema";
+import { approvalRequests, consentSnapshots, sites } from "@/db/schema";
 import { APPROVAL_STATEMENT } from "@/lib/approval-record";
 import { secureEqual } from "@/lib/desktop-auth-values";
 import { sha256 } from "@/lib/encoding";
@@ -12,6 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const token = typeof body?.token === "string" ? body.token : "";
   const [approval] = await db.select({
     personId: approvalRequests.personId,
+    siteName: sites.name,
     unitId: approvalRequests.unitId,
     files: approvalRequests.files,
     consentSnapshotId: approvalRequests.consentSnapshotId,
@@ -19,6 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     snapshotRecords: consentSnapshots.records,
   }).from(approvalRequests)
     .innerJoin(consentSnapshots, eq(consentSnapshots.id, approvalRequests.consentSnapshotId))
+    .innerJoin(sites, eq(sites.id, approvalRequests.siteId))
     .where(and(eq(approvalRequests.id, id), gt(approvalRequests.expiresAt, new Date()), eq(approvalRequests.completed, false)))
     .limit(1);
   if (!approval || !secureEqual(sha256(token), approval.tokenSha256)) {
@@ -35,6 +37,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   return Response.json({
     statement: APPROVAL_STATEMENT,
+    siteName: approval.siteName,
     unitId: approval.unitId,
     files: approval.files,
     consentSnapshot: {
