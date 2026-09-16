@@ -4,10 +4,16 @@ import { agreementRecords, operatorMemberships, people, sites } from "@/db/schem
 import { siteOperator } from "@/lib/site-membership";
 
 export async function managedSites(identityId: string) {
-  return db.select({ id: sites.id, name: sites.name, role: people.role })
+  return db.select({
+    id: sites.id, name: sites.name, role: people.role,
+    personName: people.name, jobTitle: people.jobTitle,
+    siteAgreementId: agreementRecords.id,
+  })
     .from(operatorMemberships)
     .innerJoin(people, eq(people.id, operatorMemberships.personId))
     .innerJoin(sites, eq(sites.id, people.siteId))
+    .leftJoin(agreementRecords, and(eq(agreementRecords.siteId, sites.id),
+      eq(agreementRecords.kind, "site_agreement"), eq(agreementRecords.status, "active")))
     .where(and(eq(operatorMemberships.identityId, identityId), eq(people.status, "active"),
       eq(sites.status, "active"), sql`${people.role} IN ('admin', 'supervisor')`));
 }

@@ -17,7 +17,6 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
   const router = useRouter();
   const data = initialData;
   const initialMember = data.members.find((item) => item.id === personId)!;
-  const [name, setName] = useState(initialMember.name);
   const [jobTitle, setJobTitle] = useState(initialMember.jobTitle ?? "");
   const [note, setNote] = useState(initialMember.note ?? "");
   const [role, setRole] = useState<Role>(initialMember.role as Role);
@@ -37,11 +36,11 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
     event.preventDefault(); setBusy(true); setError("");
     try {
       const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, {
-        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, jobTitle, note, role }),
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: member.name, jobTitle, note, role }),
       });
       if (response.status === 401) return router.push(`/login?next=/manage/${siteId}`);
       if (!response.ok) throw new Error((await response.json()).error ?? "保存できませんでした。");
-      if (embedded) onChanged?.({ ...member, name, jobTitle: jobTitle || null, note: note || null, role });
+      if (embedded) onChanged?.({ ...member, jobTitle: jobTitle || null, note: note || null, role });
       else router.push(data.site.personId === personId && role === "staff" ? "/manage" : `/manage/${siteId}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "保存できませんでした。"); }
     finally { setBusy(false); }
@@ -60,14 +59,15 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
   const content = <>
     {embedded ? <button type="button" className={styles.backLink} onClick={onClose}>← スタッフ一覧に戻る</button>
       : <Link className={styles.backLink} href={`/manage/${siteId}`}>← {data.site.name}</Link>}
-    <h1 className={styles.title}>スタッフのプロフィール</h1>
+    <h1 className={styles.title}>{member.name}</h1>
     <>
-      <form onSubmit={save}>
-        <div className={styles.field}><label htmlFor="memberName">氏名</label><input id="memberName" value={name} maxLength={100} required autoFocus={embedded} onChange={(event) => setName(event.target.value)} /></div>
+      <form className={styles.profileForm} onSubmit={save}>
+        <div className={styles.profileFormGrid}>
         <div className={styles.field}><label htmlFor="jobTitle">担当・役職</label><input id="jobTitle" value={jobTitle} maxLength={100} onChange={(event) => setJobTitle(event.target.value)} placeholder="例：調理担当" /></div>
         <div className={styles.field}><label htmlFor="role">権限</label><select id="role" value={role} disabled={Boolean(lastSupervisor) || (member.role === "supervisor" && !canChangeSupervisor)} onChange={(event) => setRole(event.target.value as Role)}><option value="staff">スタッフ</option><option value="admin">管理者</option><option value="supervisor" disabled={!canChangeSupervisor}>現場監督者</option></select>{lastSupervisor && <span className={styles.roleHint}>最後の現場監督者は変更できません</span>}</div>
-        <div className={styles.field}><label htmlFor="memberNote">現場用メモ</label><textarea id="memberNote" value={note} maxLength={1000} rows={4} onChange={(event) => setNote(event.target.value)} placeholder="担当業務などを記録できます" /></div>
-        <button className={styles.button} disabled={busy || !name.trim()}>{busy ? "保存中…" : "変更を保存"}</button>
+        </div>
+        <div className={styles.field}><label htmlFor="memberNote">現場用メモ</label><textarea id="memberNote" value={note} maxLength={1000} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="担当業務などを記録できます" /></div>
+        <button className={styles.button} disabled={busy}>{busy ? "保存中…" : "変更を保存"}</button>
       </form>
       <section className={styles.profileRecord}>
         <h2 className={styles.sectionTitle}>登録と同意</h2>
@@ -76,7 +76,6 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
           <dt>SMSアカウント</dt><dd>{member.identityId ? (member.phoneLast4 ? `登録済み · 末尾 ${member.phoneLast4}` : "登録済み") : "招待待ち"}</dd>
           <dt>撮影参加への同意</dt><dd>{member.consentId ? <>{new Date(member.consentSignedAt!).toLocaleString("ja-JP")}<br /><a className={styles.link} href={`/verify/${member.consentId}`} target="_blank">同意記録を確認</a></> : "未同意"}</dd>
         </dl>
-        <p className={styles.meta}>氏名の変更は、成立済みの同意記録には反映されません。</p>
       </section>
       <section className={styles.deleteSection}>
         <button type="button" className={styles.deleteButton} disabled={busy || Boolean(lastSupervisor)} onClick={() => setConfirmDelete(true)}><Image src="/trash.svg" alt="" width={18} height={18} />スタッフを削除</button>
