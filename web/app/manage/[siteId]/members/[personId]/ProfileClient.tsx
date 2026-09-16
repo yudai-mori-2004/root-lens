@@ -5,43 +5,44 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/shared/SiteHeader";
+import type { ManagedSiteData } from "@/lib/operator-data";
 import styles from "../../../operator.module.css";
 
 type Role = "staff" | "admin" | "supervisor";
-type Member = { id: string; name: string; jobTitle: string | null; note: string | null; role: Role; identityId: string | null; consentId: string | null; consentSignedAt: string | null; phoneLast4: string | null; createdAt: string };
-type Data = { site: { name: string; role: "admin" | "supervisor"; personId: string }; members: Member[] };
 
-export default function ProfileClient({ siteId, personId }: { siteId: string; personId: string }) {
+export default function ProfileClient({ siteId, personId, initialData, embedded = false, onClose, onChanged, onRemoved }: {
+  siteId: string; personId: string; initialData: ManagedSiteData; embedded?: boolean;
+  onClose?: () => void; onChanged?: (member: ManagedSiteData["members"][number]) => void; onRemoved?: () => void;
+}) {
   const router = useRouter();
-  const [data, setData] = useState<Data | null>(null);
-  const [name, setName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [note, setNote] = useState("");
-  const [role, setRole] = useState<Role>("staff");
+  const data = initialData;
+  const initialMember = data.members.find((item) => item.id === personId)!;
+  const [name, setName] = useState(initialMember.name);
+  const [jobTitle, setJobTitle] = useState(initialMember.jobTitle ?? "");
+  const [note, setNote] = useState(initialMember.note ?? "");
+  const [role, setRole] = useState<Role>(initialMember.role as Role);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    fetch(`/api/operator/sites/${siteId}`).then(async (response) => {
-      if (response.status === 401) return router.replace(`/login?next=/manage/${siteId}/members/${personId}`);
-      if (!response.ok) return setError((await response.json()).error);
-      const value: Data = await response.json();
-      const member = value.members.find((item) => item.id === personId);
-      if (!member) return setError("スタッフが見つかりません。");
-      setData(value); setName(member.name); setJobTitle(member.jobTitle ?? ""); setNote(member.note ?? ""); setRole(member.role);
-    }).catch(() => setError("プロフィールを読み込めませんでした。"));
-  }, [router, siteId, personId]);
-  const member = data?.members.find((item) => item.id === personId);
-  const lastSupervisor = member?.role === "supervisor" && data?.members.filter((item) => item.role === "supervisor" && item.identityId).length === 1;
-  const canChangeSupervisor = data?.site.role === "supervisor";
+    if (!embedded) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [embedded, onClose]);
+  const member = initialMember;
+  const lastSupervisor = member.role === "supervisor" && data.members.filter((item) => item.role === "supervisor" && item.identityId).length === 1;
+  const canChangeSupervisor = data.site.role === "supervisor";
   async function save(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
       const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, {
         method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, jobTitle, note, role }),
       });
+      if (response.status === 401) return router.push(`/login?next=/manage/${siteId}`);
       if (!response.ok) throw new Error((await response.json()).error ?? "保存できませんでした。");
-      router.push(data?.site.personId === personId && role === "staff" ? "/manage" : `/manage/${siteId}`);
+      if (embedded) onChanged?.({ ...member, name, jobTitle: jobTitle || null, note: note || null, role });
+      else router.push(data.site.personId === personId && role === "staff" ? "/manage" : `/manage/${siteId}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "保存できませんでした。"); }
     finally { setBusy(false); }
   }
@@ -49,17 +50,20 @@ export default function ProfileClient({ siteId, personId }: { siteId: string; pe
     setBusy(true); setError("");
     try {
       const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, { method: "DELETE" });
+      if (response.status === 401) return router.push(`/login?next=/manage/${siteId}`);
       if (!response.ok) throw new Error((await response.json()).error ?? "削除できませんでした。");
-      router.push(data?.site.personId === personId ? "/manage" : `/manage/${siteId}`);
+      if (embedded) onRemoved?.();
+      else router.push(data.site.personId === personId ? "/manage" : `/manage/${siteId}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "削除できませんでした。"); }
     finally { setBusy(false); }
   }
-  return <div className={styles.shell}><SiteHeader /><main className={`${styles.main} ${styles.narrow}`}>
-    <Link className={styles.backLink} href={`/manage/${siteId}`}>← {data?.site.name ?? "事業所"}</Link>
+  const content = <>
+    {embedded ? <button type="button" className={styles.backLink} onClick={onClose}>← スタッフ一覧に戻る</button>
+      : <Link className={styles.backLink} href={`/manage/${siteId}`}>← {data.site.name}</Link>}
     <h1 className={styles.title}>スタッフのプロフィール</h1>
-    {member && <>
+    <>
       <form onSubmit={save}>
-        <div className={styles.field}><label htmlFor="memberName">氏名</label><input id="memberName" value={name} maxLength={100} required onChange={(event) => setName(event.target.value)} /></div>
+        <div className={styles.field}><label htmlFor="memberName">氏名</label><input id="memberName" value={name} maxLength={100} required autoFocus={embedded} onChange={(event) => setName(event.target.value)} /></div>
         <div className={styles.field}><label htmlFor="jobTitle">担当・役職</label><input id="jobTitle" value={jobTitle} maxLength={100} onChange={(event) => setJobTitle(event.target.value)} placeholder="例：調理担当" /></div>
         <div className={styles.field}><label htmlFor="role">権限</label><select id="role" value={role} disabled={Boolean(lastSupervisor) || (member.role === "supervisor" && !canChangeSupervisor)} onChange={(event) => setRole(event.target.value as Role)}><option value="staff">スタッフ</option><option value="admin">管理者</option><option value="supervisor" disabled={!canChangeSupervisor}>現場監督者</option></select>{lastSupervisor && <span className={styles.roleHint}>最後の現場監督者は変更できません</span>}</div>
         <div className={styles.field}><label htmlFor="memberNote">現場用メモ</label><textarea id="memberNote" value={note} maxLength={1000} rows={4} onChange={(event) => setNote(event.target.value)} placeholder="担当業務などを記録できます" /></div>
@@ -82,7 +86,10 @@ export default function ProfileClient({ siteId, personId }: { siteId: string; pe
           <div className={styles.actions}><button type="button" className={styles.deleteButton} disabled={busy} onClick={remove}>削除する</button><button type="button" className={`${styles.button} ${styles.buttonSecondary}`} disabled={busy} onClick={() => setConfirmDelete(false)}>キャンセル</button></div>
         </div>}
       </section>
-    </>}
+    </>
     {error && <p className={styles.error}>{error}</p>}
-  </main></div>;
+  </>;
+  return embedded ? <div className={styles.profileOverlay} role="dialog" aria-modal="true" aria-label={`${member.name}のプロフィール`}>
+    <div className={styles.profileDialog}>{content}</div>
+  </div> : <div className={styles.shell}><SiteHeader /><main className={`${styles.main} ${styles.narrow}`}>{content}</main></div>;
 }

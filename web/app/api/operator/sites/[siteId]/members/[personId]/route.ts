@@ -15,7 +15,7 @@ const bodySchema = z.object({
 export async function PATCH(request: Request, context: { params: Promise<{ siteId: string; personId: string }> }) {
   const identityId = await authenticateOperator(request);
   const { siteId, personId } = await context.params;
-  if (!identityId) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
+  if (!identityId) return Response.json({ error: "ログインが必要です。" }, { status: 401 });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "プロフィールを確認してください。" }, { status: 400 });
   const nextRole = parsed.data.role as SiteRole;
@@ -57,7 +57,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ siteI
 export async function DELETE(request: Request, context: { params: Promise<{ siteId: string; personId: string }> }) {
   const identityId = await authenticateOperator(request);
   const { siteId, personId } = await context.params;
-  if (!identityId) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
+  if (!identityId) return Response.json({ error: "ログインが必要です。" }, { status: 401 });
   return db.transaction(async (transaction) => {
     const [site] = await transaction.select({ id: sites.id }).from(sites)
       .where(and(eq(sites.id, siteId), eq(sites.status, "active"))).for("update");

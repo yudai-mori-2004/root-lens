@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   try {
     const identity = await verifySmsCode(parsed.data.phone, parsed.data.code);
     const response = NextResponse.json({ authenticated: true });
-    response.cookies.set(OPERATOR_COOKIE, issueOperatorCookie(identity.identityId), {
+    response.cookies.set(OPERATOR_COOKIE, issueOperatorCookie(identity.identityId, parsed.data.phone.slice(-4)), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

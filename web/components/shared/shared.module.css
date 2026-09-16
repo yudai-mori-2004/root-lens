@@ -77,7 +77,7 @@
   position: absolute;
   top: calc(100% + var(--space-xs));
   right: var(--page-gutter);
-  width: min(28rem, calc(100vw - (var(--page-gutter) * 2)));
+  width: min(42rem, calc(100vw - (var(--page-gutter) * 2)));
   display: grid;
   border: var(--rule-thin) solid var(--color-rule-strong);
   background: var(--color-paper);
@@ -100,9 +100,9 @@
 }
 
 .navMenuSecondary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-md);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--page-gutter);
 }
 

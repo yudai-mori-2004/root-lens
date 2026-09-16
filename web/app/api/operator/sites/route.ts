@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { agreementRecords, operatorMemberships, people, sites } from "@/db/schema";
 import { storeAgreementOriginal } from "@/lib/agreement-service";
 import { operatorPhoneLast4 } from "@/lib/operator-identity";
 import { authenticateOperator } from "@/lib/operator-browser";
+import { managedSites } from "@/lib/operator-data";
 import { provisionSiteDrive } from "@/lib/site-provisioning";
 
 const bodySchema = z.object({
@@ -17,16 +17,7 @@ const bodySchema = z.object({
 export async function GET(request: Request) {
   const identityId = await authenticateOperator(request);
   if (!identityId) return Response.json({ error: "ログインが必要です。" }, { status: 401 });
-  const rows = await db.select({ id: sites.id, name: sites.name, role: people.role })
-    .from(operatorMemberships)
-    .innerJoin(people, eq(people.id, operatorMemberships.personId))
-    .innerJoin(sites, eq(sites.id, people.siteId))
-    .where(and(
-      eq(operatorMemberships.identityId, identityId),
-      eq(people.status, "active"),
-      eq(sites.status, "active"),
-      sql`${people.role} IN ('admin', 'supervisor')`,
-    ));
+  const rows = await managedSites(identityId);
   return Response.json({ sites: rows });
 }
 

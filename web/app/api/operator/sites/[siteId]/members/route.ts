@@ -12,7 +12,8 @@ const bodySchema = z.object({ name: z.string().trim().min(1).max(100) });
 export async function POST(request: Request, context: { params: Promise<{ siteId: string }> }) {
   const identityId = await authenticateOperator(request);
   const { siteId } = await context.params;
-  const operator = identityId ? await siteOperator(identityId, siteId) : null;
+  if (!identityId) return Response.json({ error: "ログインが必要です。" }, { status: 401 });
+  const operator = await siteOperator(identityId, siteId);
   if (!operator) return Response.json({ error: "この操作を行う権限がありません。" }, { status: 403 });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "スタッフの氏名を入力してください。" }, { status: 400 });
