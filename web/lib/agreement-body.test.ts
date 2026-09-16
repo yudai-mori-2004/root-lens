@@ -18,7 +18,9 @@ describe("electronic agreement body", () => {
     expect(body).not.toContain("| 記入欄 |");
     expect(agreementTemplates.staff_consent.sha256).toBe(sha256(body));
     const page = renderToStaticMarkup(createElement(AgreementDocument, { body }));
-    expect(page).toMatch(/<ul\b/);
+    expect(page).toContain("第1条（撮影するもの）");
+    expect(page).toContain("<span>1</span>作業中の動画");
+    expect(page).toContain("<span>(1)</span>映っている方の特定");
     expect(page).not.toContain("[ ]");
     expect(page).not.toContain("記入欄");
     expect(page).toContain("撮影参加に関する同意書");
@@ -28,7 +30,7 @@ describe("electronic agreement body", () => {
     expect(staffConsentConfirmations).toHaveLength(5);
     expect(staffConsentConfirmations[0]).toBe("作業中の動画（映像と音声）とIMUセンサーによるデータが記録されることに同意します。");
     expect(staffConsentConfirmations[4]).toContain("すべてを回収・削除できない場合があることを確認しました。");
-    expect(staffConsentDocument).not.toContain("## 同意の確認");
+    expect(staffConsentDocument).not.toContain("第4条（同意の確認）");
     expect(staffConsentAcceptance.safeParse({ confirmations: [true, true, true, true, true] }).success).toBe(true);
     expect(staffConsentAcceptance.safeParse({ confirmations: [true, true, false, true, true] }).success).toBe(false);
     expect(staffConsentAcceptance.safeParse({ confirmations: [true] }).success).toBe(false);
