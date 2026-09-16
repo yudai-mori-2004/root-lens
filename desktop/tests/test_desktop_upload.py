@@ -74,7 +74,7 @@ class UploadDesktopTests(unittest.TestCase):
             snapshots = kwargs['drive_reader']({record.unit_id for record in current})
         except ImportFailure:
             raise ImportFailure('Google Driveの保存状況を確認できません') from None
-        kwargs['on_drive_checked'](snapshots)
+        kwargs['on_drive_checked'](snapshots, '')
         sources = {}
         for record in current:
             name = self.names[record.unit_id]
@@ -201,7 +201,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.recording_list.topLevelItemCount(), 0)
         self.assertIsNone(self.window.preview.path)
         self.assertFalse(self.window.upload_button.isEnabled())
-        self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
+        self.assertFalse(self.clips[0].exists())
         self.assertIn("アップロードが完了", self.window.status_label.text())
         self.assertEqual(self.window.count_label.text(), "アップロード待ち 0 件")
 
@@ -223,7 +223,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.count_label.text(), "アップロード待ち 1 件")
         self.assertNotIn('drive_recordings', self.importer.call_args.kwargs)
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
-        self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
+        self.assertFalse(self.clips[0].exists())
 
     def test_drive_deletion_does_not_resurrect_a_removed_device_clip_from_local_copy(self):
         self.uploader.upload_recording.side_effect = self.uploaded_to_drive
@@ -236,7 +236,7 @@ class UploadDesktopTests(unittest.TestCase):
         self.assertEqual([record.path for record in self.window.records], [self.clips[1]])
         self.assertEqual(self.window.count_label.text(), 'アップロード待ち 1 件')
         self.assertEqual(self.drive_reader.call_args.args[1], {self.records[1].unit_id})
-        self.assertEqual({p.name for p in self.clips[0].iterdir()}, set(FILES))
+        self.assertFalse(self.clips[0].exists())
 
     def test_cleanup_uses_original_source_even_when_preview_selection_changes(self):
         self.window.start_import()

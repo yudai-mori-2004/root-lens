@@ -211,13 +211,13 @@ class RootLensGateway:
         self.token = token
         self.site_id = site_id
 
-    def _request(self, method, path, body=None, failure_message="RootLensで処理を完了できませんでした。しばらくしてからやり直してください。"):
+    def _request(self, method, path, body=None, failure_message="RootLensで処理を完了できませんでした。しばらくしてからやり直してください。", timeout=(10, 60)):
         headers = {"Accept": "application/json", "Authorization": "Bearer " + self.token,
                    "X-RootLens-Site-Id": self.site_id}
         try:
             response = self.account.session.request(
                 method, self.account.api_origin + path, headers=headers, json=body,
-                timeout=(10, 60), allow_redirects=False,
+                timeout=timeout, allow_redirects=False,
             )
         except Exception as error:
             raise ImportFailure("RootLensへ接続できません。インターネット接続を確認してください。") from error
@@ -233,7 +233,8 @@ class RootLensGateway:
 
     def current_recordings(self, unit_ids):
         value = self._request("POST", "/api/v1/drive-recordings", {"unitIds": sorted(unit_ids)},
-                              "Google Driveの録画情報を読み込めませんでした。もう一度接続してください。")
+                              "Google Driveの録画情報を読み込めませんでした。もう一度接続してください。",
+                              timeout=(3, 10))
         rows = value.get("recordings")
         if not isinstance(rows, list):
             raise ImportFailure("Google Driveの録画情報を読み込めませんでした。もう一度接続してください。")

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .core import ClipProgress, ImportCancelled, ImportFailure
-from .device_sync import sync_recordings, cleanup_uploaded_recording
+from .device_sync import sync_recordings, cleanup_uploaded_recording, remove_uploaded_local_copy
 from .branding import APP_NAME, app_icon
 from .account import RootLensAccount
 from .approval import approve_recording
@@ -30,6 +30,7 @@ PROGRESS_LABELS = {
     "discovering": "確認中", "importing": "取り込み中", "verifying": "確認中",
     "ready": "未アップロード", "drive_saved": "Driveに保存済み",
     "deleting": "端末から削除中", "cleanup_pending": "端末の削除待ち",
+    "local_cleanup_pending": "PCのコピー削除待ち",
     "incomplete": "録画が未完了", "error": "取り込みエラー",
 }
 
@@ -470,10 +471,10 @@ class ImportWindow(QMainWindow):
         self.folder_button.setEnabled(record is not None and not self.closing)
         self.drive_button.setEnabled(self.profile is not None and not self.closing)
         upload_ready = (record is not None and self.profile is not None
-                        and not self.busy and not self.closing)
+                        and not self.busy and not self.closing and not self.completion_error)
         self.upload_button.setEnabled(bool(upload_ready))
-        self.upload_button.setToolTip("" if self.profile
-                                     else "「設定」からSMSでログインしてください。")
+        self.upload_button.setToolTip(self.completion_error if self.completion_error else
+                                     ("" if self.profile else "「設定」からSMSでログインしてください。"))
         self.cancel_upload_button.setVisible(self.busy and self.job_kind == "upload")
         self.cancel_upload_button.setEnabled(self.busy and self.job_kind == "upload" and not self.cancel_event.is_set())
         allowed = [i for i, item in enumerate(self.records)
@@ -507,7 +508,7 @@ class ImportWindow(QMainWindow):
                                         site_id=profile.site_id,
                                         drive_reader=lambda unit_ids: self.drive_reader(
                                             profile, unit_ids, self.cancel_event, self.gateway_factory(profile)),
-                                        on_drive_checked=lambda recordings: self.signals.drive_checked.emit(recordings, ""))
+                                        on_drive_checked=lambda recordings, error: self.signals.drive_checked.emit(recordings, error))
                 self.signals.done.emit(summary, "", False)
             except ImportCancelled:
                 self.signals.done.emit(None, "", True)
@@ -583,6 +584,8 @@ class ImportWindow(QMainWindow):
                 parts.append(f"取り込みエラー {summary.failed} 件")
             if getattr(summary, "cleanup_pending", 0):
                 parts.append("端末から削除できなかった録画があります。もう一度「接続」を押してください。")
+            if getattr(summary, "local_cleanup_pending", 0):
+                parts.append("PCのコピーを削除できなかった録画があります。保存先を確認してください。")
             if self.completion_error:
                 parts.append(self.completion_error)
             self.status_label.setText(" ／ ".join(parts))
@@ -699,10 +702,20 @@ class ImportWindow(QMainWindow):
                     and result.unit_id == record.unit_id and not error and not cancelled)
         if verified:
             name = self._recording_name(record)
-            self.progress_states[name] = ClipProgress(name, None,
-                "cleanup_pending" if cleanup_error else "drive_saved", cleanup_error)
+            device_cleanup_error = bool(cleanup_error)
             self.device_sources.pop(record.unit_id, None)
             self.recording_names.pop(record.unit_id, None)
+            if self.preview.path == record.path / "rgb.mp4":
+                self.preview.clear()
+            local_cleanup_error = False
+            try:
+                remove_uploaded_local_copy(self.recordings_root, record.unit_id)
+            except (ImportFailure, OSError):
+                local_cleanup_error = True
+                cleanup_error = (cleanup_error + " " if cleanup_error else "") + "PCのコピーを削除できませんでした。次の接続時に再確認します。"
+            self.progress_states[name] = ClipProgress(name, None,
+                "cleanup_pending" if device_cleanup_error else
+                "local_cleanup_pending" if local_cleanup_error else "drive_saved", cleanup_error)
         self.refresh_recordings()
         if self.closing:
             self.close()

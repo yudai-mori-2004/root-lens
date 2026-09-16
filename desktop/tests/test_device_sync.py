@@ -149,16 +149,68 @@ class DeviceSyncTests(unittest.TestCase):
         result = self.sync()
         self.assertEqual(result.sources, {})
         self.assertEqual(self.events, [])
-        self.reader.assert_not_called()
+        self.reader.assert_called_once_with({self.unit_id})
         self.assertTrue(any(self.output.iterdir()))
 
-    def test_drive_error_does_not_copy_or_delete(self):
+    def test_drive_error_still_imports_without_deleting(self):
         self.reader.side_effect = RuntimeError("secret request headers")
-        with self.assertRaises(core.ImportFailure) as error:
-            self.sync()
-        self.assertNotIn("secret", str(error.exception))
+        checked = []
+        result = device_sync.sync_recordings(
+            self.output, drive_reader=self.reader, site_id="fixture", log=lambda _: None,
+            on_drive_checked=lambda recordings, error: checked.append((recordings, error)),
+        )
+        self.assertEqual(result.imported, 1)
+        self.assertEqual(checked[0][0], {})
+        self.assertIn("保存状況を確認できません", checked[0][1])
+        self.assertNotIn("secret", checked[0][1])
         self.cleanup.assert_not_called()
-        self.assertEqual(self.adb.pulled, [])
+        self.assertEqual(self.adb.pulled, list(core.FILES))
+
+    def test_saved_clip_removes_matching_pc_copy_after_device_cleanup(self):
+        self.sync()
+        self.reader.reset_mock()
+        files = {name: {"size": (self.source / name).stat().st_size,
+                        "sha256": hashlib.sha256((self.source / name).read_bytes()).hexdigest()}
+                 for name in core.FILES}
+        self.reader.return_value = {self.unit_id: SimpleNamespace(unit_id=self.unit_id, files=files)}
+        result = self.sync()
+        self.assertEqual((result.cleaned, result.local_cleaned), (1, 1))
+        self.assertFalse((self.output / self.unit_id).exists())
+
+    def test_saved_copy_is_removed_after_device_clip_disappeared(self):
+        self.sync()
+        files = {name: {"size": (self.source / name).stat().st_size,
+                        "sha256": hashlib.sha256((self.source / name).read_bytes()).hexdigest()}
+                 for name in core.FILES}
+        self.adb.clip_names = lambda root: []
+        self.reader.return_value = {self.unit_id: SimpleNamespace(unit_id=self.unit_id, files=files)}
+        result = self.sync()
+        self.assertEqual(result.local_cleaned, 1)
+        self.assertFalse((self.output / self.unit_id).exists())
+
+    def test_partially_deleted_copy_is_finished_on_reconnect(self):
+        self.sync()
+        files = {name: {"size": (self.source / name).stat().st_size,
+                        "sha256": hashlib.sha256((self.source / name).read_bytes()).hexdigest()}
+                 for name in core.FILES}
+        (self.output / self.unit_id / "rgb.mp4").unlink()
+        self.adb.clip_names = lambda root: []
+        self.reader.return_value = {self.unit_id: SimpleNamespace(unit_id=self.unit_id, files=files)}
+        result = self.sync()
+        self.assertEqual(result.local_cleaned, 1)
+        self.assertFalse((self.output / self.unit_id).exists())
+
+    def test_mismatched_saved_copy_is_retained(self):
+        self.sync()
+        self.adb.clip_names = lambda root: []
+        self.reader.return_value = {self.unit_id: SimpleNamespace(
+            unit_id=self.unit_id,
+            files={name: {"size": 1, "sha256": "0" * 64} for name in core.FILES},
+        )}
+        result = self.sync()
+        self.assertEqual(result.local_cleaned, 0)
+        self.assertEqual(result.local_cleanup_pending, 1)
+        self.assertTrue((self.output / self.unit_id).exists())
 
     def test_pending_cleanup_uses_unit_id_even_if_metadata_was_removed(self):
         self.adb.clip_names = lambda root: []
@@ -170,6 +222,17 @@ class DeviceSyncTests(unittest.TestCase):
         self.assertEqual(result.cleaned, 1)
         self.assertEqual(self.reader.call_args.args[0], {self.unit_id})
         self.assertEqual(self.cleanup.call_args.args[2:4], (item.name, self.unit_id))
+
+    def test_offline_pending_cleanup_is_deferred_without_rechecking_drive(self):
+        self.adb.clip_names = lambda root: []
+        self.pending.return_value = [SimpleNamespace(
+            name="pending-device-directory", original_name=self.name, unit_id=self.unit_id,
+        )]
+        self.reader.side_effect = RuntimeError("offline")
+        result = self.sync()
+        self.assertEqual(result.cleanup_pending, 1)
+        self.assertEqual(self.reader.call_count, 1)
+        self.cleanup.assert_not_called()
 
     def test_cleanup_failure_stays_visible_without_retransmitting(self):
         self.reader.return_value = {self.unit_id: object()}

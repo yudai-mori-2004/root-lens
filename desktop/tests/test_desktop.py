@@ -157,7 +157,7 @@ class DesktopTests(unittest.TestCase):
             self.assertNotIn('drive_recordings', kwargs)
             result = kwargs['drive_reader']({identity})
             self.assertIs(result, snapshots)
-            kwargs['on_drive_checked'](result)
+            kwargs['on_drive_checked'](result, '')
             return SyncSummary(kwargs['output'])
         self.window.importer = importer
         self.window.start_import()
@@ -165,6 +165,14 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(order, ['device', 'drive'])
         reader.assert_called_once_with(self.profile, {identity}, self.window.cancel_event, ANY)
         self.assertTrue(self.window.drive_synced)
+
+    def test_offline_import_remains_reviewable_but_cannot_upload(self):
+        clips = self.populate(1)
+        self.window._drive_checked({}, "Google Driveの保存状況を確認できません。")
+        self.assertEqual(self.window.selected_recording().path, clips[0])
+        self.assertEqual(self.window.preview.path, clips[0] / "rgb.mp4")
+        self.assertFalse(self.window.upload_button.isEnabled())
+        self.assertTrue(self.window.connect_button.isEnabled())
 
     def test_ready_progress_adds_clip_and_preserves_current_selection(self):
         clips = self.populate(1)

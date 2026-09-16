@@ -5,7 +5,8 @@ from pathlib import Path
 
 from .core import (
     Adb, ClipProgress, ImportCancelled, ImportFailure, check_cancelled, find_adb,
-    ensure_unit_id, import_clip, import_lock, is_link, recover_staging,
+    ensure_unit_id, import_clip, import_lock, is_link, recover_staging, UNIT_ID, FILES,
+    checksum, validate_local_files,
 )
 from .device_cleanup import cleanup_recording, discover_pending
 
@@ -29,7 +30,53 @@ class SyncSummary:
     failed: int = 0
     cleaned: int = 0
     cleanup_pending: int = 0
+    local_cleaned: int = 0
+    local_cleanup_pending: int = 0
     sources: dict[str, DeviceSource] = field(default_factory=dict)
+
+
+def remove_saved_local_copy(output, unit_id, recording):
+    """Remove an app-owned preview copy only when it matches the saved unit."""
+    directory = output / unit_id
+    if not directory.exists():
+        return False
+    if (not UNIT_ID.fullmatch(unit_id) or is_link(directory) or not directory.is_dir()
+            or recording is None or recording.unit_id != unit_id
+            or set(recording.files) != set(FILES)):
+        raise ImportFailure("PCの録画を安全に削除できません。保存先を確認してください。")
+    local_files = list(directory.iterdir())
+    if {path.name for path in local_files} - set(FILES) - {".DS_Store", "Thumbs.db", "desktop.ini"}:
+        raise ImportFailure("PCの録画を安全に削除できません。保存先を確認してください。")
+    for path in local_files:
+        if path.name not in FILES:
+            continue
+        name = path.name
+        saved = recording.files[name]
+        if (is_link(path) or not path.is_file() or path.stat().st_size != saved["size"]
+                or checksum(path) != saved["sha256"]):
+            raise ImportFailure("PCの録画とDriveの保存内容が一致しないため、PCの録画を残しました。")
+    _delete_local_directory(directory)
+    return True
+
+
+def _delete_local_directory(directory):
+    for path in directory.iterdir():
+        if is_link(path) or not path.is_file():
+            raise ImportFailure("PCの録画を安全に削除できません。保存先を確認してください。")
+        path.unlink()
+    directory.rmdir()
+
+
+def remove_uploaded_local_copy(output, unit_id):
+    """Discard the preview copy after the server has verified this upload."""
+    if not UNIT_ID.fullmatch(unit_id):
+        raise ImportFailure("PCの録画を安全に削除できません。保存先を確認してください。")
+    directory = output / unit_id
+    if not directory.exists():
+        return False
+    validate_local_files(directory)
+    _delete_local_directory(directory)
+    return True
 
 
 def _output_directory(output):
@@ -47,14 +94,15 @@ def _output_directory(output):
 def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                     on_clip=None, on_drive_checked=None, adb_path=None, package=None,
                     site_id="local"):
-    """Read USB first; Drive is queried only for unit ids currently on that device."""
+    """Import device recordings even offline; reconcile only known unit ids."""
     check_cancelled(cancel_event)
     adb = Adb(find_adb(adb_path), cancel_event=cancel_event)
     serial = adb.connect()
     selected_package = adb.package(package)
     root = f"/sdcard/Android/data/{selected_package}/files/recordings"
     output, staging = _output_directory(output)
-    counts = dict(imported=0, existing=0, incomplete=0, failed=0, cleaned=0, cleanup_pending=0)
+    counts = dict(imported=0, existing=0, incomplete=0, failed=0, cleaned=0,
+                  cleanup_pending=0, local_cleaned=0, local_cleanup_pending=0)
     sources = {}
 
     def report(name, state, path=None, error=""):
@@ -88,6 +136,12 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             log("端末からの削除が終わっていません。次の接続でもう一度確認します。")
         else:
             counts["cleaned"] += 1
+            try:
+                if remove_saved_local_copy(output, unit_id, fresh_recording(unit_id)):
+                    counts["local_cleaned"] += 1
+            except (ImportFailure, OSError) as error:
+                counts["local_cleanup_pending"] += 1
+                log(str(error))
             report(display_name, "drive_saved")
 
     with import_lock(staging):
@@ -115,11 +169,20 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             report(item.original_name, "deleting")
         unit_ids = set(complete.values()) | {item.unit_id for item in pending}
         log("スマートグラスの録画がDriveに保存されているか確認しています…")
-        snapshots = read_drive(unit_ids) if unit_ids else {}
+        drive_error = ""
+        try:
+            snapshots = read_drive(unit_ids) if unit_ids else {}
+        except ImportFailure as error:
+            drive_error = str(error)
+            snapshots = {}
         if on_drive_checked is not None:
-            on_drive_checked(snapshots)
+            on_drive_checked(snapshots, drive_error)
         for item in pending:
-            clean(item.name, item.unit_id, item.original_name)
+            if drive_error:
+                counts["cleanup_pending"] += 1
+                report(item.original_name, "cleanup_pending", error=drive_error)
+            else:
+                clean(item.name, item.unit_id, item.original_name)
         for name, unit_id in complete.items():
             check_cancelled(cancel_event)
             if unit_id in snapshots:
@@ -138,6 +201,23 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                 counts["failed"] += 1
                 report(name, "error", error=str(error))
                 log(str(error))
+        if not drive_error:
+            local_ids = {path.name for path in output.iterdir()
+                         if path.is_dir() and not is_link(path) and UNIT_ID.fullmatch(path.name)}
+            local_only = sorted(local_ids - set(complete.values()))
+            for start in range(0, len(local_only), 100):
+                try:
+                    saved = read_drive(set(local_only[start:start + 100]))
+                except ImportFailure as error:
+                    log(str(error))
+                    break
+                for unit_id, recording in saved.items():
+                    try:
+                        if remove_saved_local_copy(output, unit_id, recording):
+                            counts["local_cleaned"] += 1
+                    except (ImportFailure, OSError) as error:
+                        counts["local_cleanup_pending"] += 1
+                        log(str(error))
     return SyncSummary(output, **counts, sources=sources)
 
 

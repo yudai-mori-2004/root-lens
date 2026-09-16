@@ -55,7 +55,7 @@ class ImportSummary:
 class ClipProgress:
     name: str
     path: Optional[Path]
-    state: Literal["discovering", "importing", "verifying", "ready", "drive_saved", "cleanup_pending", "deleting", "incomplete", "error"]
+    state: Literal["discovering", "importing", "verifying", "ready", "drive_saved", "cleanup_pending", "local_cleanup_pending", "deleting", "incomplete", "error"]
     error: str = ""
 
 
