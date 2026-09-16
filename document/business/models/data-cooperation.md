@@ -15,8 +15,8 @@
 
 ## 現行文書
 
-- 店舗・事業所との基本合意：`documents/current/agreements/site-cooperation.md`
-- 撮影参加者本人の同意：`documents/current/consents/participant-consent.md`
+- 店舗・事業所との基本合意：`documents/current/agreements/site-cooperation-v1.0.md`
+- 撮影参加者本人の同意：`documents/current/consents/participant-consent-v1.0.md`
 - 米国向け追加説明：`documents/current/notices/foreign-transfer-us.md`
 
 ## 過去資料

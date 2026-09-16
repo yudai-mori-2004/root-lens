@@ -29,7 +29,7 @@
 
 ## 根拠文書
 
-- `document/business/documents/current/agreements/site-cooperation.md`
-- `document/business/documents/current/consents/participant-consent.md`
+- `document/business/documents/current/agreements/site-cooperation-v1.0.md`
+- `document/business/documents/current/consents/participant-consent-v1.0.md`
 - `document/business/documents/current/notices/foreign-transfer-us.md`
 - `document/legal/privacy-policy/ja.md`

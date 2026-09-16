@@ -271,8 +271,8 @@ Claruは8月10日時点で従来のパン屋サンプルを確認している。
 - Claru向けMentra能力説明：`progress/business/archive/partners/claru/mentra-live-capability.pdf`
 - Claru向けiPhone能力説明：`progress/business/archive/partners/claru/iphone-15-pro-capability.pdf`
 - Claruへの供給能力・価格返信案：`/Users/forest/Downloads/Claru_reply_EN.txt`
-- 店舗基本合意：`document/business/documents/current/agreements/site-cooperation.md`
-- 撮影参加者同意：`document/business/documents/current/consents/participant-consent.md`
+- 店舗基本合意：`document/business/documents/current/agreements/site-cooperation-v1.0.md`
+- 撮影参加者同意：`document/business/documents/current/consents/participant-consent-v1.0.md`
 - 米国提供の説明：`document/business/documents/current/notices/foreign-transfer-us.md`
 - Mentra実装記録：`document/v0.1.4/tasks/16-claru-mentra-capture/README.md`
 - iPhone実装記録：`document/v0.1.4/tasks/17-iphone-rgb-imu-capture/README.md`

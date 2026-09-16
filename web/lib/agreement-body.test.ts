@@ -27,5 +27,8 @@ describe("electronic agreement body", () => {
     expect(body).toContain("第15条（準拠法）");
     expect(body).not.toContain("合意日：");
     expect(agreementTemplates.site_agreement.sha256).toBe(sha256(agreementTemplates.site_agreement.body));
+    const page = renderToStaticMarkup(createElement(AgreementDocument, { body }));
+    expect(page).toContain("テスト事業所");
+    expect(page).not.toContain("合意日：");
   });
 });

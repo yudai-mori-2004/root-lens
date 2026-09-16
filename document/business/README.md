@@ -41,13 +41,15 @@ progress/business/
 
 | 用途 | Markdown正本 |
 |---|---|
-| 店舗・事業所との基本合意 | `documents/current/agreements/site-cooperation.md` |
-| 撮影参加者本人の同意 | `documents/current/consents/participant-consent.md` |
+| 店舗・事業所との基本合意 | `documents/current/agreements/site-cooperation-v1.0.md` |
+| 撮影参加者本人の同意 | `documents/current/consents/participant-consent-v1.0.md` |
 | 米国にある提供先への追加説明・同意 | `documents/current/notices/foreign-transfer-us.md` |
 
 案件ごとの協力費、提供先、納品条件などは基本合意書に固定せず、案件別の提示・記録で管理する。外国移転を伴う案件では、個人同意に加えて該当国の説明を表示し、その文書版と同意日時を記録する。
 
 ## ビルド
+
+以下のビルドは文書のプレビュー用です。現場合意・撮影参加同意の正式な電子同意原本は、`web/lib/agreement-original.ts` が同じMarkdown本文にSMS同意記録を付けて生成します。
 
 ```bash
 cd document/business
@@ -59,7 +61,7 @@ npm run build
 
 ```bash
 npm run build -- current
-npm run build -- current/consents/participant-consent.md
+npm run build -- current/consents/participant-consent-v1.0.md
 npm run build -- archive/flyers
 ```
 
@@ -71,7 +73,9 @@ npm run build -- archive/flyers
 2. front matterで `layout`、`page`、`margin`、`page_numbers` を指定する。
 3. 共通画像は、文書から `assets/` への相対パスで参照する。
 4. `npm run build -- <対象>` でPDFを生成する。
-5. PDFをレンダリングし、全ページの改ページ、欠落、画像、署名欄を目視確認する。
+5. PDFをレンダリングし、全ページの改ページ、欠落、画像を目視確認する。
+
+現行の2つの同意Markdownは電子同意用の条文で、紙の署名欄は含まない。Webの同意画面と、同意記録を末尾に付けてDriveへ保存するPDFは、どちらもこの同じ本文を使う。旧紙版PDFは `documents/archive/paper/` に保管する。
 
 旧フライヤーは現行化せず、冒頭にアーカイブ表示を付けて `documents/archive/flyers/` に保存する。旧合意書や旧運用マニュアルは正本として残さない。
 
