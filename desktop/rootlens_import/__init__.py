@@ -1,3 +1,3 @@
 """RootLens desktop USB import, recording review, and Drive upload."""
 
-__version__ = "0.4.6"
+__version__ = "0.4.7"

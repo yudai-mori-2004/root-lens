@@ -89,6 +89,39 @@ export class GoogleDriveClient {
     return matches[0];
   }
 
+  async filesInFolder(parentId: string, driveId: string): Promise<DriveFile[]> {
+    const files: DriveFile[] = [];
+    let pageToken: string | undefined;
+    do {
+      const query = new URLSearchParams({
+        q: `'${parentId}' in parents and trashed = false`,
+        corpora: "drive", driveId,
+        includeItemsFromAllDrives: "true", supportsAllDrives: "true",
+        pageSize: "1000", fields: "nextPageToken,files(id,name,mimeType,parents,driveId,trashed)",
+      });
+      if (pageToken) query.set("pageToken", pageToken);
+      const page = await this.send(`${API}/files?${query}`).then((response) => response.json()) as {
+        files?: DriveFile[];
+        nextPageToken?: string;
+      };
+      files.push(...(page.files ?? []));
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    return files;
+  }
+
+  async copyFile(fileId: string, name: string, parentId: string): Promise<void> {
+    const query = new URLSearchParams({ supportsAllDrives: "true", fields: "id,name,parents" });
+    const copied = await this.send(`${API}/files/${encodeURIComponent(fileId)}/copy?${query}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, parents: [parentId] }),
+    }).then((response) => response.json()) as DriveFile;
+    if (copied.name !== name || copied.parents?.[0] !== parentId) {
+      throw new Error("Drive installer copy did not land in the site folder");
+    }
+  }
+
   async createFolder(input: {
     id: string;
     name: string;

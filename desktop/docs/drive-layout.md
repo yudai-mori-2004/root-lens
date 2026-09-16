@@ -4,8 +4,13 @@
 
 ```text
 RootLens Submit/
+  アプリ配布/
+    RootLens-Import-<version>-macOS-arm64.dmg
+    RootLens-Import-Setup-<version>-windows-x64.exe
   現場データ収集/
     <事業所名>/
+      RootLens-Import-<version>-macOS-arm64.dmg
+      RootLens-Import-Setup-<version>-windows-x64.exe
       現場合意書/
       スタッフ同意書/
       承認済みデータ/

@@ -19,6 +19,16 @@ export async function provisionSiteDrive(siteName: string): Promise<ProvisionedS
   const drive = new GoogleDriveClient(await googleDriveSession());
   const sharedDrive = await drive.sharedDriveNamed(SHARED_DRIVE_NAME);
   const collection = await drive.folderNamed(COLLECTION_FOLDER_NAME, sharedDrive.id, sharedDrive.id);
+  const distribution = await drive.folderNamed("アプリ配布", sharedDrive.id, sharedDrive.id);
+  const installers = await drive.filesInFolder(distribution.id, sharedDrive.id);
+  const platformInstallers = [
+    /^RootLens-Import-\d+\.\d+\.\d+-macOS-(arm64|x86_64|universal2)\.dmg$/,
+    /^RootLens-Import-Setup-\d+\.\d+\.\d+-windows-x64\.exe$/,
+  ].map((pattern) => {
+    const matches = installers.filter((file) => pattern.test(file.name));
+    if (matches.length !== 1) throw new Error("Drive must have one current installer for each desktop platform");
+    return matches[0];
+  });
   const siteId = `site_${randomUUID()}`;
   const rootFolderId = await drive.generateId();
   await drive.createFolder({
@@ -37,6 +47,9 @@ export async function provisionSiteDrive(siteName: string): Promise<ProvisionedS
     });
     return id;
   };
+  for (const installer of platformInstallers) {
+    await drive.copyFile(installer.id, installer.name, rootFolderId);
+  }
   return {
     siteId,
     sharedDriveId: sharedDrive.id,

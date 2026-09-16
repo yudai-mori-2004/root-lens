@@ -156,6 +156,23 @@ signed package from Mentra support. An official Mentra-specific Windows download
 been identified in the referenced public instructions. Do not modify an INF file, disable
 signature enforcement, or replace a driver with a generic utility as part of the field guide.
 
+## Publish installers to sites
+
+After both platform builds pass their checks, publish the matching-version `.dmg` and `.exe`
+from a trusted maintainer machine. From `web/`:
+
+```sh
+node --env-file=.env.local scripts/sync-desktop-installers.mjs \
+  --mac /path/to/RootLens-Import-VERSION-macOS-arm64.dmg \
+  --windows /path/to/RootLens-Import-Setup-VERSION-windows-x64.exe
+```
+
+This first command only lists the site folders and planned files. Repeat it with `--apply` to
+upload the installers to `RootLens Submit/アプリ配布`, copy them to every folder directly under
+`RootLens Submit/現場データ収集`, and move older installers to Drive trash after verifying the
+copies' checksums. New sites receive the current pair from `アプリ配布` when created. The
+service account credential remains on the maintainer machine; CI does not receive Drive access.
+
 ## Release acceptance
 
 Run core, library and desktop tests before building. On each supported OS, verify a
