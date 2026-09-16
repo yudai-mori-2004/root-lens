@@ -110,7 +110,10 @@ export class GoogleDriveClient {
     return files;
   }
 
-  async copyFile(fileId: string, name: string, parentId: string): Promise<void> {
+  async copyFile(fileId: string, name: string, parentId: string, sharedDriveId: string): Promise<void> {
+    const existing = (await this.filesInFolder(parentId, sharedDriveId)).filter((file) => file.name === name);
+    if (existing.length === 1) return;
+    if (existing.length > 1) throw new Error("Duplicate installer copies in site folder");
     const query = new URLSearchParams({ supportsAllDrives: "true", fields: "id,name,parents" });
     const copied = await this.send(`${API}/files/${encodeURIComponent(fileId)}/copy?${query}`, {
       method: "POST",
@@ -128,6 +131,16 @@ export class GoogleDriveClient {
     parentId: string;
     appProperties: Record<string, string>;
   }): Promise<DriveFile> {
+    const existing = await this.fileOrNull(input.id);
+    if (existing) {
+      const propertiesMatch = Object.entries(input.appProperties)
+        .every(([key, value]) => existing.appProperties?.[key] === value);
+      if (existing.name !== input.name || existing.mimeType !== "application/vnd.google-apps.folder"
+          || existing.parents?.[0] !== input.parentId || existing.trashed || !propertiesMatch) {
+        throw new Error("Existing Drive folder does not match site registration");
+      }
+      return existing;
+    }
     const query = new URLSearchParams({ supportsAllDrives: "true", fields: "id,name,mimeType,parents,driveId,trashed,appProperties" });
     return this.send(`${API}/files?${query}`, {
       method: "POST",

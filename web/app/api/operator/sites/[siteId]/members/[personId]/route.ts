@@ -6,11 +6,10 @@ import { authenticateOperator } from "@/lib/operator-browser";
 import type { SiteRole } from "@/lib/site-membership";
 
 const bodySchema = z.object({
-  name: z.string().trim().min(1).max(100),
   jobTitle: z.string().trim().max(100),
   note: z.string().trim().max(1000),
   role: z.enum(["staff", "admin", "supervisor"]),
-});
+}).strict();
 
 export async function PATCH(request: Request, context: { params: Promise<{ siteId: string; personId: string }> }) {
   const identityId = await authenticateOperator(request);
@@ -45,7 +44,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ siteI
       }
     }
     await transaction.update(people).set({
-      name: parsed.data.name,
       jobTitle: parsed.data.jobTitle || null,
       note: parsed.data.note || null,
       role: nextRole,
@@ -81,7 +79,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ site
     await transaction.update(agreementRecords).set({ status: "revoked" }).where(and(
       eq(agreementRecords.personId, personId), eq(agreementRecords.kind, "staff_consent"), eq(agreementRecords.status, "active"),
     ));
-    await transaction.delete(operatorInvites).where(eq(operatorInvites.personId, personId));
+    await transaction.update(operatorInvites).set({ expiresAt: new Date() })
+      .where(eq(operatorInvites.personId, personId));
+    await transaction.delete(operatorMemberships).where(eq(operatorMemberships.personId, personId));
     return Response.json({ removed: true });
   });
 }

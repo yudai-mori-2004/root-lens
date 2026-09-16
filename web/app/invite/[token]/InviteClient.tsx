@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/shared/SiteHeader";
 import AgreementDocument from "@/components/operator/AgreementDocument";
 import styles from "../../manage/operator.module.css";
 
 type Invite = { personName: string; siteName: string };
 export default function InviteClient({ token, agreement }: { token: string; agreement: string }) {
+  const router = useRouter();
   const [invite, setInvite] = useState<Invite | null>(null);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -14,14 +16,21 @@ export default function InviteClient({ token, agreement }: { token: string; agre
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    fetch(`/api/operator/invites/${token}`).then(async (response) => response.ok ? setInvite(await response.json()) : setError((await response.json()).error));
+    fetch(`/api/operator/invites/${token}`).then(async (response) => {
+      const value = await response.json();
+      if (!response.ok) setError(value.error);
+      else if (value.accepted) setComplete(true);
+      else setInvite(value);
+    });
     fetch("/api/operator/me").then((response) => setAuthenticated(response.ok));
   }, [token]);
   async function accept() {
     setBusy(true); setError("");
     try {
-      const response = await fetch(`/api/operator/invites/${token}/accept`, { method: "POST" });
-      if (response.status === 401) return location.assign(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
+      const response = await fetch(`/api/operator/invites/${token}/accept`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agreed }),
+      });
+      if (response.status === 401) return router.push(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
       const value = await response.json();
       if (!response.ok) { setError(value.error); return; }
       setComplete(true);

@@ -6,6 +6,28 @@ function json(value: unknown, status = 200) {
 }
 
 describe("agreement files in the RootLens shared Drive", () => {
+  it("reuses a folder created before a registration retry", async () => {
+    const request = vi.fn().mockResolvedValue(json({
+      id: "site-folder", name: "Bakery", mimeType: "application/vnd.google-apps.folder",
+      parents: ["collection"], trashed: false,
+      appProperties: { rootlens_site_id: "site_test" },
+    }));
+    const drive = new GoogleDriveClient({ accessToken: "access" }, request);
+    const folder = await drive.createFolder({ id: "site-folder", name: "Bakery", parentId: "collection",
+      appProperties: { rootlens_site_id: "site_test" } });
+    expect(folder.id).toBe("site-folder");
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0][1].method).toBeUndefined();
+  });
+
+  it("does not copy a distributed installer twice on registration retry", async () => {
+    const request = vi.fn().mockResolvedValue(json({ files: [{ id: "copy", name: "RootLens-Import-1.0.0-macOS-arm64.dmg",
+      parents: ["site-folder"] }] }));
+    const drive = new GoogleDriveClient({ accessToken: "access" }, request);
+    await drive.copyFile("original", "RootLens-Import-1.0.0-macOS-arm64.dmg", "site-folder", "shared-drive");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("reuses the preallocated file after a webhook retry instead of creating a duplicate", async () => {
     const bytes = new TextEncoder().encode("signed pdf");
     const request = vi.fn()

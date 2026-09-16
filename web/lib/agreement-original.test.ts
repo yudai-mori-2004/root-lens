@@ -22,19 +22,21 @@ describe("agreement original", () => {
     }
   });
   it("renders the fixed agreement text and SMS acceptance record as a PDF", async () => {
-    const pdf = await createAgreementPdf({
+    const input = {
       agreementId: "agr_00000000-0000-4000-8000-000000000001",
-      kind: "staff_consent",
+      kind: "staff_consent" as const,
       siteId: "site_test",
       siteName: "テスト事業所",
       signer: { name: "山田 花子", phoneLast4: "1234", identityId: "identity_test" },
       acceptedAt: new Date("2026-09-14T05:32:10.000Z"),
       acceptedStatement: "上記内容を確認し、同意します",
-    });
+    };
+    const pdf = await createAgreementPdf(input);
     expect(Buffer.from(pdf.subarray(0, 5)).toString("ascii")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(10_000);
     expect(Buffer.from(pdf).toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(3);
     expect(sha256(pdf)).toMatch(/^[0-9a-f]{64}$/);
+    expect(sha256(await createAgreementPdf(input))).toBe(sha256(pdf));
     expect(agreementTemplates.staff_consent.sha256).toMatch(/^[0-9a-f]{64}$/);
     if (process.env.WRITE_AGREEMENT_SAMPLE) {
       await mkdir(dirname(process.env.WRITE_AGREEMENT_SAMPLE), { recursive: true });

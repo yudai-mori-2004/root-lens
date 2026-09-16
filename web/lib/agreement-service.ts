@@ -1,8 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
 import { agreementTemplates, type AgreementKind } from "@/content/agreementTemplates.generated";
-import { db } from "@/db/client";
-import { agreementRecords } from "@/db/schema";
 import { createAgreementPdf } from "./agreement-original";
 import { canonicalJson, sha256 } from "./encoding";
 import type { GoogleDriveClient } from "./google-drive";
@@ -26,11 +23,13 @@ type AgreementInput = Readonly<{
   signerName: string;
   phoneLast4: string;
   acceptedAt?: Date;
+  agreementId?: string;
+  driveFileId?: string;
 }>;
 
 export async function storeAgreementOriginal(input: AgreementInput) {
   const acceptedAt = input.acceptedAt ?? new Date();
-  const agreementId = `agr_${randomUUID()}`;
+  const agreementId = input.agreementId ?? `agr_${randomUUID()}`;
   const template = agreementTemplates[input.kind];
   const acceptancePayloadSha256 = sha256(canonicalJson({
     site_id: input.site.id,
@@ -53,7 +52,7 @@ export async function storeAgreementOriginal(input: AgreementInput) {
     acceptedAt,
     acceptedStatement: ACCEPTED_STATEMENT,
   });
-  const fileId = await input.drive.generateId();
+  const fileId = input.driveFileId ?? await input.drive.generateId();
   const folderId = input.kind === "site_agreement"
     ? input.site.siteAgreementsFolderId : input.site.staffConsentsFolderId;
   const baseName = input.kind === "site_agreement" ? "site-agreement" : "staff-consent";
@@ -90,16 +89,4 @@ export async function storeAgreementOriginal(input: AgreementInput) {
     storedAt: new Date(),
     status: "active",
   } as const;
-}
-
-export async function activateAgreement(record: Awaited<ReturnType<typeof storeAgreementOriginal>>) {
-  await db.transaction(async (transaction) => {
-    const scope = record.kind === "site_agreement"
-      ? and(eq(agreementRecords.siteId, record.siteId), eq(agreementRecords.kind, "site_agreement"))
-      : and(eq(agreementRecords.personId, record.personId!), eq(agreementRecords.kind, "staff_consent"));
-    await transaction.update(agreementRecords).set({ status: "superseded" }).where(and(
-      scope, eq(agreementRecords.status, "active"), ne(agreementRecords.id, record.id),
-    ));
-    await transaction.insert(agreementRecords).values(record);
-  });
 }
