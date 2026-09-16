@@ -59,6 +59,11 @@ td:first-child {
   margin-top: 6mm;
   margin-bottom: 2mm;
   font-size: 12pt;
+  break-after: avoid-page;
+}
+
+.variant-participant h2:nth-of-type(3) {
+  break-before: page;
 }
 
 .variant-participant p,
@@ -66,12 +71,6 @@ td:first-child {
   margin-bottom: 2.2mm;
   font-size: 10.5pt;
   line-height: 1.75;
-}
-
-.variant-participant h2:nth-of-type(4) {
-  margin-top: 0;
-  break-before: page;
-  page-break-before: always;
 }
 
 .variant-participant table {

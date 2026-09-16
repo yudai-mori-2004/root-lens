@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { agreementTemplates } from "@/content/agreementTemplates.generated";
 
-const heading = "\n## 第4条（同意の確認）\n";
+const heading = "\n## 同意の確認\n";
 const body = agreementTemplates.staff_consent.body;
 const headingIndex = body.indexOf(heading);
 if (headingIndex < 0) throw new Error("スタッフ同意書に「同意の確認」がありません。");

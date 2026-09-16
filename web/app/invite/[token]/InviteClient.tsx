@@ -45,7 +45,7 @@ export default function InviteClient({ token, agreement, confirmations }: { toke
       <AgreementDocument body={agreement} />
       {authenticated === true ? <>
         <fieldset className={styles.consentChecklist}>
-          <legend>第4条（同意の確認）</legend>
+          <legend>同意の確認</legend>
           {confirmations.map((statement, index) => <label className={styles.check} key={index}>
             <input type="checkbox" checked={checked[index]} onChange={(event) => setChecked((current) => current.map((value, item) => item === index ? event.target.checked : value))} />
             <span>{index + 1}　{statement}</span>

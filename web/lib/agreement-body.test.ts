@@ -30,7 +30,8 @@ describe("electronic agreement body", () => {
     expect(staffConsentConfirmations).toHaveLength(5);
     expect(staffConsentConfirmations[0]).toBe("作業中の動画（映像と音声）とIMUセンサーによるデータが記録されることに同意します。");
     expect(staffConsentConfirmations[4]).toContain("すべてを回収・削除できない場合があることを確認しました。");
-    expect(staffConsentDocument).not.toContain("第4条（同意の確認）");
+    expect(staffConsentDocument).toContain("## 同意記録");
+    expect(staffConsentDocument).not.toContain("## 同意の確認");
     expect(staffConsentAcceptance.safeParse({ confirmations: [true, true, true, true, true] }).success).toBe(true);
     expect(staffConsentAcceptance.safeParse({ confirmations: [true, true, false, true, true] }).success).toBe(false);
     expect(staffConsentAcceptance.safeParse({ confirmations: [true] }).success).toBe(false);
