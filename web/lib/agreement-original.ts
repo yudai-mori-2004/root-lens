@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import { agreementTemplates, type AgreementKind } from "@/content/agreementTemplates.generated";
+import { agreementBodyForSite } from "@/lib/agreement-body";
 
 export type AgreementSigner = Readonly<{
   name: string;
@@ -21,16 +22,6 @@ export type AgreementOriginalInput = Readonly<{
 
 function plainMarkdown(line: string): string {
   return line.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1");
-}
-
-function agreementBody(kind: AgreementKind, body: string, siteName: string): string {
-  const withSiteName = kind === "site_agreement"
-    ? body.replace("［　　　　　　　　　　　　　　］", `［${siteName}］`)
-    : body;
-  if (kind === "site_agreement") return withSiteName.split("\n---\n", 1)[0].trimEnd();
-  return withSiteName
-    .replace(/^- \[ \] /gm, "- ")
-    .replace(/\n\| 項目 \| 記入欄 \|\n\|---\|---\|\n(?:\|.*\|\n){4}/, "\n");
 }
 
 function japaneseDateTime(value: Date): string {
@@ -59,7 +50,11 @@ const LINE_HEIGHT = 18;
 const LINE_GAP = 1.18;
 
 function agreementLine(document: PDFKit.PDFDocument, text: string, options: PDFKit.Mixins.TextOptions = {}) {
-  document.fontSize(FONT_SIZE).fillColor("#000").text(text, {
+  document.fontSize(FONT_SIZE).fillColor("#000");
+  const width = document.page.width - document.page.margins.left - document.page.margins.right - (options.indent ?? 0);
+  const height = document.heightOfString(text, { width, lineGap: LINE_GAP });
+  if (document.y + height + 2 > document.page.height - document.page.margins.bottom) document.addPage();
+  document.text(text, {
     lineGap: LINE_GAP,
     ...options,
   });
@@ -81,7 +76,7 @@ export async function createAgreementPdf(input: AgreementOriginalInput): Promise
     document.on("error", reject);
   });
 
-  const body = agreementBody(input.kind, template.body, input.siteName);
+  const body = agreementBodyForSite(template.electronicBody, input.siteName);
   for (const rawLine of body.split("\n")) {
     const line = plainMarkdown(rawLine.trim());
     if (!line || line === "---") { document.y += LINE_HEIGHT; continue; }

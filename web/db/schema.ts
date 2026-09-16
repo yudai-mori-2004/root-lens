@@ -156,6 +156,8 @@ export const people = pgTable("people", {
   id: text("id").primaryKey(),
   siteId: text("site_id").notNull().references(() => sites.id),
   name: text("name").notNull(),
+  jobTitle: text("job_title"),
+  note: text("note"),
   role: text("role").notNull(),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

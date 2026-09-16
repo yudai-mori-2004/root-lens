@@ -12,12 +12,16 @@ export async function GET(request: Request, context: { params: Promise<{ siteId:
   const members = await db.select({
     id: people.id,
     name: people.name,
+    jobTitle: people.jobTitle,
+    note: people.note,
+    createdAt: people.createdAt,
     role: people.role,
     identityId: operatorMemberships.identityId,
     inviteId: operatorInvites.id,
     inviteAcceptedAt: operatorInvites.acceptedAt,
     consentId: agreementRecords.id,
     consentSignedAt: agreementRecords.signedAt,
+    phoneLast4: agreementRecords.phoneLast4,
   }).from(people)
     .leftJoin(operatorMemberships, eq(operatorMemberships.personId, people.id))
     .leftJoin(operatorInvites, eq(operatorInvites.personId, people.id))

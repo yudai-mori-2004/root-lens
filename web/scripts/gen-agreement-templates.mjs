@@ -21,13 +21,21 @@ function parse(source) {
   return { title, body: body.trim() + "\n" };
 }
 
+function electronicBody(kind, body) {
+  if (kind === "site_agreement") return body.split("\n---\n", 1)[0].trimEnd() + "\n";
+  return body.replace(/^- \[ \] /gm, "- ")
+    .replace(/\n\| 項目 \| 記入欄 \|\n\|---\|---\|\n(?:\|.*\|\n){4}/, "\n");
+}
+
 const templates = Object.fromEntries(Object.entries(definitions).map(([kind, relativePath]) => {
   const source = readFileSync(join(repoRoot, relativePath), "utf8");
   const parsed = parse(source);
+  const electronic = electronicBody(kind, parsed.body);
   return [kind, {
     ...parsed,
+    electronicBody: electronic,
     version: "2026-09-14",
-    sha256: createHash("sha256").update(parsed.body, "utf8").digest("hex"),
+    sha256: createHash("sha256").update(electronic, "utf8").digest("hex"),
   }];
 }));
 
