@@ -53,7 +53,15 @@ def run(command, *, environment=None, timeout=60, expected=0):
 
 def diagnostic(executable, name, arguments, output, environment):
     path = output / (name + ".log")
-    run([executable, "--diagnostic-output", path, *arguments], environment=environment, timeout=75)
+    # WebEngine's child process can outlive the launcher and keep inherited pipes open.
+    # Write console output to a file so waiting for pipe EOF cannot hang acceptance.
+    with (output / (name + "-console.log")).open("wb") as console:
+        result = subprocess.run(
+            [str(executable), "--diagnostic-output", str(path), *map(str, arguments)],
+            env=environment, timeout=75, stdout=console, stderr=subprocess.STDOUT,
+        )
+    if result.returncode:
+        raise RuntimeError(f"{name} returned {result.returncode}.")
     if not path.is_file() or not path.stat().st_size:
         raise RuntimeError(f"No diagnostic evidence for {name}.")
     content = path.read_text(encoding="utf-8")

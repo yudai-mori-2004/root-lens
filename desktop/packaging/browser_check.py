@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 import tempfile
 
 import shiboken6
@@ -16,7 +17,10 @@ def main(arguments=None):
     argparse.ArgumentParser(description=__doc__).parse_args(arguments)
     own_app = QApplication.instance() is None
     app = QApplication.instance() or QApplication([])
-    with tempfile.TemporaryDirectory(prefix="rootlens-browser-check-") as directory:
+    # Chromium may still hold its session-storage log when Qt closes on Windows.
+    with tempfile.TemporaryDirectory(
+        prefix="rootlens-browser-check-", ignore_cleanup_errors=sys.platform == "win32"
+    ) as directory:
         browser = RootLensBrowser("https://www.rootlens.io", Path(directory) / "browser")
         loop = QEventLoop()
         loaded = []
