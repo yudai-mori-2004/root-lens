@@ -179,6 +179,7 @@ class ImportWindow(QMainWindow):
         layout.addWidget(self.status_label)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
+        self.progress.setFormat("%v / %m 件")
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -495,6 +496,7 @@ class ImportWindow(QMainWindow):
         self.drive_synced = False
         self.completion_error = ""
         self.refresh_recordings(rescan=False)
+        self.progress.setRange(0, 0)
         self.progress.setVisible(True)
         self.status_label.setText("USB接続を確認しています…")
         self._update_controls()
@@ -531,6 +533,10 @@ class ImportWindow(QMainWindow):
     def _clip_progress(self, progress):
         selected = self.selected_recording()
         self.progress_states[progress.name] = progress
+        if progress.total and self.busy and self.job_kind == "import":
+            self.progress.setRange(0, progress.total)
+            complete = progress.state in ("ready", "drive_saved", "cleanup_pending", "error")
+            self.progress.setValue(progress.position if complete else progress.position - 1)
         if progress.path is not None and progress.state in ("ready", "error"):
             try:
                 record = read_recording(progress.path)

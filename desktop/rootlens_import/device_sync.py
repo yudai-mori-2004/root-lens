@@ -105,9 +105,9 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                   cleanup_pending=0, local_cleaned=0, local_cleanup_pending=0)
     sources = {}
 
-    def report(name, state, path=None, error=""):
+    def report(name, state, path=None, error="", position=0, total=0):
         if on_clip is not None:
-            on_clip(ClipProgress(name, path, state, error))
+            on_clip(ClipProgress(name, path, state, error, position, total))
 
     def read_drive(unit_ids):
         check_cancelled(cancel_event)
@@ -121,9 +121,10 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
     def fresh_recording(unit_id):
         return read_drive({unit_id}).get(unit_id)
 
-    def clean(name, unit_id, display_name):
-        report(display_name, "deleting")
-        log("Driveに保存済みの録画を確認し、スマートグラスから削除しています…")
+    def clean(name, unit_id, display_name, position=0, total=0):
+        report(display_name, "deleting", position=position, total=total)
+        prefix = f"録画 {position}/{total}：" if total else ""
+        log(prefix + "Driveに保存済みの録画を確認し、スマートグラスから削除しています…")
         try:
             if adb.run("get-serialno") != serial:
                 raise ImportFailure("接続したスマートグラスが変わりました。もう一度「接続」を押してください。")
@@ -132,8 +133,8 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             raise
         except (ImportFailure, OSError) as error:
             counts["cleanup_pending"] += 1
-            report(display_name, "cleanup_pending", error=str(error))
-            log("端末からの削除が終わっていません。次の接続でもう一度確認します。")
+            report(display_name, "cleanup_pending", error=str(error), position=position, total=total)
+            log(prefix + "端末からの削除が終わっていません。次の接続でもう一度確認します。")
         else:
             counts["cleaned"] += 1
             try:
@@ -142,7 +143,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
             except (ImportFailure, OSError) as error:
                 counts["local_cleanup_pending"] += 1
                 log(str(error))
-            report(display_name, "drive_saved")
+            report(display_name, "drive_saved", position=position, total=total)
 
     with import_lock(staging):
         recover_staging(staging)
@@ -183,13 +184,21 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                 report(item.original_name, "cleanup_pending", error=drive_error)
             else:
                 clean(item.name, item.unit_id, item.original_name)
-        for name, unit_id in complete.items():
+        total = len(complete)
+        for position, (name, unit_id) in enumerate(complete.items(), 1):
             check_cancelled(cancel_event)
             if unit_id in snapshots:
-                clean(name, unit_id, name)
+                log(f"録画 {position}/{total}：Drive保存済みの録画を確認しています…")
+                clean(name, unit_id, name, position, total)
                 continue
             try:
-                result = import_clip(adb, root, name, output, staging, site_id=site_id, log=log, on_clip=on_clip)
+                log(f"録画 {position}/{total} を確認しています…")
+                result = import_clip(
+                    adb, root, name, output, staging, site_id=site_id,
+                    log=lambda message: log(f"録画 {position}/{total}：{message}"),
+                    on_clip=lambda event: report(event.name, event.state, event.path, event.error,
+                                                 position, total),
+                )
                 if result in ("imported", "existing"):
                     if adb.metadata(root + "/" + name)["unit_id"] != unit_id:
                         raise ImportFailure("接続中に録画情報が変わりました。もう一度「接続」を押してください。")
@@ -199,7 +208,7 @@ def sync_recordings(output, *, drive_reader, log=print, cancel_event=None,
                 raise
             except (ImportFailure, OSError) as error:
                 counts["failed"] += 1
-                report(name, "error", error=str(error))
+                report(name, "error", error=str(error), position=position, total=total)
                 log(str(error))
         if not drive_error:
             local_ids = {path.name for path in output.iterdir()

@@ -104,6 +104,7 @@ class DeviceSyncTests(unittest.TestCase):
         self.reader.side_effect = read
         result = self.sync()
         self.assertEqual(result.imported, 1)
+        self.assertEqual((self.events[-1].position, self.events[-1].total), (1, 1))
         self.assertEqual(self.reader.call_count, 1)
         self.assertEqual(self.adb.hashed, [core.FILES])
         self.assertEqual(self.adb.pulled, list(core.FILES))

@@ -57,6 +57,8 @@ class ClipProgress:
     path: Optional[Path]
     state: Literal["discovering", "importing", "verifying", "ready", "drive_saved", "cleanup_pending", "local_cleanup_pending", "deleting", "incomplete", "error"]
     error: str = ""
+    position: int = 0
+    total: int = 0
 
 
 def check_cancelled(cancel_event):

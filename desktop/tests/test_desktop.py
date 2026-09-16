@@ -195,6 +195,18 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(pending.flags() & Qt.ItemFlag.ItemIsSelectable)
         self.assertEqual(len(self.window.records), 1)
 
+    def test_import_progress_shows_recording_count_instead_of_looping_animation(self):
+        self.window.set_profile(self.profile)
+        self.window.busy = True
+        self.window.job_kind = "import"
+        self.window._clip_progress(ClipProgress(device_name(), None, "importing", position=2, total=4))
+        self.assertEqual((self.window.progress.minimum(), self.window.progress.maximum(),
+                          self.window.progress.value()), (0, 4, 1))
+        self.window._clip_progress(ClipProgress(device_name(), None, "ready", position=2, total=4))
+        self.assertEqual(self.window.progress.value(), 2)
+        self.window.busy = False
+        self.window.job_kind = None
+
     def test_bulk_progress_is_batched_without_rescanning_local_files(self):
         self.populate(1)
         with patch.object(desktop, 'read_recording', wraps=desktop.read_recording) as scan:
