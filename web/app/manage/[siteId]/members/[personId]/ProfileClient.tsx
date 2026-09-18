@@ -42,7 +42,7 @@ export default function ProfileClient({ siteId, personId, initialData, embedded 
       try {
         const response = await fetch(`/api/operator/sites/${siteId}/members/${personId}`, {
           method: "PATCH", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: member.name, ...snapshot }),
+          body: JSON.stringify(snapshot),
         });
         if (response.status === 401) { router.push(`/login?next=/manage/${siteId}`); return false; }
         if (!response.ok) throw new Error((await response.json()).error ?? "保存できませんでした。");
