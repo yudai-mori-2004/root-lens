@@ -67,37 +67,49 @@
   background: var(--color-paper);
 }
 
+.processFooter {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  border-bottom: var(--rule-thin) solid var(--color-rule);
+}
+
 .processCaption {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
   font-family: var(--font-label);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
 
-.processButton {
-  min-width: 0;
-  padding: var(--space-sm) var(--space-xs);
-  border: 0;
-  border-bottom: var(--rule-thin) solid var(--color-rule);
-  background: transparent;
+.processNumber {
+  flex: none;
   color: var(--color-ink-muted);
-  text-align: left;
+}
+
+.processControls {
+  display: flex;
+  flex: none;
+}
+
+.processControls button {
+  width: 3rem;
+  border: 0;
+  border-left: var(--rule-thin) solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
   cursor: pointer;
 }
 
-.processButton:first-child {
-  padding-left: 0;
-}
-
-.processButton:hover {
-  color: var(--color-ink);
+.processControls button:hover {
   background: var(--color-surface-hover);
 }
 
-.processButtonActive {
-  color: var(--color-ink);
-  box-shadow: inset 0 calc(0px - var(--rule-heavy)) var(--color-ink);
+.processControls button:active {
+  background: var(--color-surface-pressed);
 }
 
 .illustrationStrip {
@@ -217,11 +229,7 @@
   }
 
   .processCaption {
+    gap: var(--space-xs);
     font-size: var(--text-xs);
   }
-
-  .processButton {
-    padding: var(--space-xs) var(--space-3xs);
-  }
-
 }

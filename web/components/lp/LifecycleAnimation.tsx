@@ -40,18 +40,27 @@ export default function LifecycleAnimation({ locale }: { locale: "ja" | "en" }) 
           />
         ))}
       </div>
-      <figcaption className={s.processCaption}>
-        {captions.map((caption, index) => (
+      <figcaption className={s.processFooter}>
+        <span className={s.processCaption} aria-live="polite">
+          <span className={s.processNumber}>0{stage + 1} / 03</span>
+          {captions[stage]}
+        </span>
+        <div className={s.processControls}>
           <button
-            className={`${s.processButton} ${index === stage ? s.processButtonActive : ""}`}
             type="button"
-            aria-pressed={index === stage}
-            onClick={() => setStage(index)}
-            key={caption}
+            aria-label={locale === "ja" ? "前の画像" : "Previous image"}
+            onClick={() => setStage((current) => (current + imageStages.length - 1) % imageStages.length)}
           >
-            {caption}
+            ←
           </button>
-        ))}
+          <button
+            type="button"
+            aria-label={locale === "ja" ? "次の画像" : "Next image"}
+            onClick={() => setStage((current) => (current + 1) % imageStages.length)}
+          >
+            →
+          </button>
+        </div>
       </figcaption>
     </figure>
   );
