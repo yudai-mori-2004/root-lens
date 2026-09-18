@@ -8,6 +8,7 @@ const CONTACT_EMAIL = "contact@rootlens.io";
 export const metadata: Metadata = {
   title: "RootLens – Contact",
   description: "Contact RootLens by email.",
+  alternates: { canonical: "/contact" },
 };
 
 export default async function ContactPage() {

@@ -6,6 +6,7 @@ import { getLegalDoc } from "../../content/legalDocs.generated";
 export const metadata: Metadata = {
   title: "Child Safety Standards",
   description: "RootLens child safety standards.",
+  alternates: { canonical: "/safety" },
 };
 
 export default async function SafetyPage() {

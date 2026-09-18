@@ -6,7 +6,11 @@ import { buildSamplePipelines, DRIVE_SAMPLES_URL } from "../../lib/samplePipelin
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("pages.sample.meta");
-  return { title: t("title"), description: t("description") };
+  return {
+    title: t("title"),
+    description: t("description"),
+    alternates: { canonical: "/sample" },
+  };
 }
 
 export default async function Page() {

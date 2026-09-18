@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl = "https://rootlens.io";
+const siteUrl = "https://www.rootlens.io";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

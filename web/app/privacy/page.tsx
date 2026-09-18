@@ -6,6 +6,7 @@ import { getLegalDoc } from "../../content/legalDocs.generated";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "How RootLens handles personal information.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default async function PrivacyPolicy() {

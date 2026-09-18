@@ -3,6 +3,6 @@
 Egocentric home-chore video for embodied-AI training data. iPhone capture app
 + REST API + Modal workers, with an FPV Labs / Stera-compatible handoff.
 
-- Site: https://rootlens.io
+- Site: https://www.rootlens.io
 - Repo: https://github.com/yudai-mori-2004/root-lens
 - Contact: contact@rootlens.io

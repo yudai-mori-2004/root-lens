@@ -6,6 +6,7 @@ import { getLegalDoc } from "../../content/legalDocs.generated";
 export const metadata: Metadata = {
   title: "Terms of Use",
   description: "Terms governing the use of RootLens.",
+  alternates: { canonical: "/terms" },
 };
 
 export default async function TermsOfUse() {

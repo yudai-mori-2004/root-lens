@@ -13,6 +13,19 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { absolute: copy.metaTitle },
     description: copy.metaDescription,
     alternates: { canonical: "/" },
+    openGraph: {
+      type: "website",
+      locale: locale === "ja" ? "ja_JP" : "en_US",
+      siteName: "RootLens",
+      url: "/",
+      title: copy.metaTitle,
+      description: copy.metaDescription,
+    },
+    twitter: {
+      card: "summary",
+      title: copy.metaTitle,
+      description: copy.metaDescription,
+    },
   };
 }
 

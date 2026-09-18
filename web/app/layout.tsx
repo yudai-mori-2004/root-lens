@@ -4,6 +4,10 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 
+const siteUrl = "https://www.rootlens.io";
+const siteName = "RootLens";
+const siteDescription = "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -38,14 +42,13 @@ const courierPrime = Courier_Prime({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://rootlens.io"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "フィジカルAI・ロボティクス向け現場作業データ | RootLens",
     template: "%s | RootLens",
   },
-  description: "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。",
-  applicationName: "RootLens",
-  alternates: { canonical: "/" },
+  description: siteDescription,
+  applicationName: siteName,
   robots: {
     index: true,
     follow: true,
@@ -63,16 +66,30 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getLocale();
-  const siteDescription = locale === "ja"
-    ? "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。"
+  const localizedSiteDescription = locale === "ja"
+    ? siteDescription
     : "RootLens records hands-on work from a first-person perspective in Japanese workplaces, then delivers the data for physical AI and robotics research after workplace consent and approval.";
   const structuredData = JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "RootLens",
-    description: siteDescription,
-    url: "https://rootlens.io/",
-    inLanguage: locale,
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: siteName,
+        url: `${siteUrl}/`,
+        email: "contact@rootlens.io",
+        sameAs: ["https://x.com/rootlens_sol"],
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        name: siteName,
+        url: `${siteUrl}/`,
+        description: localizedSiteDescription,
+        inLanguage: locale,
+        publisher: { "@id": `${siteUrl}/#organization` },
+      },
+    ],
   });
 
   return (
