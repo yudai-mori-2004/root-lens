@@ -1,0 +1,58 @@
+/* Hallmark · pre-emit critique: P5 H4 E5 S5 R5 V5 · genre: plain institutional editorial · design-system: design.md */
+.page {
+  width: min(760px, calc(100% - var(--page-gutter) - var(--page-gutter)));
+  margin: 0 auto;
+  padding: clamp(2rem, 6vw, 4.5rem) 0 var(--space-2xl);
+}
+
+.title {
+  margin-bottom: var(--space-md);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -.025em;
+}
+
+.lead { margin-bottom: var(--space-lg); color: var(--color-ink-muted); }
+
+.details { border-top: var(--rule-thin) solid var(--color-rule-strong); }
+.detail {
+  display: grid;
+  grid-template-columns: minmax(9rem, 32%) minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: var(--rule-thin) solid var(--color-rule);
+}
+.detail dt { color: var(--color-ink-muted); font-size: var(--text-sm); }
+.detail dd { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+.technical { font-family: var(--font-geist-mono, monospace); font-size: var(--text-sm); line-height: 1.7; }
+
+.actions { margin-top: var(--space-lg); }
+.actionLink,
+.linkList a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 52px;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-thin) solid var(--color-rule-strong);
+  color: var(--color-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.actionLink:hover,
+.linkList a:hover { background: var(--color-surface-hover); }
+.actionLink:active,
+.linkList a:active { background: var(--color-surface-pressed); }
+.actionLink span:last-child,
+.linkList a span:last-child { flex: none; font-size: 1.25em; font-weight: 400; }
+.note { margin-top: var(--space-xs); color: var(--color-ink-muted); font-size: var(--text-sm); }
+.linkList { margin-top: var(--space-lg); list-style: none; }
+.linkList li + li { margin-top: -.0625rem; }
+.linkList a { font-family: var(--font-geist-mono, monospace); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+
+@media (max-width: 520px) {
+  .detail { display: block; }
+  .detail dt { margin-bottom: var(--space-3xs); }
+}

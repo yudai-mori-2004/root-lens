@@ -3,25 +3,36 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agreementRecords, consentSnapshots, evidenceBundles } from "@/db/schema";
+import styles from "./verify.module.css";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const pageStyle = { maxWidth: "52rem", margin: "0 auto", padding: "clamp(2.5rem, 8vw, 6rem) 1.25rem", color: "#111" };
-const hashStyle = { overflowWrap: "anywhere" as const, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" };
+function Detail({ label, value, technical = false }: { label: string; value: React.ReactNode; technical?: boolean }) {
+  return <div className={styles.detail}><dt>{label}</dt><dd className={technical ? styles.technical : undefined}>{value}</dd></div>;
+}
+
+function OriginalLink({ fileId }: { fileId: string }) {
+  return <a className={styles.actionLink} href={`https://drive.google.com/open?id=${encodeURIComponent(fileId)}`}>
+    <span>同意記録の原本を開く</span><span aria-hidden="true">↗</span>
+  </a>;
+}
 
 function AgreementView({ record }: { record: typeof agreementRecords.$inferSelect }) {
   return (
-    <main style={pageStyle}>
-      <h1>同意記録</h1>
-      <p>状態：{record.status}</p>
-      <p>文書：{record.kind === "site_agreement" ? "現場合意書" : "撮影参加に関する同意書"}</p>
-      <p>文書版：{record.documentVersion}</p>
-      <p>同意日時：{record.signedAt?.toISOString() ?? "未完了"}</p>
-      <p>本人確認：{record.authenticationMethod === "sms_otp" ? "SMSワンタイムパスワード" : record.authenticationMethod}</p>
-      <p style={hashStyle}>同意記録PDF SHA-256：{record.signedPdfSha256 ?? "未確定"}</p>
-      {record.signedPdfFileId ? (
-        <p><a href={`https://drive.google.com/open?id=${encodeURIComponent(record.signedPdfFileId)}`}>権限のあるGoogleアカウントで原本を開く</a></p>
-      ) : null}
+    <main className={styles.page}>
+      <h1 className={styles.title}>同意記録</h1>
+      <dl className={styles.details}>
+        <Detail label="状態" value={record.status} />
+        <Detail label="文書" value={record.kind === "site_agreement" ? "現場合意書" : "撮影参加に関する同意書"} />
+        <Detail label="文書版" value={record.documentVersion} />
+        <Detail label="同意日時" value={record.signedAt?.toISOString() ?? "未完了"} />
+        <Detail label="本人確認" value={record.authenticationMethod === "sms_otp" ? "SMSワンタイムパスワード" : record.authenticationMethod} />
+        <Detail label="同意記録PDF SHA-256" value={record.signedPdfSha256 ?? "未確定"} technical />
+      </dl>
+      {record.signedPdfFileId ? <div className={styles.actions}>
+        <OriginalLink fileId={record.signedPdfFileId} />
+        <p className={styles.note}>原本の表示には、権限のあるGoogleアカウントが必要です。</p>
+      </div> : null}
     </main>
   );
 }
@@ -29,12 +40,12 @@ function AgreementView({ record }: { record: typeof agreementRecords.$inferSelec
 function SnapshotView({ snapshot }: { snapshot: typeof consentSnapshots.$inferSelect }) {
   const records = Array.isArray(snapshot.records) ? snapshot.records as Array<{ record_id?: unknown }> : [];
   return (
-    <main style={pageStyle}>
-      <h1>同意記録のスナップショット</h1>
-      <p>承認時点で、この事業所に適用されていた記録の集合です。</p>
-      <p style={hashStyle}>SHA-256：{snapshot.snapshotSha256}</p>
-      <ul>{records.map((record) => typeof record.record_id === "string" ? (
-        <li key={record.record_id}><Link href={`/verify/${encodeURIComponent(record.record_id)}`}>{record.record_id}</Link></li>
+    <main className={styles.page}>
+      <h1 className={styles.title}>同意記録のスナップショット</h1>
+      <p className={styles.lead}>承認時点で、この事業所に適用されていた記録の集合です。</p>
+      <dl className={styles.details}><Detail label="SHA-256" value={snapshot.snapshotSha256} technical /></dl>
+      <ul className={styles.linkList}>{records.map((record) => typeof record.record_id === "string" ? (
+        <li key={record.record_id}><Link href={`/verify/${encodeURIComponent(record.record_id)}`}><span>{record.record_id}</span><span aria-hidden="true">→</span></Link></li>
       ) : null)}</ul>
     </main>
   );
@@ -42,13 +53,15 @@ function SnapshotView({ snapshot }: { snapshot: typeof consentSnapshots.$inferSe
 
 function EvidenceView({ row }: { row: typeof evidenceBundles.$inferSelect }) {
   return (
-    <main style={pageStyle}>
-      <h1>RootLensデータ証跡</h1>
-      <p>RootLensの保存記録と照合済みです。</p>
-      <p>撮影単位：{row.unitId}</p>
-      <p>発行日時：{row.issuedAt.toISOString()}</p>
-      <p style={hashStyle}>証跡payload SHA-256：{row.payloadSha256}</p>
-      <p style={hashStyle}>承認対象ファイル一式 SHA-256：{row.filesSha256}</p>
+    <main className={styles.page}>
+      <h1 className={styles.title}>RootLensデータ証跡</h1>
+      <p className={styles.lead}>RootLensの保存記録と照合済みです。</p>
+      <dl className={styles.details}>
+        <Detail label="撮影単位" value={row.unitId} />
+        <Detail label="発行日時" value={row.issuedAt.toISOString()} />
+        <Detail label="証跡payload SHA-256" value={row.payloadSha256} technical />
+        <Detail label="承認対象ファイル一式 SHA-256" value={row.filesSha256} technical />
+      </dl>
     </main>
   );
 }
