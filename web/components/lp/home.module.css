@@ -139,7 +139,8 @@
 }
 
 .overviewContent {
-  max-width: var(--content-max);
+  max-width: 52rem;
+  margin-inline: auto;
 }
 
 .overviewBlock + .overviewBlock {
