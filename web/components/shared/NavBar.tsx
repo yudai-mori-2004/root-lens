@@ -41,6 +41,13 @@ export default function NavBar({
           />
         </Link>
         <div className={s.navSpacer} />
+        <div className={s.navPrimary}>
+          {items.slice(0, 2).map((item) => (
+            <Link href={item.href} className={s.navPrimaryLink} key={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
         <div className={s.navLocale} aria-label={locale === "ja" ? "表示言語" : "Display language"}>
           <button
             type="button"
