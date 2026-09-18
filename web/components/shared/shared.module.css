@@ -135,21 +135,28 @@
 
 .navMenuSecondary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--page-gutter);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .navMenuSecondaryLink {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: var(--space-xs) var(--page-gutter);
+  border-top: var(--rule-thin) solid var(--color-rule);
   font-size: var(--text-xs);
   line-height: 1.4;
   color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.navMenuSecondaryLink:nth-child(odd) {
+  border-right: var(--rule-thin) solid var(--color-rule);
 }
 
 .navMenuSecondaryLink:hover {
+  background: var(--color-surface-hover);
   color: var(--color-ink);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
 
 .navLogo:active,
@@ -206,6 +213,14 @@
 }
 
 @media (max-width: 520px) {
+  .navMenuSecondary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .navMenuSecondaryLink:nth-child(odd) {
+    border-right: 0;
+  }
+
   .navInner {
     min-height: 3.4rem;
   }
