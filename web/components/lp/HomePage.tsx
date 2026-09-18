@@ -39,14 +39,11 @@ export default async function HomePage() {
       </section>
 
       <nav className={s.entryGrid} aria-label={locale === "ja" ? "案内" : "Explore"}>
-        {pageCopy.entries.slice(0, 2).map(([title, href]) => (
-          <a className={s.entry} href={href} key={href}>
-            <span>{title}</span>
+        {pageCopy.entries.map(([title, href], index) => (
+          <a className={index === 2 ? s.entrySecondary : s.entry} href={href} key={href}>
+            {title}
           </a>
         ))}
-        <a className={s.entrySecondary} href={pageCopy.entries[2][1]}>
-          {pageCopy.entries[2][0]}
-        </a>
       </nav>
     </main>
   );
