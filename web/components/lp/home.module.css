@@ -18,11 +18,16 @@
   padding: var(--space-lg) var(--content-gutter);
 }
 
+.introTitle {
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-xl);
+}
+
 .introBody {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   border-top: var(--rule-thin) solid var(--color-rule-strong);
   font-size: var(--public-body-size);
   line-height: 1.7;
@@ -30,13 +35,13 @@
 }
 
 .introBody p {
-  max-width: 48rem;
+  max-width: 39rem;
 }
 
 .introTitle h1 {
   min-width: 0;
   max-width: 22ch;
-  font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+  font-size: clamp(2rem, 3vw, 3rem);
   font-weight: 600;
   line-height: 1.18;
   letter-spacing: -0.035em;
@@ -48,83 +53,52 @@
 }
 
 .workplaceFigure {
-  padding: 0 var(--content-gutter) var(--space-lg);
-}
-
-.workplaceFigure:focus-visible {
-  outline: var(--rule-heavy) solid var(--color-focus);
-  outline-offset: calc(var(--rule-heavy) * -1);
+  width: min(52rem, calc(100% - var(--content-gutter) - var(--content-gutter)));
+  margin-left: var(--content-gutter);
+  padding-bottom: var(--space-xl);
 }
 
 .illustrationCluster {
-  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
-  max-width: var(--content-max);
   aspect-ratio: 3 / 1;
-  margin: 0 auto;
   overflow: hidden;
   border: var(--rule-thin) solid var(--color-rule-strong);
   background: var(--color-paper);
 }
 
+.illustrationPanel {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.illustrationPanel + .illustrationPanel {
+  border-left: var(--rule-thin) solid var(--color-rule-strong);
+}
+
 .processCaption {
-  width: 100%;
-  max-width: var(--content-max);
-  min-height: 1.7em;
-  margin: 0 auto;
-  font-family: var(--font-typewriter-ja), "Courier New", monospace;
-  font-size: var(--public-body-size);
-  font-weight: 400;
-  line-height: 1.7;
-  letter-spacing: 0.035em;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
   padding-top: var(--space-sm);
-}
-
-:global(html[lang="en"]) .processCaption {
-  font-family: var(--font-typewriter-en), "Courier New", monospace;
-}
-
-.processCaption :global(.Typewriter__cursor) {
-  font-weight: 400;
+  font-family: var(--font-label);
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .illustrationStrip {
   object-fit: cover;
-  opacity: 0;
-  transition: opacity 180ms linear;
+  filter: saturate(0.82);
 }
 
-.illustrationStripActive {
-  opacity: 1;
-}
-
-.illustrationDividerLeft,
-.illustrationDividerRight {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 2;
-  width: var(--rule-thin);
-  background: var(--color-rule-strong);
-  pointer-events: none;
-}
-
-.illustrationDividerLeft {
-  left: 33.333%;
-}
-
-.illustrationDividerRight {
-  left: 66.666%;
+.illustrationPanel:last-child .illustrationStrip {
+  object-position: 88% center;
 }
 
 .introTitleLine {
   display: block;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .illustrationStrip {
-    transition: none;
-  }
 }
 
 .overview {
@@ -137,7 +111,7 @@
 }
 
 .overviewBlock + .overviewBlock {
-  margin-top: var(--space-lg);
+  margin-top: var(--space-xl);
 }
 
 .overviewBlock h2 {
@@ -147,7 +121,7 @@
 }
 
 .overviewText {
-  max-width: 48rem;
+  max-width: 42rem;
   margin-top: var(--space-sm);
   display: grid;
   gap: var(--space-sm);
@@ -223,7 +197,12 @@
   }
 
   .illustrationCluster {
-    padding: var(--space-sm) 0;
+    aspect-ratio: 3 / 1.25;
+  }
+
+  .processCaption {
+    gap: var(--space-xs);
+    font-size: var(--text-xs);
   }
 
 }
