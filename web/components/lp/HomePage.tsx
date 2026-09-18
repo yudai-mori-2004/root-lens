@@ -40,18 +40,14 @@ export default async function HomePage() {
 
       <nav className={s.entrySection} aria-label={locale === "ja" ? "案内" : "Explore"}>
         <div className={s.entryInner}>
-          <p className={s.entryLabel}>{locale === "ja" ? "案内" : "Explore"}</p>
           <div className={s.entryList}>
-            {pageCopy.entries.slice(0, 2).map(([title, href]) => (
-              <a className={s.entry} href={href} key={href}>
+            {pageCopy.entries.map(([title, href], index) => (
+              <a className={index === 2 ? s.entrySecondary : s.entry} href={href} key={href}>
                 <span>{title}</span>
-                <span aria-hidden="true">↗</span>
+                <span aria-hidden="true">→</span>
               </a>
             ))}
           </div>
-          <a className={s.entrySecondary} href={pageCopy.entries[2][1]}>
-            {pageCopy.entries[2][0]} <span aria-hidden="true">↗</span>
-          </a>
         </div>
       </nav>
     </main>
