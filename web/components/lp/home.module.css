@@ -54,7 +54,7 @@
 
 .workplaceFigure {
   width: min(52rem, calc(100% - var(--content-gutter) - var(--content-gutter)));
-  margin-left: var(--content-gutter);
+  margin-inline: auto;
   padding-bottom: var(--space-xl);
 }
 
