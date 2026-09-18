@@ -1,5 +1,15 @@
 /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · genre: plain institutional editorial · macrostructure: studied disclosure + compact colophon · theme: studied-DNA (source: materialcultures.org) · contrast: pass (40–41) · nav: studied disclosure · footer: Ft4 · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
 
+.siteLayout {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.siteLayout > main {
+  flex: 1;
+}
+
 .nav {
   position: relative;
   z-index: 100;

@@ -45,6 +45,7 @@
 }
 
 .document h3 {
+  max-width: calc(var(--content-gutter) + 48rem);
   padding: var(--space-md) var(--content-gutter) 0;
   font-size: var(--public-body-size);
   font-weight: 700;
@@ -54,6 +55,7 @@
 .document p,
 .document ul,
 .document ol {
+  max-width: calc(var(--content-gutter) + 48rem);
   padding-right: var(--content-gutter);
   padding-left: var(--content-gutter);
   font-size: var(--public-body-size);

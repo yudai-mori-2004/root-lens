@@ -135,7 +135,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  padding: var(--space-sm) var(--content-gutter);
+  padding: var(--space-sm) max(var(--content-gutter), calc(100vw - var(--content-gutter) - 48rem)) var(--space-sm) var(--content-gutter);
   list-style: none;
   cursor: pointer;
   font-size: var(--public-section-size);
