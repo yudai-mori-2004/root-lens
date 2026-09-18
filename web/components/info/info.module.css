@@ -29,13 +29,28 @@
   line-height: 1.7;
 }
 
+.contactPage {
+  width: 100%;
+  max-width: 40rem;
+  margin-inline: auto;
+  padding: clamp(3.5rem, 8vw, 6rem) var(--page-gutter);
+}
+
+.contactPage h1 {
+  font-size: clamp(1.5rem, 2.6vw, 2.15rem);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
 .contactEmail {
   display: inline-block;
-  margin-top: var(--space-md);
+  margin-top: var(--space-lg);
   color: var(--color-ink);
   font-family: var(--font-lp-mono, monospace);
   font-size: var(--public-body-size);
   line-height: 1.7;
+  text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 

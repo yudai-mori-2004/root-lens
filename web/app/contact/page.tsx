@@ -6,7 +6,7 @@ import { infoStyles as s } from "../../components/info/PageFrame";
 const CONTACT_EMAIL = "contact@rootlens.io";
 
 export const metadata: Metadata = {
-  title: "RootLens – Contact",
+  title: "お問い合わせ",
   description: "Contact RootLens by email.",
   alternates: { canonical: "/contact" },
 };
@@ -16,14 +16,11 @@ export default async function ContactPage() {
 
   return (
     <SiteLayout>
-      <main className={s.accordionPage}>
-        <header className={s.contributeOverview}>
-          <h1>{t("title")}</h1>
-          <p>{t("lead")}</p>
-          <a className={s.contactEmail} href={`mailto:${CONTACT_EMAIL}`}>
-            {CONTACT_EMAIL}
-          </a>
-        </header>
+      <main className={s.contactPage}>
+        <h1>{t("title")}</h1>
+        <a className={s.contactEmail} href={`mailto:${CONTACT_EMAIL}`}>
+          {CONTACT_EMAIL}
+        </a>
       </main>
     </SiteLayout>
   );
