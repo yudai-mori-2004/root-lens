@@ -117,6 +117,7 @@
 }
 
 .accordionList {
+  --accordion-gutter: max(var(--page-gutter), calc((100% - 48rem) / 2));
   border-top: var(--rule-thin) solid var(--color-rule-strong);
   border-bottom: var(--rule-thin) solid var(--color-rule-strong);
 }
@@ -135,7 +136,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  padding: var(--space-sm) max(var(--content-gutter), calc(100vw - var(--content-gutter) - 48rem)) var(--space-sm) var(--content-gutter);
+  padding: var(--space-sm) var(--accordion-gutter);
   list-style: none;
   cursor: pointer;
   font-size: var(--public-section-size);
@@ -177,7 +178,7 @@
 }
 
 .accordionBody {
-  padding: var(--space-sm) var(--content-gutter) var(--space-lg);
+  padding: var(--space-sm) var(--accordion-gutter) var(--space-lg);
 }
 
 .accordionBody > p {
