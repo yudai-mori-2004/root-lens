@@ -11,8 +11,8 @@ export const publicPages = {
       metaDescription: "RootLensは、日本の現場で働く人の手作業を一人称視点で記録し、現場の同意と承認を経たデータとして、フィジカルAI・ロボティクスの研究開発に届けます。",
       title: ["現場の手作業を撮影し、", "ロボット開発に活かし、", "現場に収益を還す。"],
       intro: [
-        "RootLensは、日本を拠点に、あらゆる業種の現場とフィジカルAI業界をつなぐプロジェクトです。",
-        "現場の手作業データを、ロボティクス分野の研究開発に活かせる形で収集し、得られた利益を現場に還元します。",
+        "RootLensは、日本の現場で一人称視点の作業映像と動作データを収集し、フィジカルAI・ロボティクスの研究開発に提供します。",
+        "撮影は現場との合意と参加するスタッフの同意のもとで行い、販売先に採用されたデータに応じて現場へ撮影協力費を支払います。",
       ],
       backgroundTitle: "背景",
       background: [
@@ -178,8 +178,8 @@ export const publicPages = {
       metaDescription: "RootLens records hands-on work from a first-person perspective in Japanese workplaces, then delivers the data for physical AI and robotics research after workplace consent and approval.",
       title: ["We record hands-on work,", "put it to use in robotics development,", "and return revenue to workplaces."],
       intro: [
-        "RootLens is a Japan-based project connecting workplaces across industries with the physical AI sector.",
-        "We collect hands-on work data in a form that can support robotics research and development, then return the resulting revenue to the workplaces.",
+        "RootLens collects first-person video of hands-on work and motion data in Japanese workplaces for physical AI and robotics research and development.",
+        "Recording takes place with the workplace's agreement and participating staff's consent. We pay the workplace a filming fee based on the data accepted by a buyer.",
       ],
       backgroundTitle: "Background",
       background: [
