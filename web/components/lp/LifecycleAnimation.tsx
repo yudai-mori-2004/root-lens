@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 import s from "./home.module.css";
 
 const imageStages = [
@@ -19,24 +22,36 @@ export default function LifecycleAnimation({ locale }: { locale: "ja" | "en" }) 
         "Use the data to develop robots.",
         "Return revenue to workplaces.",
       ];
+  const [stage, setStage] = useState(0);
+
   return (
     <figure className={s.workplaceFigure}>
       <div className={s.illustrationCluster}>
         {imageStages.map((src, index) => (
-          <div className={s.illustrationPanel} key={src}>
-            <Image
-              className={s.illustrationStrip}
-              src={src}
-              alt=""
-              fill
-              sizes="(max-width: 832px) 33vw, 18rem"
-              loading={index === 0 ? "eager" : "lazy"}
-            />
-          </div>
+          <Image
+            className={`${s.illustrationStrip} ${index === stage ? s.illustrationStripActive : ""}`}
+            src={src}
+            alt=""
+            fill
+            sizes="(max-width: 832px) 100vw, 52rem"
+            loading={index === 0 ? "eager" : "lazy"}
+            aria-hidden={index !== stage}
+            key={src}
+          />
         ))}
       </div>
       <figcaption className={s.processCaption}>
-        {captions.map((caption) => <span key={caption}>{caption}</span>)}
+        {captions.map((caption, index) => (
+          <button
+            className={`${s.processButton} ${index === stage ? s.processButtonActive : ""}`}
+            type="button"
+            aria-pressed={index === stage}
+            onClick={() => setStage(index)}
+            key={caption}
+          >
+            {caption}
+          </button>
+        ))}
       </figcaption>
     </figure>
   );

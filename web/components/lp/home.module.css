@@ -59,8 +59,7 @@
 }
 
 .illustrationCluster {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  position: relative;
   width: 100%;
   aspect-ratio: 3 / 1;
   overflow: hidden;
@@ -68,33 +67,54 @@
   background: var(--color-paper);
 }
 
-.illustrationPanel {
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.illustrationPanel + .illustrationPanel {
-  border-left: var(--rule-thin) solid var(--color-rule-strong);
-}
-
 .processCaption {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-sm);
-  padding-top: var(--space-sm);
   font-family: var(--font-label);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
 
+.processButton {
+  min-width: 0;
+  padding: var(--space-sm) var(--space-xs);
+  border: 0;
+  border-bottom: var(--rule-thin) solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.processButton:first-child {
+  padding-left: 0;
+}
+
+.processButton:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-hover);
+}
+
+.processButtonActive {
+  color: var(--color-ink);
+  box-shadow: inset 0 calc(0px - var(--rule-heavy)) var(--color-ink);
+}
+
 .illustrationStrip {
-  object-fit: cover;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 180ms linear;
   filter: saturate(0.82);
 }
 
-.illustrationPanel:last-child .illustrationStrip {
-  object-position: 88% center;
+.illustrationStripActive {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illustrationStrip {
+    transition: none;
+  }
 }
 
 .introTitleLine {
@@ -196,13 +216,12 @@
     margin-top: var(--space-sm);
   }
 
-  .illustrationCluster {
-    aspect-ratio: 3 / 1.25;
+  .processCaption {
+    font-size: var(--text-xs);
   }
 
-  .processCaption {
-    gap: var(--space-xs);
-    font-size: var(--text-xs);
+  .processButton {
+    padding: var(--space-xs) var(--space-3xs);
   }
 
 }
