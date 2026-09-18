@@ -107,7 +107,7 @@ export const publicPages = {
       ],
     },
     buy: {
-      label: "研究開発・データ調達の方",
+      label: "研究開発・データ調達のご担当者へ",
       title: "実際の現場で収集した、一人称視点データ。",
       overviewTitle: "概要",
       overview: [
